@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Kharcha" />
+  <meta name="theme-color" content="#0f0f0f" />
+  <title>Kharcha — Family Expense Tracker</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --surface2: #1c1c1c;
+      --border: #2a2a2a;
+      --accent: #d4f57a;
+      --accent2: #7affd4;
+      --text: #f0f0f0;
+      --muted: #666;
+      --danger: #ff6b6b;
+      --success: #7affd4;
+      --radius: 16px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      overflow-x: hidden;
+    }
+
+    body {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    .app {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+      padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+    }
+
+    /* Header */
+    header {
+      padding: 24px 24px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .logo-text {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--accent);
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.05em;
+    }
+
+    .header-date {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    /* Main card */
+    main {
+      flex: 1;
+      padding: 20px 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .hint-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      line-height: 1.6;
+      transition: opacity 0.3s;
+    }
+
+    .hint-card span {
+      color: var(--accent);
+    }
+
+    .hint-card.hidden {
+      display: none;
+    }
+
+    /* Textarea */
+    .input-area {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.2s;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .input-area:focus-within {
+      border-color: var(--accent);
+    }
+
+    .input-label {
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      padding: 12px 16px 4px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    textarea {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.5;
+      padding: 8px 16px 16px;
+      resize: none;
+      flex: 1;
+      min-height: 120px;
+      caret-color: var(--accent);
+    }
+
+    textarea::placeholder {
+      color: #333;
+      font-weight: 400;
+    }
+
+    /* Tags section */
+    .tags-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .tags-label {
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tags-label::after {
+      content: 'optional';
+      font-size: 9px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 1px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+    }
+
+    .tags-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag-pill {
+      padding: 7px 14px;
+      border-radius: 100px;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .tag-pill:active { transform: scale(0.95); }
+
+    .tag-pill.active {
+      border-color: var(--accent);
+      color: var(--bg);
+      background: var(--accent);
+    }
+
+    .tag-pill .tag-emoji { font-size: 14px; }
+
+    /* Custom tag input */
+    .custom-tag-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .custom-tag-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 100px;
+      padding: 7px 14px;
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .custom-tag-input::placeholder { color: #333; font-weight: 400; }
+    .custom-tag-input:focus { border-color: var(--accent2); }
+
+    /* Submit button */
+    .submit-btn {
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: var(--radius);
+      padding: 18px;
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      width: 100%;
+      letter-spacing: 0.02em;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .submit-btn:active { transform: scale(0.98); }
+    .submit-btn:disabled {
+      background: var(--surface2);
+      color: var(--muted);
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .submit-btn .btn-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: opacity 0.2s;
+    }
+
+    /* Loading state */
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid rgba(10,10,10,0.3);
+      border-top-color: var(--bg);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .submit-btn.loading .spinner { display: block; }
+    .submit-btn.loading .btn-text { display: none; }
+
+    /* Result overlay */
+    .result-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .result-overlay.show {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 380px;
+      transform: translateY(20px);
+      transition: transform 0.3s;
+    }
+
+    .result-overlay.show .result-card {
+      transform: translateY(0);
+    }
+
+    .result-icon {
+      font-size: 40px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+
+    .result-title {
+      font-size: 20px;
+      font-weight: 800;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .result-title.success { color: var(--success); }
+    .result-title.error { color: var(--danger); }
+
+    .parsed-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .parsed-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--surface2);
+      border-radius: 10px;
+    }
+
+    .parsed-key {
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 2px;
+    }
+
+    .parsed-val {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .parsed-val.amount {
+      color: var(--accent);
+      font-size: 16px;
+    }
+
+    .result-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-secondary {
+      flex: 1;
+      padding: 14px;
+      border: 1.5px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      border-radius: 12px;
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn-secondary:active { transform: scale(0.97); background: var(--surface2); }
+
+    .btn-primary-sm {
+      flex: 1;
+      padding: 14px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 12px;
+      font-family: 'Syne', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn-primary-sm:active { transform: scale(0.97); }
+
+    /* Config modal */
+    .config-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .config-btn:active { background: var(--surface2); }
+
+    .config-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(12px);
+      display: flex;
+      align-items: flex-end;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .config-overlay.show {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .config-sheet {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px 24px 0 0;
+      padding: 28px 24px;
+      width: 100%;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    .config-overlay.show .config-sheet { transform: translateY(0); }
+
+    .config-title {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .config-field {
+      margin-bottom: 16px;
+    }
+
+    .config-field label {
+      display: block;
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 8px;
+    }
+
+    .config-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .config-input:focus { border-color: var(--accent); }
+
+    .save-config-btn {
+      width: 100%;
+      margin-top: 8px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 12px;
+      padding: 16px;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Char count */
+    .char-count {
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      text-align: right;
+      padding: 0 4px;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 20px;
+      border-radius: 100px;
+      font-size: 13px;
+      font-weight: 600;
+      opacity: 0;
+      transition: all 0.3s;
+      white-space: nowrap;
+      z-index: 300;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 0 -20px;
+    }
+
+    /* Error msg */
+    .error-msg {
+      font-size: 13px;
+      color: var(--danger);
+      text-align: center;
+      padding: 8px;
+    }
+
+    /* Animations */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .app > * { animation: fadeUp 0.4s ease both; }
+    header { animation-delay: 0s; }
+    main > * { animation: fadeUp 0.4s ease both; }
+    main > *:nth-child(1) { animation-delay: 0.05s; }
+    main > *:nth-child(2) { animation-delay: 0.1s; }
+    main > *:nth-child(3) { animation-delay: 0.15s; }
+    main > *:nth-child(4) { animation-delay: 0.2s; }
+    main > *:nth-child(5) { animation-delay: 0.25s; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="logo">
+        <span class="logo-text">Kharcha</span>
+        <span class="logo-sub">/ family log</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="header-date" id="headerDate"></div>
+        <button class="config-btn" onclick="openConfig()" title="Settings">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <div class="hint-card" id="hintCard">
+        Just type naturally — <span>"milk 60 dmart"</span> or <span>"electricity bill 1200"</span> or <span>"shoes for Rahul 850 Bata, birthday"</span>
+      </div>
+
+      <div class="input-area">
+        <div class="input-label">What did you spend on?</div>
+        <textarea
+          id="expenseInput"
+          placeholder="e.g. vegetables 120 at Big Bazaar&#10;or just: medicines 230"
+          maxlength="500"
+          autofocus
+          oninput="onType()"
+        ></textarea>
+        <div class="char-count" id="charCount">500</div>
+      </div>
+
+      <div class="tags-section">
+        <div class="tags-label">Tag this expense</div>
+        <div class="tags-grid" id="tagsGrid">
+          <div class="tag-pill" data-tag="Groceries" onclick="toggleTag(this)">
+            <span class="tag-emoji">🛒</span> Groceries
+          </div>
+          <div class="tag-pill" data-tag="Food & Dining" onclick="toggleTag(this)">
+            <span class="tag-emoji">🍽️</span> Food
+          </div>
+          <div class="tag-pill" data-tag="Transport" onclick="toggleTag(this)">
+            <span class="tag-emoji">🚗</span> Transport
+          </div>
+          <div class="tag-pill" data-tag="Bills & Utilities" onclick="toggleTag(this)">
+            <span class="tag-emoji">⚡</span> Bills
+          </div>
+          <div class="tag-pill" data-tag="Health" onclick="toggleTag(this)">
+            <span class="tag-emoji">💊</span> Health
+          </div>
+          <div class="tag-pill" data-tag="Shopping" onclick="toggleTag(this)">
+            <span class="tag-emoji">🛍️</span> Shopping
+          </div>
+          <div class="tag-pill" data-tag="Education" onclick="toggleTag(this)">
+            <span class="tag-emoji">📚</span> Education
+          </div>
+          <div class="tag-pill" data-tag="Entertainment" onclick="toggleTag(this)">
+            <span class="tag-emoji">🎬</span> Fun
+          </div>
+        </div>
+        <div class="custom-tag-wrap">
+          <input
+            class="custom-tag-input"
+            id="customTag"
+            placeholder="+ custom tag (e.g. Wedding, Trip)"
+            maxlength="30"
+          />
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <button class="submit-btn" id="submitBtn" onclick="submitExpense()" disabled>
+        <div class="btn-content">
+          <div class="spinner"></div>
+          <span class="btn-text">Log Expense →</span>
+        </div>
+      </button>
+    </main>
+  </div>
+
+  <!-- Result Overlay -->
+  <div class="result-overlay" id="resultOverlay">
+    <div class="result-card">
+      <div class="result-icon" id="resultIcon">✅</div>
+      <div class="result-title success" id="resultTitle">Logged!</div>
+      <div class="parsed-rows" id="parsedRows"></div>
+      <div class="error-msg" id="errorMsg" style="display:none;"></div>
+      <div class="result-actions">
+        <button class="btn-secondary" onclick="closeResult()">Close</button>
+        <button class="btn-primary-sm" onclick="logAnother()">+ Add More</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Config Sheet -->
+  <div class="config-overlay" id="configOverlay" onclick="maybeCloseConfig(event)">
+    <div class="config-sheet">
+      <div class="config-title">⚙️ Setup</div>
+      <div class="config-field">
+        <label>Google Apps Script URL</label>
+        <input class="config-input" id="scriptUrl" type="url" placeholder="https://script.google.com/macros/s/..." />
+      </div>
+      <div class="config-field">
+        <label>Your Name (who's logging)</label>
+        <input class="config-input" id="userName" type="text" placeholder="e.g. Maa, Papa, Rahul" />
+      </div>
+      <div class="config-field">
+        <label>Anthropic API Key</label>
+        <input class="config-input" id="apiKey" type="password" placeholder="sk-ant-..." />
+      </div>
+      <button class="save-config-btn" onclick="saveConfig()">Save Settings</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ── Config ──────────────────────────────────────────────
+    const STORAGE_KEY = 'kharcha_config';
+
+    function loadConfig() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+    }
+
+    function saveConfig() {
+      const cfg = {
+        scriptUrl: document.getElementById('scriptUrl').value.trim(),
+        userName: document.getElementById('userName').value.trim(),
+        apiKey: document.getElementById('apiKey').value.trim(),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+      closeConfig();
+      showToast('Settings saved ✓');
+    }
+
+    function openConfig() {
+      const cfg = loadConfig();
+      document.getElementById('scriptUrl').value = cfg.scriptUrl || '';
+      document.getElementById('userName').value = cfg.userName || '';
+      document.getElementById('apiKey').value = cfg.apiKey || '';
+      document.getElementById('configOverlay').classList.add('show');
+    }
+
+    function closeConfig() {
+      document.getElementById('configOverlay').classList.remove('show');
+    }
+
+    function maybeCloseConfig(e) {
+      if (e.target === document.getElementById('configOverlay')) closeConfig();
+    }
+
+    // ── Date ────────────────────────────────────────────────
+    function updateDate() {
+      const now = new Date();
+      const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      document.getElementById('headerDate').innerHTML =
+        `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}<br>${now.getFullYear()}`;
+    }
+    updateDate();
+
+    // ── Tags ────────────────────────────────────────────────
+    let selectedTag = null;
+
+    function toggleTag(el) {
+      document.querySelectorAll('.tag-pill').forEach(p => p.classList.remove('active'));
+      if (selectedTag === el.dataset.tag) {
+        selectedTag = null;
+      } else {
+        el.classList.add('active');
+        selectedTag = el.dataset.tag;
+        document.getElementById('customTag').value = '';
+      }
+    }
+
+    function getTag() {
+      const custom = document.getElementById('customTag').value.trim();
+      return custom || selectedTag || '';
+    }
+
+    document.getElementById('customTag').addEventListener('input', () => {
+      if (document.getElementById('customTag').value.trim()) {
+        document.querySelectorAll('.tag-pill').forEach(p => p.classList.remove('active'));
+        selectedTag = null;
+      }
+    });
+
+    // ── Input ───────────────────────────────────────────────
+    function onType() {
+      const val = document.getElementById('expenseInput').value;
+      const remaining = 500 - val.length;
+      document.getElementById('charCount').textContent = remaining;
+      document.getElementById('submitBtn').disabled = val.trim().length === 0;
+      if (val.length > 0) document.getElementById('hintCard').classList.add('hidden');
+      else document.getElementById('hintCard').classList.remove('hidden');
+    }
+
+    // ── AI Parse ────────────────────────────────────────────
+    async function parseWithClaude(text, apiKey) {
+      const today = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+
+      const prompt = `Extract expense details from this casual text and return ONLY a JSON object. No explanation.
+
+Text: "${text}"
+Today's date: ${today}
+
+Return this exact JSON structure:
+{
+  "date": "DD Mon YYYY (use today if not mentioned)",
+  "item": "what was bought/paid for",
+  "amount": number or null,
+  "shop": "shop/place name or null",
+  "comment": "any other relevant info or null"
+}
+
+Rules:
+- amount must be a number only (no ₹ or Rs)
+- if multiple items, combine them in item field
+- shop can be null if not mentioned
+- comment for anything extra like 'for birthday', 'for Rahul' etc
+- date: use today (${today}) if not specified`;
+
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 300,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+
+      if (!res.ok) throw new Error('AI parsing failed');
+      const data = await res.json();
+      const raw = data.content[0].text.trim();
+      const clean = raw.replace(/```json|```/g, '').trim();
+      return JSON.parse(clean);
+    }
+
+    // ── Submit ───────────────────────────────────────────────
+    async function submitExpense() {
+      const cfg = loadConfig();
+      if (!cfg.scriptUrl) { openConfig(); showToast('Please add your Script URL first'); return; }
+      if (!cfg.apiKey) { openConfig(); showToast('Please add your Anthropic API key'); return; }
+
+      const text = document.getElementById('expenseInput').value.trim();
+      if (!text) return;
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.classList.add('loading');
+
+      try {
+        // 1. Parse with Claude
+        const parsed = await parseWithClaude(text, cfg.apiKey);
+        const tag = getTag();
+        const loggedBy = cfg.userName || 'Unknown';
+
+        // 2. Send to Google Sheets via Apps Script
+        const payload = { ...parsed, tag, loggedBy, rawText: text };
+        await fetch(cfg.scriptUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        // 3. Show result
+        showResult(parsed, tag, loggedBy);
+
+      } catch (err) {
+        showError(err.message || 'Something went wrong');
+      } finally {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+      }
+    }
+
+    function showResult(parsed, tag, loggedBy) {
+      const rows = document.getElementById('parsedRows');
+      rows.innerHTML = '';
+      document.getElementById('errorMsg').style.display = 'none';
+
+      const fields = [
+        { k: 'Date', v: parsed.date },
+        { k: 'Item', v: parsed.item },
+        { k: 'Amount', v: parsed.amount ? `₹${parsed.amount}` : '—', cls: 'amount' },
+        { k: 'Shop', v: parsed.shop || '—' },
+        { k: 'Comment', v: parsed.comment || '—' },
+        { k: 'Tag', v: tag || '—' },
+        { k: 'Logged by', v: loggedBy },
+      ];
+
+      fields.forEach(({ k, v, cls }) => {
+        rows.innerHTML += `
+          <div class="parsed-row">
+            <div>
+              <div class="parsed-key">${k}</div>
+              <div class="parsed-val ${cls || ''}">${v}</div>
+            </div>
+          </div>`;
+      });
+
+      document.getElementById('resultIcon').textContent = '✅';
+      document.getElementById('resultTitle').textContent = 'Logged!';
+      document.getElementById('resultTitle').className = 'result-title success';
+      document.getElementById('resultOverlay').classList.add('show');
+    }
+
+    function showError(msg) {
+      document.getElementById('parsedRows').innerHTML = '';
+      document.getElementById('resultIcon').textContent = '❌';
+      document.getElementById('resultTitle').textContent = 'Oops!';
+      document.getElementById('resultTitle').className = 'result-title error';
+      document.getElementById('errorMsg').textContent = msg;
+      document.getElementById('errorMsg').style.display = 'block';
+      document.getElementById('resultOverlay').classList.add('show');
+    }
+
+    function closeResult() {
+      document.getElementById('resultOverlay').classList.remove('show');
+    }
+
+    function logAnother() {
+      closeResult();
+      document.getElementById('expenseInput').value = '';
+      document.getElementById('charCount').textContent = '500';
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('hintCard').classList.remove('hidden');
+      document.querySelectorAll('.tag-pill').forEach(p => p.classList.remove('active'));
+      selectedTag = null;
+      document.getElementById('customTag').value = '';
+      document.getElementById('expenseInput').focus();
+    }
+
+    // ── Toast ────────────────────────────────────────────────
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    // ── Init ─────────────────────────────────────────────────
+    const cfg = loadConfig();
+    if (!cfg.scriptUrl || !cfg.apiKey) {
+      setTimeout(() => showToast('Tap ⚙️ to set up your app'), 800);
+    }
+  </script>
+</body>
+</html>
