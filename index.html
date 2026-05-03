@@ -6,7 +6,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Kharcha" />
-  <meta name="theme-color" content="#0f0f0f" />
+  <meta name="theme-color" content="#0d0d0d" />
   <title>Kharcha — Family Expense Tracker</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -15,17 +15,26 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0a0a0a;
-      --surface: #141414;
-      --surface2: #1c1c1c;
-      --border: #2a2a2a;
-      --accent: #d4f57a;
-      --accent2: #7affd4;
-      --text: #f0f0f0;
-      --muted: #666;
-      --danger: #ff6b6b;
-      --success: #7affd4;
-      --radius: 16px;
+      --bg: #0d0d0d;
+      --surface: #171717;
+      --surface2: #202020;
+      --border: #2e2e2e;
+
+      /* Vibrant accent palette inspired by screenshot */
+      --accent: #FF6B35;        /* vivid orange */
+      --accent-glow: rgba(255,107,53,0.18);
+      --accent2: #FF3CAC;       /* hot pink */
+      --accent3: #784BA0;       /* purple */
+      --accent4: #2B86C5;       /* blue */
+      --shaadi: #FF3CAC;        /* shaadi = pink/festive */
+      --shaadi-glow: rgba(255,60,172,0.18);
+
+      --text: #F5F5F5;
+      --muted: #606060;
+      --muted2: #888;
+      --danger: #FF4D4D;
+      --success: #00E5A0;
+      --radius: 18px;
     }
 
     html, body {
@@ -36,20 +45,26 @@
       overflow-x: hidden;
     }
 
-    body {
-      min-height: 100dvh;
-      display: flex;
-      flex-direction: column;
-    }
+    body { min-height: 100dvh; display: flex; flex-direction: column; }
 
-    /* Noise texture overlay */
+    /* Gradient orbs in background */
     body::before {
       content: '';
       position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      top: -120px; left: -80px;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(255,107,53,0.12) 0%, transparent 70%);
       pointer-events: none;
-      z-index: 999;
+      z-index: 0;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      bottom: -100px; right: -80px;
+      width: 350px; height: 350px;
+      background: radial-gradient(circle, rgba(255,60,172,0.10) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
     }
 
     .app {
@@ -60,71 +75,81 @@
       margin: 0 auto;
       width: 100%;
       padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+      position: relative;
+      z-index: 1;
     }
 
-    /* Header */
+    /* ── Header ── */
     header {
-      padding: 24px 24px 0;
+      padding: 22px 20px 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
 
-    .logo {
-      display: flex;
-      align-items: baseline;
-      gap: 6px;
-    }
+    .logo { display: flex; align-items: baseline; gap: 6px; }
 
     .logo-text {
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 800;
       letter-spacing: -0.5px;
-      color: var(--accent);
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
     .logo-sub {
       font-size: 11px;
-      color: var(--muted);
+      color: var(--muted2);
       font-family: 'JetBrains Mono', monospace;
-      letter-spacing: 0.05em;
     }
+
+    .header-right { display: flex; align-items: center; gap: 10px; }
 
     .header-date {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      color: var(--muted);
+      font-size: 10px;
+      color: var(--muted2);
       text-align: right;
+      line-height: 1.5;
     }
 
-    /* Main card */
+    .config-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted2);
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .config-btn:active { background: var(--surface2); color: var(--accent); }
+
+    /* ── Main ── */
     main {
       flex: 1;
-      padding: 20px 20px 16px;
+      padding: 16px 16px 14px;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 12px;
     }
 
+    /* Hint card */
     .hint-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
+      border-radius: 14px;
+      padding: 12px 16px;
       font-size: 12px;
-      color: var(--muted);
+      color: var(--muted2);
       font-family: 'JetBrains Mono', monospace;
-      line-height: 1.6;
-      transition: opacity 0.3s;
+      line-height: 1.7;
     }
-
-    .hint-card span {
-      color: var(--accent);
-    }
-
-    .hint-card.hidden {
-      display: none;
-    }
+    .hint-card span { color: var(--accent); }
+    .hint-card.hidden { display: none; }
 
     /* Textarea */
     .input-area {
@@ -132,20 +157,19 @@
       border: 1.5px solid var(--border);
       border-radius: var(--radius);
       overflow: hidden;
-      transition: border-color 0.2s;
-      flex: 1;
+      transition: border-color 0.2s, box-shadow 0.2s;
       display: flex;
       flex-direction: column;
     }
-
     .input-area:focus-within {
       border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
     }
 
     .input-label {
       font-size: 10px;
       font-family: 'JetBrains Mono', monospace;
-      color: var(--muted);
+      color: var(--muted2);
       padding: 12px 16px 4px;
       letter-spacing: 0.1em;
       text-transform: uppercase;
@@ -160,36 +184,34 @@
       font-size: 18px;
       font-weight: 600;
       line-height: 1.5;
-      padding: 8px 16px 16px;
+      padding: 8px 16px 14px;
       resize: none;
-      flex: 1;
-      min-height: 120px;
+      min-height: 110px;
       caret-color: var(--accent);
     }
+    textarea::placeholder { color: #2e2e2e; font-weight: 400; }
 
-    textarea::placeholder {
-      color: #333;
-      font-weight: 400;
+    .char-count {
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      text-align: right;
+      padding: 0 12px 8px;
     }
 
-    /* Tags section */
-    .tags-section {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
+    /* ── Tags ── */
+    .tags-section { display: flex; flex-direction: column; gap: 8px; }
 
     .tags-label {
       font-size: 10px;
       font-family: 'JetBrains Mono', monospace;
-      color: var(--muted);
+      color: var(--muted2);
       letter-spacing: 0.1em;
       text-transform: uppercase;
       display: flex;
       align-items: center;
       gap: 6px;
     }
-
     .tags-label::after {
       content: 'optional';
       font-size: 9px;
@@ -197,23 +219,18 @@
       border: 1px solid var(--border);
       padding: 1px 6px;
       border-radius: 4px;
-      letter-spacing: 0.05em;
     }
 
-    .tags-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
+    .tags-grid { display: flex; flex-wrap: wrap; gap: 7px; }
 
     .tag-pill {
-      padding: 7px 14px;
+      padding: 7px 13px;
       border-radius: 100px;
       border: 1.5px solid var(--border);
       background: var(--surface);
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 600;
+      color: var(--muted2);
+      font-size: 12px;
+      font-weight: 700;
       cursor: pointer;
       transition: all 0.15s;
       user-select: none;
@@ -222,24 +239,28 @@
       align-items: center;
       gap: 5px;
     }
+    .tag-pill:active { transform: scale(0.94); }
 
-    .tag-pill:active { transform: scale(0.95); }
+    /* Each tag gets its own active color */
+    .tag-pill.active                    { color: #fff; border-color: transparent; }
+    .tag-pill[data-tag="Regular"].active { background: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+    .tag-pill[data-tag="Shaadi"].active  { background: var(--shaadi); box-shadow: 0 0 12px var(--shaadi-glow); }
+    .tag-pill[data-tag="Groceries"].active   { background: #22c55e; }
+    .tag-pill[data-tag="Food & Dining"].active { background: #f59e0b; }
+    .tag-pill[data-tag="Transport"].active { background: var(--accent4); }
+    .tag-pill[data-tag="Bills & Utilities"].active { background: #8b5cf6; }
+    .tag-pill[data-tag="Health"].active  { background: #ef4444; }
+    .tag-pill[data-tag="Shopping"].active { background: #ec4899; }
+    .tag-pill[data-tag="Education"].active { background: #06b6d4; }
+    .tag-pill[data-tag="Entertainment"].active { background: #f97316; }
 
-    .tag-pill.active {
-      border-color: var(--accent);
-      color: var(--bg);
-      background: var(--accent);
+    /* Shaadi pill gets special festive look even when inactive */
+    .tag-pill[data-tag="Shaadi"] {
+      border-color: rgba(255,60,172,0.35);
+      color: var(--shaadi);
     }
 
-    .tag-pill .tag-emoji { font-size: 14px; }
-
-    /* Custom tag input */
-    .custom-tag-wrap {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
+    .custom-tag-wrap { display: flex; align-items: center; gap: 8px; }
     .custom-tag-input {
       flex: 1;
       background: var(--surface);
@@ -248,19 +269,18 @@
       padding: 7px 14px;
       color: var(--text);
       font-family: 'Syne', sans-serif;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       outline: none;
       transition: border-color 0.2s;
     }
-
-    .custom-tag-input::placeholder { color: #333; font-weight: 400; }
+    .custom-tag-input::placeholder { color: #2e2e2e; font-weight: 400; }
     .custom-tag-input:focus { border-color: var(--accent2); }
 
-    /* Submit button */
+    /* ── Submit button ── */
     .submit-btn {
-      background: var(--accent);
-      color: var(--bg);
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+      color: #fff;
       border: none;
       border-radius: var(--radius);
       padding: 18px;
@@ -269,244 +289,186 @@
       font-weight: 800;
       cursor: pointer;
       width: 100%;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.03em;
       transition: all 0.2s;
       position: relative;
       overflow: hidden;
       -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 4px 20px rgba(255,107,53,0.3);
     }
-
-    .submit-btn:active { transform: scale(0.98); }
+    .submit-btn:active { transform: scale(0.98); box-shadow: none; }
     .submit-btn:disabled {
       background: var(--surface2);
       color: var(--muted);
       cursor: not-allowed;
       transform: none;
+      box-shadow: none;
     }
 
-    .submit-btn .btn-content {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: opacity 0.2s;
+    /* Shaadi mode — button turns pink */
+    .submit-btn.shaadi-mode {
+      background: linear-gradient(135deg, var(--accent2) 0%, var(--accent3) 100%);
+      box-shadow: 0 4px 20px rgba(255,60,172,0.35);
     }
 
-    /* Loading state */
+    .btn-content { display: flex; align-items: center; justify-content: center; gap: 8px; }
     .spinner {
-      width: 18px;
-      height: 18px;
-      border: 2.5px solid rgba(10,10,10,0.3);
-      border-top-color: var(--bg);
+      width: 18px; height: 18px;
+      border: 2.5px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
       display: none;
     }
-
     @keyframes spin { to { transform: rotate(360deg); } }
-
     .submit-btn.loading .spinner { display: block; }
     .submit-btn.loading .btn-text { display: none; }
 
-    /* Result overlay */
-    .result-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.85);
-      backdrop-filter: blur(12px);
+    /* ── Sheet badge (shows where it will go) ── */
+    .sheet-badge {
       display: flex;
       align-items: center;
       justify-content: center;
+      gap: 6px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted2);
+      padding: 2px 0;
+      transition: all 0.3s;
+    }
+    .sheet-badge .badge-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      transition: background 0.3s;
+    }
+    .sheet-badge.shaadi-mode { color: var(--shaadi); }
+    .sheet-badge.shaadi-mode .badge-dot { background: var(--shaadi); }
+
+    /* ── Result overlay ── */
+    .result-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.88);
+      backdrop-filter: blur(14px);
+      display: flex; align-items: center; justify-content: center;
       padding: 24px;
       z-index: 100;
-      opacity: 0;
-      pointer-events: none;
+      opacity: 0; pointer-events: none;
       transition: opacity 0.3s;
     }
-
-    .result-overlay.show {
-      opacity: 1;
-      pointer-events: all;
-    }
+    .result-overlay.show { opacity: 1; pointer-events: all; }
 
     .result-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 28px 24px;
+      border-radius: 22px;
+      padding: 26px 22px;
       width: 100%;
       max-width: 380px;
       transform: translateY(20px);
       transition: transform 0.3s;
     }
+    .result-overlay.show .result-card { transform: translateY(0); }
 
-    .result-overlay.show .result-card {
-      transform: translateY(0);
-    }
-
-    .result-icon {
-      font-size: 40px;
-      text-align: center;
-      margin-bottom: 12px;
-    }
-
-    .result-title {
-      font-size: 20px;
-      font-weight: 800;
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
+    .result-icon { font-size: 38px; text-align: center; margin-bottom: 10px; }
+    .result-title { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 6px; }
     .result-title.success { color: var(--success); }
-    .result-title.error { color: var(--danger); }
+    .result-title.error   { color: var(--danger); }
 
-    .parsed-rows {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 20px;
+    .result-sheet-label {
+      text-align: center;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted2);
+      margin-bottom: 18px;
     }
+    .result-sheet-label strong { color: var(--accent); }
+    .result-sheet-label.shaadi strong { color: var(--shaadi); }
 
+    .parsed-rows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
     .parsed-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
+      display: flex; justify-content: space-between; align-items: flex-start;
       gap: 12px;
-      padding: 10px 14px;
+      padding: 9px 13px;
       background: var(--surface2);
       border-radius: 10px;
     }
+    .parsed-key { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+    .parsed-val { font-size: 14px; font-weight: 600; }
+    .parsed-val.amount { color: var(--accent); font-size: 16px; }
 
-    .parsed-key {
-      font-size: 10px;
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 2px;
+    /* Error detail box */
+    .error-detail {
+      background: rgba(255,77,77,0.08);
+      border: 1px solid rgba(255,77,77,0.25);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      display: none;
     }
+    .error-detail .error-title { font-size: 12px; font-weight: 700; color: var(--danger); margin-bottom: 6px; }
+    .error-detail .error-msg { font-size: 13px; color: #ffaaaa; font-family: 'JetBrains Mono', monospace; line-height: 1.5; }
+    .error-detail .error-hint { font-size: 12px; color: var(--muted2); margin-top: 8px; line-height: 1.5; }
 
-    .parsed-val {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .parsed-val.amount {
-      color: var(--accent);
-      font-size: 16px;
-    }
-
-    .result-actions {
-      display: flex;
-      gap: 10px;
-    }
-
+    .result-actions { display: flex; gap: 10px; }
     .btn-secondary {
-      flex: 1;
-      padding: 14px;
+      flex: 1; padding: 13px;
       border: 1.5px solid var(--border);
-      background: transparent;
-      color: var(--text);
+      background: transparent; color: var(--text);
       border-radius: 12px;
-      font-family: 'Syne', sans-serif;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: all 0.15s;
+      font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: all 0.15s;
       -webkit-tap-highlight-color: transparent;
     }
-
-    .btn-secondary:active { transform: scale(0.97); background: var(--surface2); }
+    .btn-secondary:active { background: var(--surface2); }
 
     .btn-primary-sm {
-      flex: 1;
-      padding: 14px;
-      background: var(--accent);
-      color: var(--bg);
-      border: none;
+      flex: 1; padding: 13px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; border: none;
       border-radius: 12px;
-      font-family: 'Syne', sans-serif;
-      font-size: 14px;
-      font-weight: 800;
-      cursor: pointer;
-      transition: all 0.15s;
+      font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800;
+      cursor: pointer; transition: all 0.15s;
       -webkit-tap-highlight-color: transparent;
     }
-
     .btn-primary-sm:active { transform: scale(0.97); }
 
-    /* Config modal */
-    .config-btn {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: all 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .config-btn:active { background: var(--surface2); }
-
+    /* ── Config sheet ── */
     .config-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.85);
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.88);
       backdrop-filter: blur(12px);
-      display: flex;
-      align-items: flex-end;
+      display: flex; align-items: flex-end;
       z-index: 200;
-      opacity: 0;
-      pointer-events: none;
+      opacity: 0; pointer-events: none;
       transition: opacity 0.3s;
     }
-
-    .config-overlay.show {
-      opacity: 1;
-      pointer-events: all;
-    }
+    .config-overlay.show { opacity: 1; pointer-events: all; }
 
     .config-sheet {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 24px 24px 0 0;
-      padding: 28px 24px;
+      padding: 26px 20px calc(20px + env(safe-area-inset-bottom, 0));
       width: 100%;
       transform: translateY(100%);
       transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
     }
-
     .config-overlay.show .config-sheet { transform: translateY(0); }
 
     .config-title {
-      font-size: 18px;
-      font-weight: 800;
+      font-size: 18px; font-weight: 800;
       margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      display: flex; align-items: center; gap: 8px;
     }
 
-    .config-field {
-      margin-bottom: 16px;
-    }
-
+    .config-field { margin-bottom: 14px; }
     .config-field label {
       display: block;
-      font-size: 10px;
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      margin-bottom: 8px;
+      font-size: 10px; font-family: 'JetBrains Mono', monospace;
+      color: var(--muted2); text-transform: uppercase;
+      letter-spacing: 0.1em; margin-bottom: 7px;
     }
-
     .config-input {
       width: 100%;
       background: var(--surface2);
@@ -514,91 +476,52 @@
       border-radius: 10px;
       padding: 12px 14px;
       color: var(--text);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      outline: none;
-      transition: border-color 0.2s;
+      font-family: 'JetBrains Mono', monospace; font-size: 13px;
+      outline: none; transition: border-color 0.2s;
     }
-
     .config-input:focus { border-color: var(--accent); }
 
     .save-config-btn {
-      width: 100%;
-      margin-top: 8px;
-      background: var(--accent);
-      color: var(--bg);
-      border: none;
-      border-radius: 12px;
-      padding: 16px;
-      font-family: 'Syne', sans-serif;
-      font-size: 15px;
-      font-weight: 800;
+      width: 100%; margin-top: 6px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; border: none;
+      border-radius: 12px; padding: 16px;
+      font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
 
-    /* Char count */
-    .char-count {
-      font-size: 10px;
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--muted);
-      text-align: right;
-      padding: 0 4px;
-    }
+    /* Divider */
+    .divider { height: 1px; background: var(--border); margin: 0 -16px; }
 
     /* Toast */
     .toast {
       position: fixed;
-      bottom: 100px;
-      left: 50%;
-      transform: translateX(-50%) translateY(20px);
+      bottom: 90px; left: 50%;
+      transform: translateX(-50%) translateY(16px);
       background: var(--surface2);
       border: 1px solid var(--border);
       color: var(--text);
-      padding: 10px 20px;
+      padding: 9px 20px;
       border-radius: 100px;
-      font-size: 13px;
-      font-weight: 600;
-      opacity: 0;
-      transition: all 0.3s;
-      white-space: nowrap;
-      z-index: 300;
+      font-size: 13px; font-weight: 600;
+      opacity: 0; transition: all 0.3s;
+      white-space: nowrap; z-index: 300;
     }
-
-    .toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-
-    /* Divider */
-    .divider {
-      height: 1px;
-      background: var(--border);
-      margin: 0 -20px;
-    }
-
-    /* Error msg */
-    .error-msg {
-      font-size: 13px;
-      color: var(--danger);
-      text-align: center;
-      padding: 8px;
-    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
     /* Animations */
     @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to { opacity: 1; transform: translateY(0); }
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
-
-    .app > * { animation: fadeUp 0.4s ease both; }
-    header { animation-delay: 0s; }
     main > * { animation: fadeUp 0.4s ease both; }
     main > *:nth-child(1) { animation-delay: 0.05s; }
-    main > *:nth-child(2) { animation-delay: 0.1s; }
+    main > *:nth-child(2) { animation-delay: 0.10s; }
     main > *:nth-child(3) { animation-delay: 0.15s; }
-    main > *:nth-child(4) { animation-delay: 0.2s; }
+    main > *:nth-child(4) { animation-delay: 0.20s; }
     main > *:nth-child(5) { animation-delay: 0.25s; }
+    main > *:nth-child(6) { animation-delay: 0.30s; }
   </style>
 </head>
 <body>
@@ -608,11 +531,12 @@
         <span class="logo-text">Kharcha</span>
         <span class="logo-sub">/ family log</span>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;">
+      <div class="header-right">
         <div class="header-date" id="headerDate"></div>
         <button class="config-btn" onclick="openConfig()" title="Settings">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
           </svg>
         </button>
       </div>
@@ -620,14 +544,17 @@
 
     <main>
       <div class="hint-card" id="hintCard">
-        Just type naturally — <span>"milk 60 dmart"</span> or <span>"electricity bill 1200"</span> or <span>"shoes for Rahul 850 Bata, birthday"</span>
+        Just type naturally —
+        <span>"milk 60 dmart"</span> or
+        <span>"electricity 1200"</span> or
+        <span>"shoes 850 Bata, 3 days ago"</span>
       </div>
 
       <div class="input-area">
         <div class="input-label">What did you spend on?</div>
         <textarea
           id="expenseInput"
-          placeholder="e.g. vegetables 120 at Big Bazaar&#10;or just: medicines 230"
+          placeholder="e.g. vegetables 120 Big Bazaar&#10;or: medicines 230 yesterday&#10;or: saree 4500 shaadi shopping"
           maxlength="500"
           autofocus
           oninput="onType()"
@@ -638,39 +565,51 @@
       <div class="tags-section">
         <div class="tags-label">Tag this expense</div>
         <div class="tags-grid" id="tagsGrid">
+          <div class="tag-pill" data-tag="Regular" onclick="toggleTag(this)">
+            🏠 Regular
+          </div>
+          <div class="tag-pill" data-tag="Shaadi" onclick="toggleTag(this)">
+            💍 Shaadi
+          </div>
           <div class="tag-pill" data-tag="Groceries" onclick="toggleTag(this)">
-            <span class="tag-emoji">🛒</span> Groceries
+            🛒 Groceries
           </div>
           <div class="tag-pill" data-tag="Food & Dining" onclick="toggleTag(this)">
-            <span class="tag-emoji">🍽️</span> Food
+            🍽️ Food
           </div>
           <div class="tag-pill" data-tag="Transport" onclick="toggleTag(this)">
-            <span class="tag-emoji">🚗</span> Transport
+            🚗 Transport
           </div>
           <div class="tag-pill" data-tag="Bills & Utilities" onclick="toggleTag(this)">
-            <span class="tag-emoji">⚡</span> Bills
+            ⚡ Bills
           </div>
           <div class="tag-pill" data-tag="Health" onclick="toggleTag(this)">
-            <span class="tag-emoji">💊</span> Health
+            💊 Health
           </div>
           <div class="tag-pill" data-tag="Shopping" onclick="toggleTag(this)">
-            <span class="tag-emoji">🛍️</span> Shopping
+            🛍️ Shopping
           </div>
           <div class="tag-pill" data-tag="Education" onclick="toggleTag(this)">
-            <span class="tag-emoji">📚</span> Education
+            📚 Education
           </div>
           <div class="tag-pill" data-tag="Entertainment" onclick="toggleTag(this)">
-            <span class="tag-emoji">🎬</span> Fun
+            🎬 Fun
           </div>
         </div>
         <div class="custom-tag-wrap">
           <input
             class="custom-tag-input"
             id="customTag"
-            placeholder="+ custom tag (e.g. Wedding, Trip)"
+            placeholder="+ custom tag (e.g. Trip, Party)"
             maxlength="30"
           />
         </div>
+      </div>
+
+      <!-- Sheet destination indicator -->
+      <div class="sheet-badge" id="sheetBadge">
+        <div class="badge-dot"></div>
+        <span id="sheetBadgeText">Will save to → Expenses sheet</span>
       </div>
 
       <div class="divider"></div>
@@ -678,27 +617,32 @@
       <button class="submit-btn" id="submitBtn" onclick="submitExpense()" disabled>
         <div class="btn-content">
           <div class="spinner"></div>
-          <span class="btn-text">Log Expense →</span>
+          <span class="btn-text" id="btnText">Submit</span>
         </div>
       </button>
     </main>
   </div>
 
-  <!-- Result Overlay -->
+  <!-- ── Result Overlay ── -->
   <div class="result-overlay" id="resultOverlay">
     <div class="result-card">
       <div class="result-icon" id="resultIcon">✅</div>
-      <div class="result-title success" id="resultTitle">Logged!</div>
+      <div class="result-title success" id="resultTitle">Submitted!</div>
+      <div class="result-sheet-label" id="resultSheetLabel"></div>
       <div class="parsed-rows" id="parsedRows"></div>
-      <div class="error-msg" id="errorMsg" style="display:none;"></div>
+      <div class="error-detail" id="errorDetail">
+        <div class="error-title" id="errorTitle">What went wrong</div>
+        <div class="error-msg" id="errorMsg"></div>
+        <div class="error-hint" id="errorHint"></div>
+      </div>
       <div class="result-actions">
         <button class="btn-secondary" onclick="closeResult()">Close</button>
-        <button class="btn-primary-sm" onclick="logAnother()">+ Add More</button>
+        <button class="btn-primary-sm" onclick="addAnother()">+ Add More</button>
       </div>
     </div>
   </div>
 
-  <!-- Config Sheet -->
+  <!-- ── Config Sheet ── -->
   <div class="config-overlay" id="configOverlay" onclick="maybeCloseConfig(event)">
     <div class="config-sheet">
       <div class="config-title">⚙️ Setup</div>
@@ -711,7 +655,7 @@
         <input class="config-input" id="userName" type="text" placeholder="e.g. Maa, Papa, Rahul" />
       </div>
       <div class="config-field">
-        <label>Gemini API Key (free)</label>
+        <label>Gemini API Key (free — aistudio.google.com)</label>
         <input class="config-input" id="apiKey" type="password" placeholder="AIza..." />
       </div>
       <button class="save-config-btn" onclick="saveConfig()">Save Settings</button>
@@ -722,8 +666,8 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    // ── Config ──────────────────────────────────────────────
-    const STORAGE_KEY = 'kharcha_config';
+    // ── CONFIG ──────────────────────────────────────────────────────────────
+    const STORAGE_KEY = 'kharcha_config_v2';
 
     function loadConfig() {
       try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
@@ -732,8 +676,8 @@
     function saveConfig() {
       const cfg = {
         scriptUrl: document.getElementById('scriptUrl').value.trim(),
-        userName: document.getElementById('userName').value.trim(),
-        apiKey: document.getElementById('apiKey').value.trim(),
+        userName:  document.getElementById('userName').value.trim(),
+        apiKey:    document.getElementById('apiKey').value.trim(),
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
       closeConfig();
@@ -743,8 +687,8 @@
     function openConfig() {
       const cfg = loadConfig();
       document.getElementById('scriptUrl').value = cfg.scriptUrl || '';
-      document.getElementById('userName').value = cfg.userName || '';
-      document.getElementById('apiKey').value = cfg.apiKey || '';
+      document.getElementById('userName').value  = cfg.userName  || '';
+      document.getElementById('apiKey').value    = cfg.apiKey    || '';
       document.getElementById('configOverlay').classList.add('show');
     }
 
@@ -756,28 +700,30 @@
       if (e.target === document.getElementById('configOverlay')) closeConfig();
     }
 
-    // ── Date ────────────────────────────────────────────────
+    // ── DATE ────────────────────────────────────────────────────────────────
     function updateDate() {
       const now = new Date();
-      const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const days   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       document.getElementById('headerDate').innerHTML =
         `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}<br>${now.getFullYear()}`;
     }
     updateDate();
 
-    // ── Tags ────────────────────────────────────────────────
+    // ── TAGS ────────────────────────────────────────────────────────────────
     let selectedTag = null;
 
     function toggleTag(el) {
+      const wasActive = selectedTag === el.dataset.tag;
       document.querySelectorAll('.tag-pill').forEach(p => p.classList.remove('active'));
-      if (selectedTag === el.dataset.tag) {
+      if (wasActive) {
         selectedTag = null;
       } else {
         el.classList.add('active');
         selectedTag = el.dataset.tag;
         document.getElementById('customTag').value = '';
       }
+      updateSheetBadge();
     }
 
     function getTag() {
@@ -785,77 +731,143 @@
       return custom || selectedTag || '';
     }
 
+    function isShaadi() {
+      const custom = document.getElementById('customTag').value.trim().toLowerCase();
+      return selectedTag === 'Shaadi' || custom === 'shaadi';
+    }
+
+    function updateSheetBadge() {
+      const badge     = document.getElementById('sheetBadge');
+      const badgeText = document.getElementById('sheetBadgeText');
+      const btn       = document.getElementById('submitBtn');
+      if (isShaadi()) {
+        badge.classList.add('shaadi-mode');
+        btn.classList.add('shaadi-mode');
+        badgeText.textContent = 'Will save to → Shaadi sheet 💍';
+      } else {
+        badge.classList.remove('shaadi-mode');
+        btn.classList.remove('shaadi-mode');
+        badgeText.textContent = 'Will save to → Expenses sheet';
+      }
+    }
+
     document.getElementById('customTag').addEventListener('input', () => {
-      if (document.getElementById('customTag').value.trim()) {
+      const val = document.getElementById('customTag').value.trim();
+      if (val) {
         document.querySelectorAll('.tag-pill').forEach(p => p.classList.remove('active'));
         selectedTag = null;
       }
+      updateSheetBadge();
     });
 
-    // ── Input ───────────────────────────────────────────────
+    // ── INPUT ───────────────────────────────────────────────────────────────
     function onType() {
       const val = document.getElementById('expenseInput').value;
-      const remaining = 500 - val.length;
-      document.getElementById('charCount').textContent = remaining;
+      document.getElementById('charCount').textContent = 500 - val.length;
       document.getElementById('submitBtn').disabled = val.trim().length === 0;
       if (val.length > 0) document.getElementById('hintCard').classList.add('hidden');
       else document.getElementById('hintCard').classList.remove('hidden');
     }
 
-    // ── AI Parse (Gemini - free) ─────────────────────────────
+    // ── GEMINI PARSE ────────────────────────────────────────────────────────
     async function parseWithGemini(text, apiKey) {
-      const today = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+      const now   = new Date();
+      const today = now.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
 
-      const prompt = `Extract expense details from this casual text and return ONLY a JSON object. No explanation, no markdown, no code fences.
+      // Give Gemini full context to resolve relative dates
+      const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+      const twoDaysAgo = new Date(now); twoDaysAgo.setDate(now.getDate() - 2);
+      const threeDaysAgo = new Date(now); threeDaysAgo.setDate(now.getDate() - 3);
+
+      const fmt = d => d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+
+      const prompt = `You are a family expense parser for an Indian family. Extract expense details from casual text and return ONLY a valid JSON object. No markdown, no explanation, no code fences.
 
 Text: "${text}"
-Today's date: ${today}
 
-Return this exact JSON structure:
+Date reference (use these to resolve relative dates):
+- Today: ${fmt(now)}
+- Yesterday: ${fmt(yesterday)}
+- 2 days ago: ${fmt(twoDaysAgo)}
+- 3 days ago: ${fmt(threeDaysAgo)}
+- Current day of week: ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()]}
+
+Return this exact JSON:
 {
-  "date": "DD Mon YYYY (use today if not mentioned)",
-  "item": "what was bought/paid for",
-  "amount": number or null,
-  "shop": "shop/place name or null",
-  "comment": "any other relevant info or null"
+  "date": "resolved date as DD Mon YYYY",
+  "item": "what was bought or paid for (be descriptive)",
+  "amount": number or null (digits only, no currency symbols),
+  "shop": "shop or place name or null if not mentioned",
+  "comment": "any extra context like 'for birthday', 'for Rahul', 'advance payment' or null"
 }
 
 Rules:
-- amount must be a number only (no ₹ or Rs)
-- if multiple items, combine them in item field
-- shop can be null if not mentioned
-- comment for anything extra like 'for birthday', 'for Rahul' etc
-- date: use today (${today}) if not specified
-- return ONLY the JSON, nothing else`;
+- Resolve ALL relative dates: "yesterday", "2 days ago", "3 days back", "last Monday" etc using the reference above
+- Amount must be a plain number (e.g. 1200, not ₹1200 or Rs.1200)
+- If multiple items, join them (e.g. "Milk and bread")
+- Return ONLY the JSON object, absolutely nothing else`;
 
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0, maxOutputTokens: 300 }
+            generationConfig: { temperature: 0, maxOutputTokens: 400 }
           })
         }
       );
 
+      // ── Detailed error handling ──
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.error?.message || 'Gemini API failed — check your API key');
+        let errBody = {};
+        try { errBody = await res.json(); } catch {}
+        const status  = res.status;
+        const apiMsg  = errBody?.error?.message || 'Unknown error';
+        const apiCode = errBody?.error?.code || status;
+
+        if (status === 400) throw new KharchaError('Invalid API Key', `Gemini rejected the request (400). Your API key may be wrong or malformed.`, 'Go to aistudio.google.com → API Keys → copy the key starting with AIza...');
+        if (status === 403) throw new KharchaError('API Key Not Authorised', `Gemini returned 403 Forbidden. The key may not have Generative Language API enabled.`, 'In Google Cloud Console, enable the "Generative Language API" for your project.');
+        if (status === 429) throw new KharchaError('Rate Limit Reached', `Gemini returned 429 Too Many Requests. You've hit the free tier limit.`, 'Wait a minute and try again. Free tier allows 15 requests/minute.');
+        throw new KharchaError(`Gemini Error (${apiCode})`, apiMsg, 'Check your API key in ⚙️ settings.');
       }
+
       const data = await res.json();
-      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (!raw) throw new Error('Empty response from Gemini');
+      const raw  = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (!raw) throw new KharchaError('Empty Gemini Response', 'Gemini returned no content.', 'Try rephrasing your expense or try again in a moment.');
+
       const clean = raw.replace(/```json|```/g, '').trim();
-      return JSON.parse(clean);
+      try {
+        return JSON.parse(clean);
+      } catch {
+        throw new KharchaError('AI Parse Error', `Could not read Gemini's response as JSON.\n\nRaw: ${clean.substring(0, 100)}`, 'Try a simpler expense description.');
+      }
     }
 
-    // ── Submit ───────────────────────────────────────────────
+    // Custom error class for structured errors
+    class KharchaError extends Error {
+      constructor(title, message, hint) {
+        super(message);
+        this.title = title;
+        this.hint  = hint;
+      }
+    }
+
+    // ── SUBMIT ──────────────────────────────────────────────────────────────
     async function submitExpense() {
       const cfg = loadConfig();
-      if (!cfg.scriptUrl) { openConfig(); showToast('Please add your Script URL first'); return; }
-      if (!cfg.apiKey) { openConfig(); showToast('Please add your Gemini API key'); return; }
+
+      if (!cfg.scriptUrl) {
+        openConfig();
+        showToast('Please add your Script URL first');
+        return;
+      }
+      if (!cfg.apiKey) {
+        openConfig();
+        showToast('Please add your Gemini API key');
+        return;
+      }
 
       const text = document.getElementById('expenseInput').value.trim();
       if (!text) return;
@@ -865,13 +877,15 @@ Rules:
       btn.classList.add('loading');
 
       try {
-        // 1. Parse with Gemini
-        const parsed = await parseWithGemini(text, cfg.apiKey);
-        const tag = getTag();
-        const loggedBy = cfg.userName || 'Unknown';
+        // 1. Parse with Gemini AI
+        const parsed    = await parseWithGemini(text, cfg.apiKey);
+        const tag       = getTag();
+        const loggedBy  = cfg.userName || 'Unknown';
+        const sheetName = isShaadi() ? 'Shaadi' : 'Expenses';
 
-        // 2. Send to Google Sheets via Apps Script
-        const payload = { ...parsed, tag, loggedBy, rawText: text };
+        // 2. Send to Google Apps Script → Google Sheets
+        const payload = { ...parsed, tag, loggedBy, rawText: text, sheetName };
+
         await fetch(cfg.scriptUrl, {
           method: 'POST',
           mode: 'no-cors',
@@ -879,34 +893,45 @@ Rules:
           body: JSON.stringify(payload)
         });
 
-        // 3. Show result
-        showResult(parsed, tag, loggedBy);
+        // 3. Show success result
+        showResult(parsed, tag, loggedBy, sheetName);
 
       } catch (err) {
-        showError(err.message || 'Something went wrong');
+        if (err instanceof KharchaError) {
+          showError(err.title, err.message, err.hint);
+        } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+          showError('Network Error', 'Could not reach the internet. Check your connection.', 'Make sure you have internet access and try again.');
+        } else {
+          showError('Unexpected Error', err.message || 'Something went wrong.', 'Try again or check your settings.');
+        }
       } finally {
         btn.classList.remove('loading');
-        btn.disabled = false;
+        btn.disabled = document.getElementById('expenseInput').value.trim().length === 0;
       }
     }
 
-    function showResult(parsed, tag, loggedBy) {
-      const rows = document.getElementById('parsedRows');
-      rows.innerHTML = '';
-      document.getElementById('errorMsg').style.display = 'none';
+    // ── RESULT ──────────────────────────────────────────────────────────────
+    function showResult(parsed, tag, loggedBy, sheetName) {
+      document.getElementById('parsedRows').innerHTML = '';
+      document.getElementById('errorDetail').style.display = 'none';
+
+      const isShaadiEntry = sheetName === 'Shaadi';
+      const sheetLabel = document.getElementById('resultSheetLabel');
+      sheetLabel.innerHTML = `Saved to → <strong>${sheetName}</strong> sheet`;
+      sheetLabel.className = 'result-sheet-label' + (isShaadiEntry ? ' shaadi' : '');
 
       const fields = [
-        { k: 'Date', v: parsed.date },
-        { k: 'Item', v: parsed.item },
-        { k: 'Amount', v: parsed.amount ? `₹${parsed.amount}` : '—', cls: 'amount' },
-        { k: 'Shop', v: parsed.shop || '—' },
-        { k: 'Comment', v: parsed.comment || '—' },
-        { k: 'Tag', v: tag || '—' },
+        { k: 'Date',      v: parsed.date || '—' },
+        { k: 'Item',      v: parsed.item || '—' },
+        { k: 'Amount',    v: parsed.amount ? `₹${parsed.amount}` : '—', cls: 'amount' },
+        { k: 'Shop',      v: parsed.shop    || '—' },
+        { k: 'Comment',   v: parsed.comment || '—' },
+        { k: 'Tag',       v: tag || '—' },
         { k: 'Logged by', v: loggedBy },
       ];
 
       fields.forEach(({ k, v, cls }) => {
-        rows.innerHTML += `
+        document.getElementById('parsedRows').innerHTML += `
           <div class="parsed-row">
             <div>
               <div class="parsed-key">${k}</div>
@@ -915,19 +940,26 @@ Rules:
           </div>`;
       });
 
-      document.getElementById('resultIcon').textContent = '✅';
-      document.getElementById('resultTitle').textContent = 'Logged!';
-      document.getElementById('resultTitle').className = 'result-title success';
+      document.getElementById('resultIcon').textContent  = isShaadiEntry ? '💍' : '✅';
+      document.getElementById('resultTitle').textContent = 'Submitted!';
+      document.getElementById('resultTitle').className   = 'result-title success';
       document.getElementById('resultOverlay').classList.add('show');
     }
 
-    function showError(msg) {
+    function showError(title, msg, hint) {
       document.getElementById('parsedRows').innerHTML = '';
-      document.getElementById('resultIcon').textContent = '❌';
-      document.getElementById('resultTitle').textContent = 'Oops!';
-      document.getElementById('resultTitle').className = 'result-title error';
-      document.getElementById('errorMsg').textContent = msg;
-      document.getElementById('errorMsg').style.display = 'block';
+      document.getElementById('resultSheetLabel').textContent = '';
+
+      document.getElementById('resultIcon').textContent  = '❌';
+      document.getElementById('resultTitle').textContent = 'Failed';
+      document.getElementById('resultTitle').className   = 'result-title error';
+
+      const detail = document.getElementById('errorDetail');
+      detail.style.display = 'block';
+      document.getElementById('errorTitle').textContent = title;
+      document.getElementById('errorMsg').textContent   = msg;
+      document.getElementById('errorHint').textContent  = hint ? `💡 ${hint}` : '';
+
       document.getElementById('resultOverlay').classList.add('show');
     }
 
@@ -935,7 +967,7 @@ Rules:
       document.getElementById('resultOverlay').classList.remove('show');
     }
 
-    function logAnother() {
+    function addAnother() {
       closeResult();
       document.getElementById('expenseInput').value = '';
       document.getElementById('charCount').textContent = '500';
@@ -944,10 +976,11 @@ Rules:
       document.querySelectorAll('.tag-pill').forEach(p => p.classList.remove('active'));
       selectedTag = null;
       document.getElementById('customTag').value = '';
+      updateSheetBadge();
       document.getElementById('expenseInput').focus();
     }
 
-    // ── Toast ────────────────────────────────────────────────
+    // ── TOAST ───────────────────────────────────────────────────────────────
     function showToast(msg) {
       const t = document.getElementById('toast');
       t.textContent = msg;
@@ -955,9 +988,9 @@ Rules:
       setTimeout(() => t.classList.remove('show'), 2500);
     }
 
-    // ── Init ─────────────────────────────────────────────────
-    const cfg = loadConfig();
-    if (!cfg.scriptUrl || !cfg.apiKey) {
+    // ── INIT ────────────────────────────────────────────────────────────────
+    const _cfg = loadConfig();
+    if (!_cfg.scriptUrl || !_cfg.apiKey) {
       setTimeout(() => showToast('Tap ⚙️ to set up your app'), 800);
     }
   </script>
