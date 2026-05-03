@@ -711,8 +711,8 @@
         <input class="config-input" id="userName" type="text" placeholder="e.g. Maa, Papa, Rahul" />
       </div>
       <div class="config-field">
-        <label>Anthropic API Key</label>
-        <input class="config-input" id="apiKey" type="password" placeholder="sk-ant-..." />
+        <label>Gemini API Key (free)</label>
+        <input class="config-input" id="apiKey" type="password" placeholder="AIza..." />
       </div>
       <button class="save-config-btn" onclick="saveConfig()">Save Settings</button>
     </div>
@@ -802,11 +802,11 @@
       else document.getElementById('hintCard').classList.remove('hidden');
     }
 
-    // ── AI Parse ────────────────────────────────────────────
-    async function parseWithClaude(text, apiKey) {
+    // ── AI Parse (Gemini - free) ─────────────────────────────
+    async function parseWithGemini(text, apiKey) {
       const today = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
 
-      const prompt = `Extract expense details from this casual text and return ONLY a JSON object. No explanation.
+      const prompt = `Extract expense details from this casual text and return ONLY a JSON object. No explanation, no markdown, no code fences.
 
 Text: "${text}"
 Today's date: ${today}
@@ -825,21 +825,28 @@ Rules:
 - if multiple items, combine them in item field
 - shop can be null if not mentioned
 - comment for anything extra like 'for birthday', 'for Rahul' etc
-- date: use today (${today}) if not specified`;
+- date: use today (${today}) if not specified
+- return ONLY the JSON, nothing else`;
 
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 300,
-          messages: [{ role: 'user', content: prompt }]
-        })
-      });
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0, maxOutputTokens: 300 }
+          })
+        }
+      );
 
-      if (!res.ok) throw new Error('AI parsing failed');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || 'Gemini API failed — check your API key');
+      }
       const data = await res.json();
-      const raw = data.content[0].text.trim();
+      const raw = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (!raw) throw new Error('Empty response from Gemini');
       const clean = raw.replace(/```json|```/g, '').trim();
       return JSON.parse(clean);
     }
@@ -848,7 +855,7 @@ Rules:
     async function submitExpense() {
       const cfg = loadConfig();
       if (!cfg.scriptUrl) { openConfig(); showToast('Please add your Script URL first'); return; }
-      if (!cfg.apiKey) { openConfig(); showToast('Please add your Anthropic API key'); return; }
+      if (!cfg.apiKey) { openConfig(); showToast('Please add your Gemini API key'); return; }
 
       const text = document.getElementById('expenseInput').value.trim();
       if (!text) return;
@@ -858,8 +865,8 @@ Rules:
       btn.classList.add('loading');
 
       try {
-        // 1. Parse with Claude
-        const parsed = await parseWithClaude(text, cfg.apiKey);
+        // 1. Parse with Gemini
+        const parsed = await parseWithGemini(text, cfg.apiKey);
         const tag = getTag();
         const loggedBy = cfg.userName || 'Unknown';
 
