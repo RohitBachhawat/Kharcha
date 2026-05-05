@@ -1,1015 +1,998 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <meta name="apple-mobile-web-app-title" content="Kharcha"/>
-  <meta name="theme-color" content="#0d0d0d"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Kharcha" />
+  <meta name="theme-color" content="#0d0d0d" />
   <title>Kharcha — Family Expense Tracker</title>
-  <link rel="manifest" href="manifest.json"/>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-    :root{
-      --bg:#0d0d0d;--surface:#171717;--surface2:#202020;--border:#2e2e2e;
-      --accent:#FF6B35;--accent-glow:rgba(255,107,53,0.18);--accent2:#FF3CAC;
-      --accent3:#784BA0;--accent4:#2B86C5;--shaadi:#FF3CAC;--shaadi-glow:rgba(255,60,172,0.18);
-      --text:#F5F5F5;--muted:#606060;--muted2:#888;--danger:#FF4D4D;--success:#00E5A0;--radius:18px;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0d;
+      --surface: #171717;
+      --surface2: #202020;
+      --border: #2e2e2e;
+
+      /* Vibrant accent palette inspired by screenshot */
+      --accent: #FF6B35;        /* vivid orange */
+      --accent-glow: rgba(255,107,53,0.18);
+      --accent2: #FF3CAC;       /* hot pink */
+      --accent3: #784BA0;       /* purple */
+      --accent4: #2B86C5;       /* blue */
+      --shaadi: #FF3CAC;        /* shaadi = pink/festive */
+      --shaadi-glow: rgba(255,60,172,0.18);
+
+      --text: #F5F5F5;
+      --muted: #606060;
+      --muted2: #888;
+      --danger: #FF4D4D;
+      --success: #00E5A0;
+      --radius: 18px;
     }
-    html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;overflow-x:hidden;}
-    body{min-height:100dvh;display:flex;flex-direction:column;}
-    body::before{content:'';position:fixed;top:-120px;left:-80px;width:400px;height:400px;background:radial-gradient(circle,rgba(255,107,53,0.12) 0%,transparent 70%);pointer-events:none;z-index:0;}
-    body::after{content:'';position:fixed;bottom:-100px;right:-80px;width:350px;height:350px;background:radial-gradient(circle,rgba(255,60,172,0.10) 0%,transparent 70%);pointer-events:none;z-index:0;}
-    .app{flex:1;display:flex;flex-direction:column;max-width:480px;margin:0 auto;width:100%;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);position:relative;z-index:1;}
 
-    /* Header */
-    header{padding:22px 20px 0;display:flex;align-items:center;justify-content:space-between;}
-    .logo{display:flex;align-items:baseline;gap:6px;}
-    .logo-text{font-size:24px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-    .logo-sub{font-size:11px;color:var(--muted2);font-family:'JetBrains Mono',monospace;}
-    .header-right{display:flex;align-items:center;gap:8px;}
-    .header-date{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);text-align:right;line-height:1.5;}
-    .icon-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted2);width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;flex-shrink:0;}
-    .icon-btn:active{background:var(--surface2);color:var(--accent);}
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      overflow-x: hidden;
+    }
 
-    /* Tabs */
-    .tab-bar{display:flex;gap:6px;padding:14px 16px 0;}
-    .tab-btn{flex:1;padding:9px 10px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted2);font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.18s;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:6px;}
-    .tab-btn.active{background:var(--surface2);border-color:var(--accent);color:var(--accent);}
-    .page{display:none;flex:1;flex-direction:column;}
-    .page.active{display:flex;}
+    body { min-height: 100dvh; display: flex; flex-direction: column; }
 
-    /* Add page */
-    .add-page{padding:14px 16px;gap:12px;}
-    .hint-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 16px;font-size:12px;color:var(--muted2);font-family:'JetBrains Mono',monospace;line-height:1.7;}
-    .hint-card span{color:var(--accent);}
-    .hint-card.hidden{display:none;}
-    .input-area{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color 0.2s,box-shadow 0.2s;display:flex;flex-direction:column;}
-    .input-area:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
-    .input-label{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);padding:12px 16px 4px;letter-spacing:0.1em;text-transform:uppercase;}
-    textarea{background:transparent;border:none;outline:none;color:var(--text);font-family:'Syne',sans-serif;font-size:18px;font-weight:600;line-height:1.5;padding:8px 16px 14px;resize:none;min-height:110px;caret-color:var(--accent);}
-    textarea::placeholder{color:#2e2e2e;font-weight:400;}
-    .char-count{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted);text-align:right;padding:0 12px 8px;}
+    /* Gradient orbs in background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -120px; left: -80px;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(255,107,53,0.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      bottom: -100px; right: -80px;
+      width: 350px; height: 350px;
+      background: radial-gradient(circle, rgba(255,60,172,0.10) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
 
-    /* Tags */
-    .tags-section{display:flex;flex-direction:column;gap:8px;}
-    .tags-label{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);letter-spacing:0.1em;text-transform:uppercase;display:flex;align-items:center;gap:6px;}
-    .tags-label::after{content:'optional';font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:1px 6px;border-radius:4px;}
-    .tags-grid{display:flex;flex-wrap:wrap;gap:7px;}
-    .tag-pill{padding:7px 13px;border-radius:100px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted2);font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;user-select:none;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:5px;}
-    .tag-pill:active{transform:scale(0.94);}
-    .tag-pill.active{color:#fff;border-color:transparent;}
-    .tag-pill[data-tag="Regular"].active{background:var(--accent);box-shadow:0 0 12px var(--accent-glow);}
-    .tag-pill[data-tag="Shaadi"].active{background:var(--shaadi);box-shadow:0 0 12px var(--shaadi-glow);}
-    .tag-pill[data-tag="Groceries"].active{background:#22c55e;}
-    .tag-pill[data-tag="Food & Dining"].active{background:#f59e0b;}
-    .tag-pill[data-tag="Transport"].active{background:var(--accent4);}
-    .tag-pill[data-tag="Bills & Utilities"].active{background:#8b5cf6;}
-    .tag-pill[data-tag="Health"].active{background:#ef4444;}
-    .tag-pill[data-tag="Shopping"].active{background:#ec4899;}
-    .tag-pill[data-tag="Education"].active{background:#06b6d4;}
-    .tag-pill[data-tag="Entertainment"].active{background:#f97316;}
-    .tag-pill[data-tag="Shaadi"]{border-color:rgba(255,60,172,0.35);color:var(--shaadi);}
-    .custom-tag-input{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:100px;padding:7px 14px;color:var(--text);font-family:'Syne',sans-serif;font-size:12px;font-weight:600;outline:none;transition:border-color 0.2s;}
-    .custom-tag-input::placeholder{color:#2e2e2e;font-weight:400;}
-    .custom-tag-input:focus{border-color:var(--accent2);}
-    .sheet-badge{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);padding:2px 0;transition:all 0.3s;}
-    .sheet-badge .badge-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);transition:background 0.3s;}
-    .sheet-badge.shaadi-mode{color:var(--shaadi);}
-    .sheet-badge.shaadi-mode .badge-dot{background:var(--shaadi);}
-    .divider{height:1px;background:var(--border);margin:0 -16px;}
+    .app {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 480px;
+      margin: 0 auto;
+      width: 100%;
+      padding: env(safe-area-inset-top, 0) 0 env(safe-area-inset-bottom, 0);
+      position: relative;
+      z-index: 1;
+    }
 
-    /* Submit button */
-    .submit-btn{background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);color:#fff;border:none;border-radius:var(--radius);padding:18px;font-family:'Syne',sans-serif;font-size:16px;font-weight:800;cursor:pointer;width:100%;letter-spacing:0.03em;transition:all 0.2s;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 20px rgba(255,107,53,0.3);}
-    .submit-btn:active{transform:scale(0.98);box-shadow:none;}
-    .submit-btn:disabled{background:var(--surface2);color:var(--muted);cursor:not-allowed;transform:none;box-shadow:none;}
-    .submit-btn.shaadi-mode{background:linear-gradient(135deg,var(--accent2) 0%,var(--accent3) 100%);box-shadow:0 4px 20px rgba(255,60,172,0.35);}
-    .btn-content{display:flex;align-items:center;justify-content:center;gap:8px;pointer-events:none;}
-    .spinner{width:18px;height:18px;border:2.5px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:none;}
-    @keyframes spin{to{transform:rotate(360deg);}}
-    .submit-btn.loading .spinner{display:block;}
-    .submit-btn.loading .btn-text{display:none;}
+    /* ── Header ── */
+    header {
+      padding: 22px 20px 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
 
-    /* History page */
-    .history-page{flex-direction:column;}
-    .history-header{padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;}
-    .history-title{font-size:16px;font-weight:800;}
-    .history-subtitle{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);margin-top:2px;}
-    .refresh-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted2);padding:8px 14px;border-radius:10px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:6px;}
-    .refresh-btn:active{background:var(--surface2);}
-    .refresh-btn.spinning svg{animation:spin 0.7s linear infinite;}
-    .sheet-tabs{display:flex;gap:6px;padding:0 16px 10px;}
-    .sheet-tab{padding:6px 14px;border-radius:100px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted2);font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
-    .sheet-tab.active{border-color:var(--accent);color:var(--accent);background:var(--surface2);}
-    .sheet-tab.shaadi.active{border-color:var(--shaadi);color:var(--shaadi);}
-    .history-list{flex:1;overflow-y:auto;padding:0 16px 20px;display:flex;flex-direction:column;gap:8px;}
-    .history-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:60px 20px;color:var(--muted2);font-size:13px;font-family:'JetBrains Mono',monospace;text-align:center;}
-    .history-empty .empty-icon{font-size:36px;opacity:0.4;}
+    .logo { display: flex; align-items: baseline; gap: 6px; }
 
-    /* Analytics summary card */
-    .summary-card{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:16px;margin:0 16px 10px;display:flex;flex-direction:column;gap:10px;}
-    .summary-card.loading-card{opacity:0.5;}
-    .summary-top{display:flex;justify-content:space-between;align-items:flex-start;}
-    .summary-label{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
-    .summary-amount{font-size:26px;font-weight:800;color:var(--text);}
-    .summary-delta{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:100px;}
-    .summary-delta.green{background:rgba(0,229,160,0.12);color:var(--success);}
-    .summary-delta.red{background:rgba(255,77,77,0.12);color:var(--danger);}
-    .summary-divider{height:1px;background:var(--border);}
-    .summary-bottom{display:flex;justify-content:space-between;align-items:center;}
-    .week-block{}
-    .week-amount{font-size:18px;font-weight:800;color:var(--accent);}
-    .last-month-block{text-align:right;}
-    .last-month-amount{font-size:15px;font-weight:700;color:var(--muted2);}
+    .logo-text {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
 
-    /* History card */
-    .history-card{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
-    .history-card:active{transform:scale(0.99);background:var(--surface2);}
-    .history-card:hover{border-color:var(--accent);}
-    .history-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;}
-    .history-item{font-size:15px;font-weight:700;flex:1;}
-    .history-amount{font-size:16px;font-weight:800;color:var(--accent);white-space:nowrap;}
-    .history-amount.shaadi-amount{color:var(--shaadi);}
-    .history-card-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
-    .meta-chip{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);background:var(--surface2);padding:3px 9px;border-radius:6px;}
-    .meta-chip.tag-chip{color:var(--accent);}
-    .history-card .edit-hint{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;text-align:right;margin-top:8px;}
-    .skeleton{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;overflow:hidden;position:relative;}
-    .skeleton::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.04) 50%,transparent 100%);animation:shimmer 1.2s infinite;}
-    @keyframes shimmer{from{transform:translateX(-100%);}to{transform:translateX(100%);}}
-    .skel-line{height:14px;background:var(--surface2);border-radius:6px;margin-bottom:8px;}
-    .skel-line.w60{width:60%;}.skel-line.w40{width:40%;}.skel-line.w80{width:80%;}
+    .logo-sub {
+      font-size: 11px;
+      color: var(--muted2);
+      font-family: 'JetBrains Mono', monospace;
+    }
 
-    /* ── REVIEW BOTTOM SHEET ── */
-    .review-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);display:flex;align-items:flex-end;z-index:120;opacity:0;pointer-events:none;transition:opacity 0.3s;}
-    .review-overlay.show{opacity:1;pointer-events:all;}
-    .review-sheet{background:var(--surface);border:1px solid var(--border);border-radius:24px 24px 0 0;padding:20px 20px calc(16px + env(safe-area-inset-bottom,0));width:100%;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);max-height:90dvh;overflow-y:auto;}
-    .review-overlay.show .review-sheet{transform:translateY(0);}
-    .review-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;}
-    .review-title{font-size:14px;font-weight:800;color:var(--muted2);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px;}
+    .header-right { display: flex; align-items: center; gap: 10px; }
 
-    /* Multi-item choice */
-    .multi-choice{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px;}
-    .multi-choice-label{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);margin-bottom:10px;}
-    .multi-choice-btns{display:flex;gap:8px;}
-    .multi-btn{flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--text);font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;text-align:center;}
-    .multi-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(255,107,53,0.08);}
-    .multi-btn:active{transform:scale(0.97);}
+    .header-date {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--muted2);
+      text-align: right;
+      line-height: 1.5;
+    }
 
-    /* Review chips */
-    .review-items{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
-    .review-chip{background:var(--surface2);border:1.5px solid var(--border);border-radius:14px;padding:12px 14px;transition:border-color 0.2s;}
-    .review-chip:focus-within{border-color:var(--accent);}
-    .review-chip-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
-    .review-chip-num{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);}
-    .review-chip-summary{font-size:13px;font-weight:700;color:var(--accent);}
-    .review-fields{display:flex;flex-wrap:wrap;gap:6px;}
-    .review-field{display:flex;flex-direction:column;flex:1;min-width:120px;}
-    .review-field label{font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;}
-    .review-input{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font-family:'Syne',sans-serif;font-size:13px;font-weight:600;outline:none;width:100%;transition:border-color 0.2s;}
-    .review-input:focus{border-color:var(--accent);}
-    .review-input.amount-input{color:var(--accent);font-size:15px;font-weight:800;}
+    .config-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted2);
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .config-btn:active { background: var(--surface2); color: var(--accent); }
 
-    /* Review action buttons */
-    .review-actions{display:flex;gap:10px;}
-    .btn-cancel-review{flex:1;padding:14px;border:1.5px solid var(--border);background:transparent;color:var(--text);border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
-    .btn-confirm{flex:2;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;pointer-events:all;}
-    .btn-confirm:disabled{background:var(--surface2);color:var(--muted);}
-    .btn-confirm .spinner{display:none;}
-    .btn-confirm.loading .spinner{display:block;}
-    .btn-confirm.loading .confirm-text{display:none;}
+    /* ── Main ── */
+    main {
+      flex: 1;
+      padding: 16px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
 
-    /* Edit overlay */
-    .edit-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.9);backdrop-filter:blur(16px);display:flex;align-items:flex-end;z-index:150;opacity:0;pointer-events:none;transition:opacity 0.3s;}
-    .edit-overlay.show{opacity:1;pointer-events:all;}
-    .edit-sheet{background:var(--surface);border:1px solid var(--border);border-radius:24px 24px 0 0;padding:24px 20px calc(20px + env(safe-area-inset-bottom,0));width:100%;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);max-height:92dvh;overflow-y:auto;}
-    .edit-overlay.show .edit-sheet{transform:translateY(0);}
-    .edit-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 20px;}
-    .edit-title{font-size:18px;font-weight:800;margin-bottom:4px;}
-    .edit-subtitle{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);margin-bottom:20px;}
-    .edit-fields{display:flex;flex-direction:column;gap:12px;margin-bottom:20px;}
-    .edit-field label{display:block;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;}
-    .edit-input{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'Syne',sans-serif;font-size:15px;font-weight:600;outline:none;transition:border-color 0.2s;}
-    .edit-input:focus{border-color:var(--accent);}
-    .edit-input::placeholder{color:var(--muted);font-weight:400;}
-    .row-info{background:var(--surface2);border-radius:10px;padding:10px 14px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);margin-bottom:16px;line-height:1.6;}
-    .edit-actions{display:flex;gap:10px;}
-    .btn-cancel{flex:1;padding:14px;border:1.5px solid var(--border);background:transparent;color:var(--text);border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
-    .btn-save{flex:2;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;}
-    .btn-save:disabled{background:var(--surface2);color:var(--muted);}
-    .btn-save .spinner{display:none;}
-    .btn-save.loading .spinner{display:block;}
-    .btn-save.loading .save-text{display:none;}
+    /* Hint card */
+    .hint-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 16px;
+      font-size: 12px;
+      color: var(--muted2);
+      font-family: 'JetBrains Mono', monospace;
+      line-height: 1.7;
+    }
+    .hint-card span { color: var(--accent); }
+    .hint-card.hidden { display: none; }
 
-    /* Config */
-    .config-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.88);backdrop-filter:blur(12px);display:flex;align-items:flex-end;z-index:200;opacity:0;pointer-events:none;transition:opacity 0.3s;}
-    .config-overlay.show{opacity:1;pointer-events:all;}
-    .config-sheet{background:var(--surface);border:1px solid var(--border);border-radius:24px 24px 0 0;padding:26px 20px calc(20px + env(safe-area-inset-bottom,0));width:100%;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);}
-    .config-overlay.show .config-sheet{transform:translateY(0);}
-    .config-title{font-size:18px;font-weight:800;margin-bottom:20px;display:flex;align-items:center;gap:8px;}
-    .config-field{margin-bottom:14px;}
-    .config-field label{display:block;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:7px;}
-    .config-input{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;transition:border-color 0.2s;}
-    .config-input:focus{border-color:var(--accent);}
-    .save-config-btn{width:100%;margin-top:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;padding:16px;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;cursor:pointer;}
+    /* Textarea */
+    .input-area {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      display: flex;
+      flex-direction: column;
+    }
+    .input-area:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .input-label {
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted2);
+      padding: 12px 16px 4px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    textarea {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      line-height: 1.5;
+      padding: 8px 16px 14px;
+      resize: none;
+      min-height: 110px;
+      caret-color: var(--accent);
+    }
+    textarea::placeholder { color: #2e2e2e; font-weight: 400; }
+
+    .char-count {
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted);
+      text-align: right;
+      padding: 0 12px 8px;
+    }
+
+    /* ── Tags ── */
+    .tags-section { display: flex; flex-direction: column; gap: 8px; }
+
+    .tags-label {
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted2);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tags-label::after {
+      content: 'optional';
+      font-size: 9px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .tags-grid { display: flex; flex-wrap: wrap; gap: 7px; }
+
+    .tag-pill {
+      padding: 7px 13px;
+      border-radius: 100px;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      color: var(--muted2);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .tag-pill:active { transform: scale(0.94); }
+
+    /* Each tag gets its own active color */
+    .tag-pill.active                    { color: #fff; border-color: transparent; }
+    .tag-pill[data-tag="Regular"].active { background: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
+    .tag-pill[data-tag="Shaadi"].active  { background: var(--shaadi); box-shadow: 0 0 12px var(--shaadi-glow); }
+    .tag-pill[data-tag="Groceries"].active   { background: #22c55e; }
+    .tag-pill[data-tag="Food & Dining"].active { background: #f59e0b; }
+    .tag-pill[data-tag="Transport"].active { background: var(--accent4); }
+    .tag-pill[data-tag="Bills & Utilities"].active { background: #8b5cf6; }
+    .tag-pill[data-tag="Health"].active  { background: #ef4444; }
+    .tag-pill[data-tag="Shopping"].active { background: #ec4899; }
+    .tag-pill[data-tag="Education"].active { background: #06b6d4; }
+    .tag-pill[data-tag="Entertainment"].active { background: #f97316; }
+
+    /* Shaadi pill gets special festive look even when inactive */
+    .tag-pill[data-tag="Shaadi"] {
+      border-color: rgba(255,60,172,0.35);
+      color: var(--shaadi);
+    }
+
+    .custom-tag-wrap { display: flex; align-items: center; gap: 8px; }
+    .custom-tag-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 100px;
+      padding: 7px 14px;
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .custom-tag-input::placeholder { color: #2e2e2e; font-weight: 400; }
+    .custom-tag-input:focus { border-color: var(--accent2); }
+
+    /* ── Submit button ── */
+    .submit-btn {
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      padding: 18px;
+      font-family: 'Syne', sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      width: 100%;
+      letter-spacing: 0.03em;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+      -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 4px 20px rgba(255,107,53,0.3);
+    }
+    .submit-btn:active { transform: scale(0.98); box-shadow: none; }
+    .submit-btn:disabled {
+      background: var(--surface2);
+      color: var(--muted);
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* Shaadi mode — button turns pink */
+    .submit-btn.shaadi-mode {
+      background: linear-gradient(135deg, var(--accent2) 0%, var(--accent3) 100%);
+      box-shadow: 0 4px 20px rgba(255,60,172,0.35);
+    }
+
+    .btn-content { display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2.5px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .submit-btn.loading .spinner { display: block; }
+    .submit-btn.loading .btn-text { display: none; }
+
+    /* ── Sheet badge (shows where it will go) ── */
+    .sheet-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted2);
+      padding: 2px 0;
+      transition: all 0.3s;
+    }
+    .sheet-badge .badge-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      transition: background 0.3s;
+    }
+    .sheet-badge.shaadi-mode { color: var(--shaadi); }
+    .sheet-badge.shaadi-mode .badge-dot { background: var(--shaadi); }
+
+    /* ── Result overlay ── */
+    .result-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.88);
+      backdrop-filter: blur(14px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      z-index: 100;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .result-overlay.show { opacity: 1; pointer-events: all; }
+
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 26px 22px;
+      width: 100%;
+      max-width: 380px;
+      transform: translateY(20px);
+      transition: transform 0.3s;
+    }
+    .result-overlay.show .result-card { transform: translateY(0); }
+
+    .result-icon { font-size: 38px; text-align: center; margin-bottom: 10px; }
+    .result-title { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 6px; }
+    .result-title.success { color: var(--success); }
+    .result-title.error   { color: var(--danger); }
+
+    .result-sheet-label {
+      text-align: center;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--muted2);
+      margin-bottom: 18px;
+    }
+    .result-sheet-label strong { color: var(--accent); }
+    .result-sheet-label.shaadi strong { color: var(--shaadi); }
+
+    .parsed-rows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 18px; }
+    .parsed-row {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 12px;
+      padding: 9px 13px;
+      background: var(--surface2);
+      border-radius: 10px;
+    }
+    .parsed-key { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--muted2); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+    .parsed-val { font-size: 14px; font-weight: 600; }
+    .parsed-val.amount { color: var(--accent); font-size: 16px; }
+
+    /* Error detail box */
+    .error-detail {
+      background: rgba(255,77,77,0.08);
+      border: 1px solid rgba(255,77,77,0.25);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .error-detail .error-title { font-size: 12px; font-weight: 700; color: var(--danger); margin-bottom: 6px; }
+    .error-detail .error-msg { font-size: 13px; color: #ffaaaa; font-family: 'JetBrains Mono', monospace; line-height: 1.5; }
+    .error-detail .error-hint { font-size: 12px; color: var(--muted2); margin-top: 8px; line-height: 1.5; }
+
+    .result-actions { display: flex; gap: 10px; }
+    .btn-secondary {
+      flex: 1; padding: 13px;
+      border: 1.5px solid var(--border);
+      background: transparent; color: var(--text);
+      border-radius: 12px;
+      font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-secondary:active { background: var(--surface2); }
+
+    .btn-primary-sm {
+      flex: 1; padding: 13px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; border: none;
+      border-radius: 12px;
+      font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800;
+      cursor: pointer; transition: all 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-primary-sm:active { transform: scale(0.97); }
+
+    /* ── Config sheet ── */
+    .config-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.88);
+      backdrop-filter: blur(12px);
+      display: flex; align-items: flex-end;
+      z-index: 200;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .config-overlay.show { opacity: 1; pointer-events: all; }
+
+    .config-sheet {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px 24px 0 0;
+      padding: 26px 20px calc(20px + env(safe-area-inset-bottom, 0));
+      width: 100%;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .config-overlay.show .config-sheet { transform: translateY(0); }
+
+    .config-title {
+      font-size: 18px; font-weight: 800;
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .config-field { margin-bottom: 14px; }
+    .config-field label {
+      display: block;
+      font-size: 10px; font-family: 'JetBrains Mono', monospace;
+      color: var(--muted2); text-transform: uppercase;
+      letter-spacing: 0.1em; margin-bottom: 7px;
+    }
+    .config-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace; font-size: 13px;
+      outline: none; transition: border-color 0.2s;
+    }
+    .config-input:focus { border-color: var(--accent); }
+
+    .save-config-btn {
+      width: 100%; margin-top: 6px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; border: none;
+      border-radius: 12px; padding: 16px;
+      font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Divider */
+    .divider { height: 1px; background: var(--border); margin: 0 -16px; }
 
     /* Toast */
-    .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 20px;border-radius:100px;font-size:13px;font-weight:600;opacity:0;transition:all 0.3s;white-space:nowrap;z-index:300;}
-    .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+    .toast {
+      position: fixed;
+      bottom: 90px; left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 20px;
+      border-radius: 100px;
+      font-size: 13px; font-weight: 600;
+      opacity: 0; transition: all 0.3s;
+      white-space: nowrap; z-index: 300;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
-    .add-page>*{animation:fadeUp 0.4s ease both;}
-    .add-page>*:nth-child(1){animation-delay:0.04s;}.add-page>*:nth-child(2){animation-delay:0.08s;}
-    .add-page>*:nth-child(3){animation-delay:0.12s;}.add-page>*:nth-child(4){animation-delay:0.16s;}
-    .add-page>*:nth-child(5){animation-delay:0.20s;}.add-page>*:nth-child(6){animation-delay:0.24s;}
-    .add-page>*:nth-child(7){animation-delay:0.28s;}
+    /* Animations */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    main > * { animation: fadeUp 0.4s ease both; }
+    main > *:nth-child(1) { animation-delay: 0.05s; }
+    main > *:nth-child(2) { animation-delay: 0.10s; }
+    main > *:nth-child(3) { animation-delay: 0.15s; }
+    main > *:nth-child(4) { animation-delay: 0.20s; }
+    main > *:nth-child(5) { animation-delay: 0.25s; }
+    main > *:nth-child(6) { animation-delay: 0.30s; }
   </style>
 </head>
 <body>
-<div class="app">
-  <header>
-    <div class="logo"><span class="logo-text">Kharcha</span><span class="logo-sub">/ family log</span></div>
-    <div class="header-right">
-      <div class="header-date" id="headerDate"></div>
-      <button class="icon-btn" onclick="openConfig()">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      </button>
-    </div>
-  </header>
-
-  <div class="tab-bar">
-    <button class="tab-btn active" id="tabAdd" onclick="switchTab('add')">
-      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Expense
-    </button>
-    <button class="tab-btn" id="tabHistory" onclick="switchTab('history')">
-      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 0 .5-4"/><polyline points="3 3 3 7 7 7"/></svg>Recent
-    </button>
-  </div>
-
-  <!-- ADD PAGE -->
-  <div class="page add-page active" id="pageAdd">
-    <div class="hint-card" id="hintCard">Just type naturally — <span>"milk 60 dmart"</span> or <span>"electricity 1200"</span> or <span>"food 300 veg 400"</span></div>
-    <div class="input-area">
-      <div class="input-label">What did you spend on?</div>
-      <textarea id="expenseInput" placeholder="e.g. vegetables 120 Big Bazaar&#10;or: medicines 230 yesterday&#10;or: food 300 vegetables 400" maxlength="500" autofocus></textarea>
-      <div class="char-count" id="charCount">500</div>
-    </div>
-    <div class="tags-section">
-      <div class="tags-label">Tag this expense</div>
-      <div class="tags-grid">
-        <div class="tag-pill" data-tag="Regular" onclick="toggleTag(this)">🏠 Regular</div>
-        <div class="tag-pill" data-tag="Shaadi" onclick="toggleTag(this)">💍 Shaadi</div>
-        <div class="tag-pill" data-tag="Groceries" onclick="toggleTag(this)">🛒 Groceries</div>
-        <div class="tag-pill" data-tag="Food & Dining" onclick="toggleTag(this)">🍽️ Food</div>
-        <div class="tag-pill" data-tag="Transport" onclick="toggleTag(this)">🚗 Transport</div>
-        <div class="tag-pill" data-tag="Bills & Utilities" onclick="toggleTag(this)">⚡ Bills</div>
-        <div class="tag-pill" data-tag="Health" onclick="toggleTag(this)">💊 Health</div>
-        <div class="tag-pill" data-tag="Shopping" onclick="toggleTag(this)">🛍️ Shopping</div>
-        <div class="tag-pill" data-tag="Education" onclick="toggleTag(this)">📚 Education</div>
-        <div class="tag-pill" data-tag="Entertainment" onclick="toggleTag(this)">🎬 Fun</div>
+  <div class="app">
+    <header>
+      <div class="logo">
+        <span class="logo-text">Kharcha</span>
+        <span class="logo-sub">/ family log</span>
       </div>
-      <input class="custom-tag-input" id="customTag" placeholder="+ custom tag (e.g. Trip, Party)" maxlength="30" oninput="onCustomTagInput()"/>
-    </div>
-    <div class="sheet-badge" id="sheetBadge"><div class="badge-dot"></div><span id="sheetBadgeText">Will save to → Expenses sheet</span></div>
-    <div class="divider"></div>
-    <button class="submit-btn" id="submitBtn" onclick="submitExpense()" disabled>
-      <div class="btn-content"><div class="spinner"></div><span class="btn-text">Submit</span></div>
-    </button>
-  </div>
-
-  <!-- HISTORY PAGE -->
-  <div class="page history-page" id="pageHistory">
-    <div class="history-header">
-      <div><div class="history-title">Recent Entries</div><div class="history-subtitle">Tap any entry to edit it</div></div>
-      <button class="refresh-btn" id="refreshBtn" onclick="loadHistory()">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh
-      </button>
-    </div>
-    <div class="sheet-tabs">
-      <button class="sheet-tab active" id="sheetTabExpenses" onclick="switchSheetTab('Expenses')">📋 Expenses</button>
-      <button class="sheet-tab shaadi" id="sheetTabShaadi" onclick="switchSheetTab('Shaadi')">💍 Shaadi</button>
-    </div>
-    <!-- Analytics summary card -->
-    <div class="summary-card" id="summaryCard" style="display:none;">
-      <div class="summary-top">
-        <div>
-          <div class="summary-label">This Month</div>
-          <div class="summary-amount" id="thisMonthAmt">₹0</div>
-        </div>
-        <div class="summary-delta" id="summaryDelta"></div>
+      <div class="header-right">
+        <div class="header-date" id="headerDate"></div>
+        <button class="config-btn" onclick="openConfig()" title="Settings">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
       </div>
-      <div class="summary-divider"></div>
-      <div class="summary-bottom">
-        <div class="week-block">
-          <div class="summary-label">This Week</div>
-          <div class="week-amount" id="thisWeekAmt">₹0</div>
+    </header>
+
+    <main>
+      <div class="hint-card" id="hintCard">
+        Just type naturally —
+        <span>"milk 60 dmart"</span> or
+        <span>"electricity 1200"</span> or
+        <span>"shoes 850 Bata, 3 days ago"</span>
+      </div>
+
+      <div class="input-area">
+        <div class="input-label">What did you spend on?</div>
+        <textarea
+          id="expenseInput"
+          placeholder="e.g. vegetables 120 Big Bazaar&#10;or: medicines 230 yesterday&#10;or: saree 4500 shaadi shopping"
+          maxlength="500"
+          autofocus
+          oninput="onType()"
+        ></textarea>
+        <div class="char-count" id="charCount">500</div>
+      </div>
+
+      <div class="tags-section">
+        <div class="tags-label">Tag this expense</div>
+        <div class="tags-grid" id="tagsGrid">
+          <div class="tag-pill" data-tag="Regular" onclick="toggleTag(this)">
+            🏠 Regular
+          </div>
+          <div class="tag-pill" data-tag="Shaadi" onclick="toggleTag(this)">
+            💍 Shaadi
+          </div>
+          <div class="tag-pill" data-tag="Groceries" onclick="toggleTag(this)">
+            🛒 Groceries
+          </div>
+          <div class="tag-pill" data-tag="Food & Dining" onclick="toggleTag(this)">
+            🍽️ Food
+          </div>
+          <div class="tag-pill" data-tag="Transport" onclick="toggleTag(this)">
+            🚗 Transport
+          </div>
+          <div class="tag-pill" data-tag="Bills & Utilities" onclick="toggleTag(this)">
+            ⚡ Bills
+          </div>
+          <div class="tag-pill" data-tag="Health" onclick="toggleTag(this)">
+            💊 Health
+          </div>
+          <div class="tag-pill" data-tag="Shopping" onclick="toggleTag(this)">
+            🛍️ Shopping
+          </div>
+          <div class="tag-pill" data-tag="Education" onclick="toggleTag(this)">
+            📚 Education
+          </div>
+          <div class="tag-pill" data-tag="Entertainment" onclick="toggleTag(this)">
+            🎬 Fun
+          </div>
         </div>
-        <div class="last-month-block">
-          <div class="summary-label">Last Month</div>
-          <div class="last-month-amount" id="lastMonthAmt">₹0</div>
+        <div class="custom-tag-wrap">
+          <input
+            class="custom-tag-input"
+            id="customTag"
+            placeholder="+ custom tag (e.g. Trip, Party)"
+            maxlength="30"
+          />
         </div>
       </div>
-    </div>
-    <div class="history-list" id="historyList"></div>
-  </div>
-</div>
 
-<!-- REVIEW BOTTOM SHEET -->
-<div class="review-overlay" id="reviewOverlay">
-  <div class="review-sheet">
-    <div class="review-handle"></div>
-    <div class="review-title">Review before saving</div>
-    <!-- multi-item choice — shown only when >1 item detected -->
-    <div class="multi-choice" id="multiChoice" style="display:none;">
-      <div class="multi-choice-label">Multiple items detected — how to save?</div>
-      <div class="multi-choice-btns">
-        <button class="multi-btn active" id="btnSeparate" onclick="setMultiMode('separate')">Separate Rows</button>
-        <button class="multi-btn" id="btnMerge" onclick="setMultiMode('merge')">Merge into One</button>
+      <!-- Sheet destination indicator -->
+      <div class="sheet-badge" id="sheetBadge">
+        <div class="badge-dot"></div>
+        <span id="sheetBadgeText">Will save to → Expenses sheet</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <button class="submit-btn" id="submitBtn" onclick="submitExpense()" disabled>
+        <div class="btn-content">
+          <div class="spinner"></div>
+          <span class="btn-text" id="btnText">Submit</span>
+        </div>
+      </button>
+    </main>
+  </div>
+
+  <!-- ── Result Overlay ── -->
+  <div class="result-overlay" id="resultOverlay">
+    <div class="result-card">
+      <div class="result-icon" id="resultIcon">✅</div>
+      <div class="result-title success" id="resultTitle">Submitted!</div>
+      <div class="result-sheet-label" id="resultSheetLabel"></div>
+      <div class="parsed-rows" id="parsedRows"></div>
+      <div class="error-detail" id="errorDetail">
+        <div class="error-title" id="errorTitle">What went wrong</div>
+        <div class="error-msg" id="errorMsg"></div>
+        <div class="error-hint" id="errorHint"></div>
+      </div>
+      <div class="result-actions">
+        <button class="btn-secondary" onclick="closeResult()">Close</button>
+        <button class="btn-primary-sm" onclick="addAnother()">+ Add More</button>
       </div>
     </div>
-    <div class="review-items" id="reviewItems"></div>
-    <div class="review-actions">
-      <button class="btn-cancel-review" onclick="closeReview()">Cancel</button>
-      <button class="btn-confirm" id="confirmBtn" onclick="confirmAndSave()">
-        <div class="spinner"></div>
-        <span class="confirm-text">✓ Confirm & Save</span>
-      </button>
+  </div>
+
+  <!-- ── Config Sheet ── -->
+  <div class="config-overlay" id="configOverlay" onclick="maybeCloseConfig(event)">
+    <div class="config-sheet">
+      <div class="config-title">⚙️ Setup</div>
+      <div class="config-field">
+        <label>Google Apps Script URL</label>
+        <input class="config-input" id="scriptUrl" type="url" placeholder="https://script.google.com/macros/s/..." />
+      </div>
+      <div class="config-field">
+        <label>Your Name (who's logging)</label>
+        <input class="config-input" id="userName" type="text" placeholder="e.g. Maa, Papa, Rahul" />
+      </div>
+      <div class="config-field">
+        <label>Gemini API Key (free — aistudio.google.com)</label>
+        <input class="config-input" id="apiKey" type="password" placeholder="AIza..." />
+      </div>
+      <button class="save-config-btn" onclick="saveConfig()">Save Settings</button>
     </div>
   </div>
-</div>
 
-<!-- EDIT OVERLAY -->
-<div class="edit-overlay" id="editOverlay" onclick="maybeCloseEdit(event)">
-  <div class="edit-sheet">
-    <div class="edit-handle"></div>
-    <div class="edit-title">✏️ Edit Entry</div>
-    <div class="edit-subtitle" id="editSubtitle"></div>
-    <div class="row-info" id="editRowInfo"></div>
-    <div class="edit-fields">
-      <div class="edit-field"><label>Date</label><input class="edit-input" id="editDate" type="text" placeholder="e.g. 03 May 2025"/></div>
-      <div class="edit-field"><label>Item / Description</label><input class="edit-input" id="editItem" type="text" placeholder="e.g. Milk and bread"/></div>
-      <div class="edit-field"><label>Amount (₹)</label><input class="edit-input" id="editAmount" type="number" placeholder="e.g. 250"/></div>
-      <div class="edit-field"><label>Shop / Place</label><input class="edit-input" id="editShop" type="text" placeholder="e.g. DMart"/></div>
-      <div class="edit-field"><label>Comment</label><input class="edit-input" id="editComment" type="text" placeholder="e.g. for birthday"/></div>
-      <div class="edit-field"><label>Tag</label><input class="edit-input" id="editTag" type="text" placeholder="e.g. Groceries"/></div>
-    </div>
-    <div class="edit-actions">
-      <button class="btn-cancel" onclick="closeEdit()">Cancel</button>
-      <button class="btn-save" id="saveEditBtn" onclick="saveEdit()">
-        <div class="spinner"></div><span class="save-text">Save Changes</span>
-      </button>
-    </div>
-  </div>
-</div>
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
 
-<!-- CONFIG -->
-<div class="config-overlay" id="configOverlay" onclick="maybeCloseConfig(event)">
-  <div class="config-sheet">
-    <div class="config-title">⚙️ Setup</div>
-    <div class="config-field"><label>Google Apps Script URL</label><input class="config-input" id="scriptUrl" type="url" placeholder="https://script.google.com/macros/s/..."/></div>
-    <div class="config-field"><label>Your Name (who's logging)</label><input class="config-input" id="userName" type="text" placeholder="e.g. Maa, Papa, Rahul"/></div>
-    <div class="config-field"><label>Gemini API Key (free — aistudio.google.com)</label><input class="config-input" id="apiKey" type="password" placeholder="AIza..."/></div>
-    <button class="save-config-btn" onclick="saveConfig()">Save Settings</button>
-  </div>
-</div>
+  <script>
+    // ── CONFIG ──────────────────────────────────────────────────────────────
+    const STORAGE_KEY = 'kharcha_config_v2';
 
-<div class="toast" id="toast"></div>
-
-<script>
-// ═══════════════════════════════════════════════
-//  CONFIG  — locked key, never changes
-// ═══════════════════════════════════════════════
-const STORAGE_KEY = 'kharcha_config'; // locked forever
-
-function loadConfig(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{};}catch{return{};}}
-function saveConfig(){
-  const cfg={
-    scriptUrl:document.getElementById('scriptUrl').value.trim(),
-    userName:document.getElementById('userName').value.trim(),
-    apiKey:document.getElementById('apiKey').value.trim()
-  };
-  localStorage.setItem(STORAGE_KEY,JSON.stringify(cfg));
-  closeConfig();showToast('Settings saved ✓');
-}
-function openConfig(){
-  const cfg=loadConfig();
-  document.getElementById('scriptUrl').value=cfg.scriptUrl||'';
-  document.getElementById('userName').value=cfg.userName||'';
-  document.getElementById('apiKey').value=cfg.apiKey||'';
-  document.getElementById('configOverlay').classList.add('show');
-}
-function closeConfig(){document.getElementById('configOverlay').classList.remove('show');}
-function maybeCloseConfig(e){if(e.target===document.getElementById('configOverlay'))closeConfig();}
-
-// ═══════════════════════════════════════════════
-//  DATE
-// ═══════════════════════════════════════════════
-function updateDate(){
-  const now=new Date();
-  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  document.getElementById('headerDate').innerHTML=`${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}<br>${now.getFullYear()}`;
-}
-updateDate();
-
-// ═══════════════════════════════════════════════
-//  TABS
-// ═══════════════════════════════════════════════
-function switchTab(tab){
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
-  document.getElementById('page'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
-  if(tab==='history')loadHistory();
-}
-
-// ═══════════════════════════════════════════════
-//  TAGS
-// ═══════════════════════════════════════════════
-let selectedTag=null;
-function toggleTag(el){
-  const was=selectedTag===el.dataset.tag;
-  document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));
-  selectedTag=was?null:el.dataset.tag;
-  if(!was){el.classList.add('active');document.getElementById('customTag').value='';}
-  updateSheetBadge();
-}
-function getTag(){const c=document.getElementById('customTag').value.trim();return c||selectedTag||'';}
-function isShaadi(){const c=document.getElementById('customTag').value.trim().toLowerCase();return selectedTag==='Shaadi'||c==='shaadi';}
-function onCustomTagInput(){
-  if(document.getElementById('customTag').value.trim()){
-    document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));
-    selectedTag=null;
-  }
-  updateSheetBadge();
-}
-function updateSheetBadge(){
-  const badge=document.getElementById('sheetBadge');
-  const text=document.getElementById('sheetBadgeText');
-  const btn=document.getElementById('submitBtn');
-  if(isShaadi()){badge.classList.add('shaadi-mode');btn.classList.add('shaadi-mode');text.textContent='Will save to → Shaadi sheet 💍';}
-  else{badge.classList.remove('shaadi-mode');btn.classList.remove('shaadi-mode');text.textContent='Will save to → Expenses sheet';}
-}
-
-// ═══════════════════════════════════════════════
-//  INPUT
-// ═══════════════════════════════════════════════
-function onType(){
-  const val=document.getElementById('expenseInput').value;
-  document.getElementById('charCount').textContent=500-val.length;
-  const hasText=val.trim().length>0;
-  document.getElementById('submitBtn').disabled=!hasText;
-  if(hasText)document.getElementById('hintCard').classList.add('hidden');
-  else document.getElementById('hintCard').classList.remove('hidden');
-}
-(function(){
-  const ta=document.getElementById('expenseInput');
-  ['input','keyup','keydown','paste','cut','change'].forEach(ev=>ta.addEventListener(ev,()=>setTimeout(onType,0)));
-})();
-
-// ═══════════════════════════════════════════════
-//  ERRORS
-// ═══════════════════════════════════════════════
-class KharchaError extends Error{
-  constructor(title,message,hint){super(message);this.title=title;this.hint=hint;}
-}
-
-// ═══════════════════════════════════════════════
-//  GEMINI — multi-item aware
-// ═══════════════════════════════════════════════
-async function parseWithGemini(text,apiKey){
-  const now=new Date();
-  const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-  const y=new Date(now);y.setDate(now.getDate()-1);
-  const d2=new Date(now);d2.setDate(now.getDate()-2);
-  const d3=new Date(now);d3.setDate(now.getDate()-3);
-
-  const prompt='You are a family expense parser for an Indian family. Parse the text and return ONLY a valid JSON array. No markdown, no explanation, no code fences.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDate reference:\n- Today: '+fmt(now)+'\n- Yesterday: '+fmt(y)+'\n- 2 days ago: '+fmt(d2)+'\n- 3 days ago: '+fmt(d3)+'\n- Day of week: '+['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()]+'\n\nReturn a JSON ARRAY (even for one item):\n[{"date":"DD Mon YYYY","item":"description","amount":number_or_null,"shop":"name_or_null","comment":"extra_or_null"}]\n\nRules: detect multiple items if text has multiple expenses, resolve relative dates, amount is digits only, return ONLY the JSON array.';
-
-  const cfg=loadConfig();
-  if(!cfg.scriptUrl) throw new KharchaError('Script URL Missing','No Apps Script URL set.','Tap ⚙️ and add your Script URL.');
-
-  // Call Gemini via Apps Script proxy (avoids CORS)
-  let res;
-  try {
-    res = await fetch(cfg.scriptUrl+'?action=geminiProxy', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({apiKey, prompt})
-    });
-  } catch(fetchErr) {
-    throw new KharchaError('Network Error','Could not reach Apps Script: '+fetchErr.message,'Check your internet connection and Script URL in ⚙️.');
-  }
-
-  if(!res.ok) throw new KharchaError('Proxy Error','Apps Script returned HTTP '+res.status,'Redeploy your Apps Script as a Web App with access set to Anyone.');
-
-  let data;
-  try { data=await res.json(); } catch(e) { throw new KharchaError('Response Error','Could not read response from Apps Script.','Make sure you deployed the latest Code.gs.'); }
-
-  if(!data.success) {
-    const m=data.error||'Unknown error';
-    if(m.includes('400')||m.includes('API_KEY')) throw new KharchaError('Invalid Gemini API Key',m,'Go to aistudio.google.com → API Keys → copy key starting with AIza...');
-    if(m.includes('429')) throw new KharchaError('Rate Limit Hit',m,'Wait a minute. Free tier = 15 req/min.');
-    throw new KharchaError('Gemini Error',m,'Check your Gemini API key in ⚙️.');
-  }
-
-  const raw=data.result||'';
-  try { 
-    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
-    return Array.isArray(parsed)?parsed:[parsed];
-  } catch {
-    throw new KharchaError('Parse Error','Bad JSON from Gemini: '+raw.substring(0,80),'Try simpler text.');
-  }
-}
-function openConfig(){
-  const cfg=loadConfig();
-  document.getElementById('scriptUrl').value=cfg.scriptUrl||'';
-  document.getElementById('userName').value=cfg.userName||'';
-  document.getElementById('apiKey').value=cfg.apiKey||'';
-  document.getElementById('configOverlay').classList.add('show');
-}
-function closeConfig(){document.getElementById('configOverlay').classList.remove('show');}
-function maybeCloseConfig(e){if(e.target===document.getElementById('configOverlay'))closeConfig();}
-
-// ═══════════════════════════════════════════════
-//  DATE
-// ═══════════════════════════════════════════════
-function updateDate(){
-  const now=new Date();
-  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  document.getElementById('headerDate').innerHTML=`${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}<br>${now.getFullYear()}`;
-}
-updateDate();
-
-// ═══════════════════════════════════════════════
-//  TABS
-// ═══════════════════════════════════════════════
-function switchTab(tab){
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
-  document.getElementById('page'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
-  if(tab==='history')loadHistory();
-}
-
-// ═══════════════════════════════════════════════
-//  TAGS
-// ═══════════════════════════════════════════════
-selectedTag=null;
-function toggleTag(el){
-  const was=selectedTag===el.dataset.tag;
-  document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));
-  selectedTag=was?null:el.dataset.tag;
-  if(!was){el.classList.add('active');document.getElementById('customTag').value='';}
-  updateSheetBadge();
-}
-function getTag(){const c=document.getElementById('customTag').value.trim();return c||selectedTag||'';}
-function isShaadi(){const c=document.getElementById('customTag').value.trim().toLowerCase();return selectedTag==='Shaadi'||c==='shaadi';}
-function onCustomTagInput(){
-  if(document.getElementById('customTag').value.trim()){
-    document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));
-    selectedTag=null;
-  }
-  updateSheetBadge();
-}
-function updateSheetBadge(){
-  const badge=document.getElementById('sheetBadge');
-  const text=document.getElementById('sheetBadgeText');
-  const btn=document.getElementById('submitBtn');
-  if(isShaadi()){badge.classList.add('shaadi-mode');btn.classList.add('shaadi-mode');text.textContent='Will save to → Shaadi sheet 💍';}
-  else{badge.classList.remove('shaadi-mode');btn.classList.remove('shaadi-mode');text.textContent='Will save to → Expenses sheet';}
-}
-
-// ═══════════════════════════════════════════════
-//  INPUT
-// ═══════════════════════════════════════════════
-function onType(){
-  const val=document.getElementById('expenseInput').value;
-  document.getElementById('charCount').textContent=500-val.length;
-  const hasText=val.trim().length>0;
-  document.getElementById('submitBtn').disabled=!hasText;
-  if(hasText)document.getElementById('hintCard').classList.add('hidden');
-  else document.getElementById('hintCard').classList.remove('hidden');
-}
-(function(){
-  const ta=document.getElementById('expenseInput');
-  ['input','keyup','keydown','paste','cut','change'].forEach(ev=>ta.addEventListener(ev,()=>setTimeout(onType,0)));
-})();
-
-// ═══════════════════════════════════════════════
-//  ERRORS
-// ═══════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════
-//  GEMINI — multi-item aware
-// ═══════════════════════════════════════════════
-async function parseWithGemini(text,apiKey){
-  const now=new Date();
-  const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-  const y=new Date(now);y.setDate(now.getDate()-1);
-  const d2=new Date(now);d2.setDate(now.getDate()-2);
-  const d3=new Date(now);d3.setDate(now.getDate()-3);
-
-  const prompt=`You are a family expense parser for an Indian family. Parse the text and return ONLY a valid JSON array. No markdown, no explanation, no code fences.
-
-Text: "${text}"
-
-Date reference:
-- Today: ${fmt(now)}
-- Yesterday: ${fmt(y)}
-- 2 days ago: ${fmt(d2)}
-- 3 days ago: ${fmt(d3)}
-- Day of week: ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()]}
-
-Return a JSON ARRAY of items (even if just one item, return array with one element):
-[{"date":"DD Mon YYYY","item":"description","amount":number_or_null,"shop":"name_or_null","comment":"extra_or_null"}]
-
-Rules:
-- Detect multiple items if the text contains multiple expense entries (e.g. "food 300 veg 400" = 2 items)
-- Resolve ALL relative dates
-- amount is digits only
-- Return ONLY the JSON array, nothing else`;
-
-  let res;
-  try {
-    res=await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`,
-      {method:'POST',headers:{'Content-Type':'application/json'},
-       body:JSON.stringify({
-         contents:[{parts:[{text:prompt}]}],
-         generationConfig:{maxOutputTokens:500},
-         thinkingConfig:{thinkingBudget:0}
-       })}
-    );
-  } catch(fetchErr) {
-    throw new KharchaError(
-      'Network / CORS Error',
-      'Could not reach Gemini API: '+fetchErr.message,
-      'If on desktop Chrome, try opening the app in an Incognito window. On mobile this usually works fine.'
-    );
-  }
-
-  if(!res.ok){
-    let err={};try{err=await res.json();}catch{}
-    const s=res.status,m=err?.error?.message||'Unknown error';
-    if(s===400)throw new KharchaError('Invalid API Key',`Gemini rejected the key (400): ${m}`,'Go to aistudio.google.com → API Keys → copy key starting with AIza...');
-    if(s===403)throw new KharchaError('API Key Not Authorised',`Gemini 403 Forbidden: ${m}`,'Enable "Generative Language API" in Google Cloud Console.');
-    if(s===429)throw new KharchaError('Rate Limit',`Gemini 429: ${m}`,'Wait a minute. Free tier = 15 req/min.');
-    throw new KharchaError(`Gemini Error (${s})`,m,'Check your API key in ⚙️ settings.');
-  }
-
-  const data=await res.json();
-  const raw=data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  if(!raw)throw new KharchaError('Empty Response','Gemini returned nothing.','Try rephrasing.');
-  try{
-    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
-    return Array.isArray(parsed)?parsed:[parsed];
-  }catch{throw new KharchaError('Parse Error',`Bad JSON from Gemini: ${raw.substring(0,80)}`,'Try simpler text.');}
-}
-
-// ═══════════════════════════════════════════════
-//  SUBMIT — shows review sheet instead of saving
-// ═══════════════════════════════════════════════
-let parsedItems=[];   // holds Gemini result
-let multiMode='separate'; // 'separate' or 'merge'
-
-async function submitExpense(){
-  const cfg=loadConfig();
-  if(!cfg.scriptUrl){openConfig();showToast('Please add your Script URL first');return;}
-  if(!cfg.apiKey){openConfig();showToast('Please add your Gemini API key');return;}
-  const text=document.getElementById('expenseInput').value.trim();
-  if(!text)return;
-
-  const btn=document.getElementById('submitBtn');
-  btn.disabled=true;btn.classList.add('loading');
-
-  try{
-    parsedItems=await parseWithGemini(text,cfg.apiKey);
-    openReview(parsedItems);
-  }catch(err){
-    if(err instanceof KharchaError)showErrorToast(err.title+': '+err.message);
-    else showErrorToast(err.message||'Something went wrong');
-  }finally{
-    btn.classList.remove('loading');
-    btn.disabled=document.getElementById('expenseInput').value.trim().length===0;
-  }
-}
-
-// ═══════════════════════════════════════════════
-//  REVIEW SHEET
-// ═══════════════════════════════════════════════
-function openReview(items){
-  multiMode='separate';
-  const isMulti=items.length>1;
-  document.getElementById('multiChoice').style.display=isMulti?'block':'none';
-  document.getElementById('btnSeparate').classList.toggle('active',true);
-  document.getElementById('btnMerge').classList.toggle('active',false);
-  renderReviewChips(items,isMulti?'separate':'single');
-  document.getElementById('reviewOverlay').classList.add('show');
-}
-
-function closeReview(){document.getElementById('reviewOverlay').classList.remove('show');}
-
-function setMultiMode(mode){
-  multiMode=mode;
-  document.getElementById('btnSeparate').classList.toggle('active',mode==='separate');
-  document.getElementById('btnMerge').classList.toggle('active',mode==='merge');
-  renderReviewChips(parsedItems,mode);
-}
-
-function renderReviewChips(items,mode){
-  const container=document.getElementById('reviewItems');
-  const tag=getTag();
-  const sheetName=isShaadi()?'Shaadi':'Expenses';
-
-  if(mode==='merge'||mode==='single'){
-    // Single merged chip
-    const mergedItem=items.map(i=>i.item||'').filter(Boolean).join(', ');
-    const mergedAmt=items.reduce((s,i)=>s+(parseFloat(i.amount)||0),0)||'';
-    // Shop: use only if all items share the same shop
-    const shops=[...new Set(items.map(i=>i.shop).filter(Boolean))];
-    const mergedShop=shops.length===1?shops[0]:'';
-    const date=items[0]?.date||'';
-    container.innerHTML=buildChip({date,item:mergedItem,amount:mergedAmt,shop:mergedShop,comment:'',tag,sheetName},0,null);
-  } else {
-    // Separate chips per item
-    container.innerHTML=items.map((item,i)=>buildChip({...item,tag,sheetName},i,items.length)).join('');
-  }
-}
-
-function buildChip(item,idx,total){
-  var label = total ? ('Item '+(idx+1)+' of '+total) : 'Review';
-  var amtDisplay = item.amount ? ('Rs.'+item.amount) : '--';
-  var dateDisplay = item.date || 'today';
-  var header = '<div class="review-chip-header">'
-    + '<span class="review-chip-num">'+label+'</span>'
-    + '<span class="review-chip-summary">'+amtDisplay+' - '+dateDisplay+'</span>'
-    + '</div>';
-  return '<div class="review-chip" id="chip-'+idx+'">'
-    + header
-    + '<div class="review-fields">'
-    + '<div class="review-field" style="flex:2;min-width:180px;">'
-    +   '<label>Item</label>'
-    +   '<input class="review-input" id="rv-item-'+idx+'" value="'+esc(item.item||'')+'" placeholder="Item name"/>'
-    + '</div>'
-    + '<div class="review-field" style="min-width:90px;">'
-    +   '<label>Amount</label>'
-    +   '<input class="review-input amount-input" id="rv-amount-'+idx+'" type="number" value="'+(item.amount||'')+'" placeholder="0"/>'
-    + '</div>'
-    + '<div class="review-field">'
-    +   '<label>Date</label>'
-    +   '<input class="review-input" id="rv-date-'+idx+'" value="'+esc(item.date||'')+'" placeholder="DD Mon YYYY"/>'
-    + '</div>'
-    + '<div class="review-field">'
-    +   '<label>Shop</label>'
-    +   '<input class="review-input" id="rv-shop-'+idx+'" value="'+esc(item.shop||'')+'" placeholder="optional"/>'
-    + '</div>'
-    + '<div class="review-field" style="flex:2;min-width:180px;">'
-    +   '<label>Comment</label>'
-    +   '<input class="review-input" id="rv-comment-'+idx+'" value="'+esc(item.comment||'')+'" placeholder="optional"/>'
-    + '</div>'
-    + '</div>'
-    + '</div>';
-}
-
-// ═══════════════════════════════════════════════
-//  CONFIRM & SAVE
-// ═══════════════════════════════════════════════
-async function confirmAndSave(){
-  const cfg=loadConfig();
-  if(!cfg.scriptUrl){showToast('Script URL not set');return;}
-
-  const btn=document.getElementById('confirmBtn');
-  btn.classList.add('loading');btn.disabled=true;
-
-  const tag=getTag();
-  const loggedBy=cfg.userName||'Unknown';
-  const sheetName=isShaadi()?'Shaadi':'Expenses';
-  const rawText=document.getElementById('expenseInput').value.trim();
-
-  try{
-    let rowsToSave=[];
-
-    if(multiMode==='merge'||parsedItems.length===1){
-      // Read from single chip (index 0)
-      rowsToSave=[{
-        date:    document.getElementById('rv-date-0').value.trim(),
-        item:    document.getElementById('rv-item-0').value.trim(),
-        amount:  document.getElementById('rv-amount-0').value.trim(),
-        shop:    document.getElementById('rv-shop-0').value.trim(),
-        comment: document.getElementById('rv-comment-0').value.trim(),
-        tag,loggedBy,rawText,sheetName
-      }];
-    } else {
-      // Read from each chip separately
-      rowsToSave=parsedItems.map((_,i)=>({
-        date:    document.getElementById(`rv-date-${i}`).value.trim(),
-        item:    document.getElementById(`rv-item-${i}`).value.trim(),
-        amount:  document.getElementById(`rv-amount-${i}`).value.trim(),
-        shop:    document.getElementById(`rv-shop-${i}`).value.trim(),
-        comment: document.getElementById(`rv-comment-${i}`).value.trim(),
-        tag,loggedBy,rawText,sheetName
-      }));
+    function loadConfig() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
     }
 
-    // Send all rows (sequential POSTs)
-    for(const row of rowsToSave){
-      await fetch(cfg.scriptUrl,{
-        method:'POST',mode:'no-cors',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(row)
-      });
+    function saveConfig() {
+      const cfg = {
+        scriptUrl: document.getElementById('scriptUrl').value.trim(),
+        userName:  document.getElementById('userName').value.trim(),
+        apiKey:    document.getElementById('apiKey').value.trim(),
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+      closeConfig();
+      showToast('Settings saved ✓');
     }
 
-    closeReview();
-    resetAddForm();
-    const count=rowsToSave.length;
-    showToast(count>1?`✅ ${count} entries saved!`:'✅ Saved!', 5000);
+    function openConfig() {
+      const cfg = loadConfig();
+      document.getElementById('scriptUrl').value = cfg.scriptUrl || '';
+      document.getElementById('userName').value  = cfg.userName  || '';
+      document.getElementById('apiKey').value    = cfg.apiKey    || '';
+      document.getElementById('configOverlay').classList.add('show');
+    }
 
-  }catch(err){
-    showToast('Save failed — try again');
-  }finally{
-    btn.classList.remove('loading');btn.disabled=false;
-  }
-}
+    function closeConfig() {
+      document.getElementById('configOverlay').classList.remove('show');
+    }
 
-function resetAddForm(){
-  document.getElementById('expenseInput').value='';
-  document.getElementById('charCount').textContent='500';
-  document.getElementById('submitBtn').disabled=true;
-  document.getElementById('hintCard').classList.remove('hidden');
-  document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));
-  selectedTag=null;
-  document.getElementById('customTag').value='';
-  updateSheetBadge();
-}
+    function maybeCloseConfig(e) {
+      if (e.target === document.getElementById('configOverlay')) closeConfig();
+    }
 
-// ═══════════════════════════════════════════════
-//  HISTORY & ANALYTICS
-// ═══════════════════════════════════════════════
-let currentSheetTab='Expenses';
-let historyData=[];
+    // ── DATE ────────────────────────────────────────────────────────────────
+    function updateDate() {
+      const now = new Date();
+      const days   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      document.getElementById('headerDate').innerHTML =
+        `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]}<br>${now.getFullYear()}`;
+    }
+    updateDate();
 
-function switchSheetTab(name){
-  currentSheetTab=name;
-  document.getElementById('sheetTabExpenses').classList.toggle('active',name==='Expenses');
-  document.getElementById('sheetTabShaadi').classList.toggle('active',name==='Shaadi');
-  loadHistory();
-}
+    // ── TAGS ────────────────────────────────────────────────────────────────
+    let selectedTag = null;
 
-async function loadHistory(){
-  const cfg=loadConfig();
-  if(!cfg.scriptUrl){showToast('Set up Script URL in ⚙️ first');return;}
+    function toggleTag(el) {
+      const wasActive = selectedTag === el.dataset.tag;
+      document.querySelectorAll('.tag-pill').forEach(p => p.classList.remove('active'));
+      if (wasActive) {
+        selectedTag = null;
+      } else {
+        el.classList.add('active');
+        selectedTag = el.dataset.tag;
+        document.getElementById('customTag').value = '';
+      }
+      updateSheetBadge();
+    }
 
-  const list=document.getElementById('historyList');
-  const refresh=document.getElementById('refreshBtn');
-  refresh.classList.add('spinning');
-  document.getElementById('summaryCard').style.display='none';
+    function getTag() {
+      const custom = document.getElementById('customTag').value.trim();
+      return custom || selectedTag || '';
+    }
 
-  list.innerHTML=Array(5).fill(0).map(()=>`<div class="skeleton"><div class="skel-line w60"></div><div class="skel-line w40"></div><div class="skel-line w80"></div></div>`).join('');
+    function isShaadi() {
+      const custom = document.getElementById('customTag').value.trim().toLowerCase();
+      return selectedTag === 'Shaadi' || custom === 'shaadi';
+    }
 
-  try{
-    // Fetch recent rows + summary in parallel
-    const [recentRes,summaryRes]=await Promise.all([
-      fetch(`${cfg.scriptUrl}?action=getRecent&sheet=${encodeURIComponent(currentSheetTab)}&n=10`),
-      currentSheetTab==='Expenses'
-        ? fetch(`${cfg.scriptUrl}?action=getSummary`)
-        : Promise.resolve(null)
-    ]);
-
-    if(!recentRes.ok)throw new Error(`HTTP ${recentRes.status}`);
-    const recentData=await recentRes.json();
-    if(!recentData.success)throw new Error(recentData.error||'Script error');
-    historyData=recentData.rows||[];
-    renderHistory();
-
-    // Render analytics card (Expenses tab only)
-    if(summaryRes && currentSheetTab==='Expenses'){
-      if(summaryRes.ok){
-        const sData=await summaryRes.json();
-        if(sData.success)renderSummaryCard(sData);
+    function updateSheetBadge() {
+      const badge     = document.getElementById('sheetBadge');
+      const badgeText = document.getElementById('sheetBadgeText');
+      const btn       = document.getElementById('submitBtn');
+      if (isShaadi()) {
+        badge.classList.add('shaadi-mode');
+        btn.classList.add('shaadi-mode');
+        badgeText.textContent = 'Will save to → Shaadi sheet 💍';
+      } else {
+        badge.classList.remove('shaadi-mode');
+        btn.classList.remove('shaadi-mode');
+        badgeText.textContent = 'Will save to → Expenses sheet';
       }
     }
 
-  }catch(err){
-    list.innerHTML=`<div class="history-empty"><div class="empty-icon">⚠️</div><div>Could not load history</div><div style="font-size:11px;margin-top:4px;color:var(--muted)">${err.message}</div><div style="font-size:11px;margin-top:8px;color:var(--muted)">Make sure you deployed the updated Code.gs</div></div>`;
-  }finally{
-    refresh.classList.remove('spinning');
-  }
+    document.getElementById('customTag').addEventListener('input', () => {
+      const val = document.getElementById('customTag').value.trim();
+      if (val) {
+        document.querySelectorAll('.tag-pill').forEach(p => p.classList.remove('active'));
+        selectedTag = null;
+      }
+      updateSheetBadge();
+    });
+
+    // ── INPUT ───────────────────────────────────────────────────────────────
+    function onType() {
+      const val = document.getElementById('expenseInput').value;
+      document.getElementById('charCount').textContent = 500 - val.length;
+      document.getElementById('submitBtn').disabled = val.trim().length === 0;
+      if (val.length > 0) document.getElementById('hintCard').classList.add('hidden');
+      else document.getElementById('hintCard').classList.remove('hidden');
+    }
+
+    // ── GEMINI PARSE ────────────────────────────────────────────────────────
+    async function parseWithGemini(text, apiKey) {
+      const now   = new Date();
+      const today = now.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+
+      // Give Gemini full context to resolve relative dates
+      const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+      const twoDaysAgo = new Date(now); twoDaysAgo.setDate(now.getDate() - 2);
+      const threeDaysAgo = new Date(now); threeDaysAgo.setDate(now.getDate() - 3);
+
+      const fmt = d => d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+
+      const prompt = `You are a family expense parser for an Indian family. Extract expense details from casual text and return ONLY a valid JSON object. No markdown, no explanation, no code fences.
+
+Text: "${text}"
+
+Date reference (use these to resolve relative dates):
+- Today: ${fmt(now)}
+- Yesterday: ${fmt(yesterday)}
+- 2 days ago: ${fmt(twoDaysAgo)}
+- 3 days ago: ${fmt(threeDaysAgo)}
+- Current day of week: ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()]}
+
+Return this exact JSON:
+{
+  "date": "resolved date as DD Mon YYYY",
+  "item": "what was bought or paid for (be descriptive)",
+  "amount": number or null (digits only, no currency symbols),
+  "shop": "shop or place name or null if not mentioned",
+  "comment": "any extra context like 'for birthday', 'for Rahul', 'advance payment' or null"
 }
 
-function renderSummaryCard(data){
-  const card=document.getElementById('summaryCard');
-  card.style.display='block';
+Rules:
+- Resolve ALL relative dates: "yesterday", "2 days ago", "3 days back", "last Monday" etc using the reference above
+- Amount must be a plain number (e.g. 1200, not ₹1200 or Rs.1200)
+- If multiple items, join them (e.g. "Milk and bread")
+- Return ONLY the JSON object, absolutely nothing else`;
 
-  const thisMonth=data.thisMonth||0;
-  const lastMonth=data.lastMonth||0;
-  const thisWeek=data.thisWeek||0;
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0, maxOutputTokens: 400 }
+          })
+        }
+      );
 
-  document.getElementById('thisMonthAmt').textContent='₹'+thisMonth.toLocaleString('en-IN');
-  document.getElementById('thisWeekAmt').textContent='₹'+thisWeek.toLocaleString('en-IN');
-  document.getElementById('lastMonthAmt').textContent='₹'+lastMonth.toLocaleString('en-IN');
+      // ── Detailed error handling ──
+      if (!res.ok) {
+        let errBody = {};
+        try { errBody = await res.json(); } catch {}
+        const status  = res.status;
+        const apiMsg  = errBody?.error?.message || 'Unknown error';
+        const apiCode = errBody?.error?.code || status;
 
-  const delta=document.getElementById('summaryDelta');
-  if(lastMonth>0){
-    const pct=Math.round(((thisMonth-lastMonth)/lastMonth)*100);
-    const less=pct<0;
-    delta.textContent=(less?'▼ ':'▲ ')+Math.abs(pct)+'% '+(less?'less':'more');
-    delta.className='summary-delta '+(less?'green':'red');
-  } else {
-    delta.textContent='First month!';
-    delta.className='summary-delta green';
-  }
-}
+        if (status === 400) throw new KharchaError('Invalid API Key', `Gemini rejected the request (400). Your API key may be wrong or malformed.`, 'Go to aistudio.google.com → API Keys → copy the key starting with AIza...');
+        if (status === 403) throw new KharchaError('API Key Not Authorised', `Gemini returned 403 Forbidden. The key may not have Generative Language API enabled.`, 'In Google Cloud Console, enable the "Generative Language API" for your project.');
+        if (status === 429) throw new KharchaError('Rate Limit Reached', `Gemini returned 429 Too Many Requests. You've hit the free tier limit.`, 'Wait a minute and try again. Free tier allows 15 requests/minute.');
+        throw new KharchaError(`Gemini Error (${apiCode})`, apiMsg, 'Check your API key in ⚙️ settings.');
+      }
 
-function renderHistory(){
-  const list=document.getElementById('historyList');
-  if(!historyData.length){
-    list.innerHTML=`<div class="history-empty"><div class="empty-icon">📭</div><div>No entries yet in ${currentSheetTab}</div></div>`;
-    return;
-  }
-  const isSh=currentSheetTab==='Shaadi';
-  list.innerHTML=historyData.map((row,i)=>`
-    <div class="history-card" onclick="openEdit(${i})">
-      <div class="history-card-top">
-        <div class="history-item">${esc(row.item||'—')}</div>
-        <div class="history-amount ${isSh?'shaadi-amount':''}">${row.amount?'₹'+row.amount:'—'}</div>
-      </div>
-      <div class="history-card-meta">
-        <span class="meta-chip">📅 ${esc(row.date||'—')}</span>
-        ${row.shop?`<span class="meta-chip">🏪 ${esc(row.shop)}</span>`:''}
-        ${row.tag?`<span class="meta-chip tag-chip">🏷 ${esc(row.tag)}</span>`:''}
-        ${row.loggedBy?`<span class="meta-chip">👤 ${esc(row.loggedBy)}</span>`:''}
-      </div>
-      ${row.comment?`<div style="font-size:12px;color:var(--muted2);margin-top:6px;font-family:'JetBrains Mono',monospace">💬 ${esc(row.comment)}</div>`:''}
-      <div class="edit-hint">Tap to edit →</div>
-    </div>`).join('');
-}
+      const data = await res.json();
+      const raw  = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (!raw) throw new KharchaError('Empty Gemini Response', 'Gemini returned no content.', 'Try rephrasing your expense or try again in a moment.');
 
-function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+      const clean = raw.replace(/```json|```/g, '').trim();
+      try {
+        return JSON.parse(clean);
+      } catch {
+        throw new KharchaError('AI Parse Error', `Could not read Gemini's response as JSON.\n\nRaw: ${clean.substring(0, 100)}`, 'Try a simpler expense description.');
+      }
+    }
 
-// ═══════════════════════════════════════════════
-//  EDIT
-// ═══════════════════════════════════════════════
-let editingRow=null;
-function openEdit(index){
-  const row=historyData[index];if(!row)return;editingRow=row;
-  document.getElementById('editSubtitle').textContent=`Row ${row.rowNum} in "${row.sheetName}" sheet`;
-  document.getElementById('editRowInfo').innerHTML=`<strong>Original:</strong> "${esc(row.rawText||row.item||'')}"`;
-  document.getElementById('editDate').value=row.date||'';
-  document.getElementById('editItem').value=row.item||'';
-  document.getElementById('editAmount').value=row.amount||'';
-  document.getElementById('editShop').value=row.shop||'';
-  document.getElementById('editComment').value=row.comment||'';
-  document.getElementById('editTag').value=row.tag||'';
-  document.getElementById('saveEditBtn').disabled=false;
-  document.getElementById('editOverlay').classList.add('show');
-}
-function closeEdit(){document.getElementById('editOverlay').classList.remove('show');editingRow=null;}
-function maybeCloseEdit(e){if(e.target===document.getElementById('editOverlay'))closeEdit();}
+    // Custom error class for structured errors
+    class KharchaError extends Error {
+      constructor(title, message, hint) {
+        super(message);
+        this.title = title;
+        this.hint  = hint;
+      }
+    }
 
-async function saveEdit(){
-  const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Script URL not set');return;}if(!editingRow)return;
-  const btn=document.getElementById('saveEditBtn');btn.classList.add('loading');btn.disabled=true;
-  const updated={
-    action:'updateRow',rowNum:editingRow.rowNum,sheetName:editingRow.sheetName,
-    date:document.getElementById('editDate').value.trim(),
-    item:document.getElementById('editItem').value.trim(),
-    amount:document.getElementById('editAmount').value.trim(),
-    shop:document.getElementById('editShop').value.trim(),
-    comment:document.getElementById('editComment').value.trim(),
-    tag:document.getElementById('editTag').value.trim(),
-    loggedBy:editingRow.loggedBy||loadConfig().userName||'',
-    rawText:editingRow.rawText||'',timestamp:editingRow.timestamp||''
-  };
-  try{
-    await fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(updated)});
-    Object.assign(editingRow,updated);renderHistory();closeEdit();showToast('Entry updated ✓');
-  }catch(err){showToast('Update failed — try again');}
-  finally{btn.classList.remove('loading');btn.disabled=false;}
-}
+    // ── SUBMIT ──────────────────────────────────────────────────────────────
+    async function submitExpense() {
+      const cfg = loadConfig();
 
-// ═══════════════════════════════════════════════
-//  TOAST
-// ═══════════════════════════════════════════════
-let toastTimer=null;
-function showToast(msg,duration=2500){
-  const t=document.getElementById('toast');
-  t.textContent=msg;t.classList.add('show');
-  if(toastTimer)clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>t.classList.remove('show'),duration);
-}
-function showErrorToast(msg){showToast('❌ '+msg,5000);}
+      if (!cfg.scriptUrl) {
+        openConfig();
+        showToast('Please add your Script URL first');
+        return;
+      }
+      if (!cfg.apiKey) {
+        openConfig();
+        showToast('Please add your Gemini API key');
+        return;
+      }
 
-// ═══════════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════════
-const _cfg=loadConfig();
-if(!_cfg.scriptUrl||!_cfg.apiKey)setTimeout(()=>showToast('Tap ⚙️ to set up your app'),800);
-</script>
+      const text = document.getElementById('expenseInput').value.trim();
+      if (!text) return;
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.classList.add('loading');
+
+      try {
+        // 1. Parse with Gemini AI
+        const parsed    = await parseWithGemini(text, cfg.apiKey);
+        const tag       = getTag();
+        const loggedBy  = cfg.userName || 'Unknown';
+        const sheetName = isShaadi() ? 'Shaadi' : 'Expenses';
+
+        // 2. Send to Google Apps Script → Google Sheets
+        const payload = { ...parsed, tag, loggedBy, rawText: text, sheetName };
+
+        await fetch(cfg.scriptUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        // 3. Show success result
+        showResult(parsed, tag, loggedBy, sheetName);
+
+      } catch (err) {
+        if (err instanceof KharchaError) {
+          showError(err.title, err.message, err.hint);
+        } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+          showError('Network Error', 'Could not reach the internet. Check your connection.', 'Make sure you have internet access and try again.');
+        } else {
+          showError('Unexpected Error', err.message || 'Something went wrong.', 'Try again or check your settings.');
+        }
+      } finally {
+        btn.classList.remove('loading');
+        btn.disabled = document.getElementById('expenseInput').value.trim().length === 0;
+      }
+    }
+
+    // ── RESULT ──────────────────────────────────────────────────────────────
+    function showResult(parsed, tag, loggedBy, sheetName) {
+      document.getElementById('parsedRows').innerHTML = '';
+      document.getElementById('errorDetail').style.display = 'none';
+
+      const isShaadiEntry = sheetName === 'Shaadi';
+      const sheetLabel = document.getElementById('resultSheetLabel');
+      sheetLabel.innerHTML = `Saved to → <strong>${sheetName}</strong> sheet`;
+      sheetLabel.className = 'result-sheet-label' + (isShaadiEntry ? ' shaadi' : '');
+
+      const fields = [
+        { k: 'Date',      v: parsed.date || '—' },
+        { k: 'Item',      v: parsed.item || '—' },
+        { k: 'Amount',    v: parsed.amount ? `₹${parsed.amount}` : '—', cls: 'amount' },
+        { k: 'Shop',      v: parsed.shop    || '—' },
+        { k: 'Comment',   v: parsed.comment || '—' },
+        { k: 'Tag',       v: tag || '—' },
+        { k: 'Logged by', v: loggedBy },
+      ];
+
+      fields.forEach(({ k, v, cls }) => {
+        document.getElementById('parsedRows').innerHTML += `
+          <div class="parsed-row">
+            <div>
+              <div class="parsed-key">${k}</div>
+              <div class="parsed-val ${cls || ''}">${v}</div>
+            </div>
+          </div>`;
+      });
+
+      document.getElementById('resultIcon').textContent  = isShaadiEntry ? '💍' : '✅';
+      document.getElementById('resultTitle').textContent = 'Submitted!';
+      document.getElementById('resultTitle').className   = 'result-title success';
+      document.getElementById('resultOverlay').classList.add('show');
+    }
+
+    function showError(title, msg, hint) {
+      document.getElementById('parsedRows').innerHTML = '';
+      document.getElementById('resultSheetLabel').textContent = '';
+
+      document.getElementById('resultIcon').textContent  = '❌';
+      document.getElementById('resultTitle').textContent = 'Failed';
+      document.getElementById('resultTitle').className   = 'result-title error';
+
+      const detail = document.getElementById('errorDetail');
+      detail.style.display = 'block';
+      document.getElementById('errorTitle').textContent = title;
+      document.getElementById('errorMsg').textContent   = msg;
+      document.getElementById('errorHint').textContent  = hint ? `💡 ${hint}` : '';
+
+      document.getElementById('resultOverlay').classList.add('show');
+    }
+
+    function closeResult() {
+      document.getElementById('resultOverlay').classList.remove('show');
+    }
+
+    function addAnother() {
+      closeResult();
+      document.getElementById('expenseInput').value = '';
+      document.getElementById('charCount').textContent = '500';
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('hintCard').classList.remove('hidden');
+      document.querySelectorAll('.tag-pill').forEach(p => p.classList.remove('active'));
+      selectedTag = null;
+      document.getElementById('customTag').value = '';
+      updateSheetBadge();
+      document.getElementById('expenseInput').focus();
+    }
+
+    // ── TOAST ───────────────────────────────────────────────────────────────
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    // ── INIT ────────────────────────────────────────────────────────────────
+    const _cfg = loadConfig();
+    if (!_cfg.scriptUrl || !_cfg.apiKey) {
+      setTimeout(() => showToast('Tap ⚙️ to set up your app'), 800);
+    }
+  </script>
 </body>
 </html>
