@@ -505,11 +505,13 @@ async function parseWithGemini(text, apiKey) {
 
   let res;
   try {
-    res = await fetch(cfg.scriptUrl, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({action: 'geminiProxy', apiKey: apiKey, prompt: prompt})
+    // Use GET with encoded params — avoids CORS preflight that blocks POST to Apps Script
+    const params = new URLSearchParams({
+      action: 'geminiProxy',
+      apiKey: apiKey,
+      prompt: prompt
     });
+    res = await fetch(cfg.scriptUrl + '?' + params.toString());
   } catch(fetchErr) {
     throw new KharchaError('Network Error', 'Could not reach Apps Script: ' + fetchErr.message, 'Check your internet connection and Script URL in settings.');
   }
