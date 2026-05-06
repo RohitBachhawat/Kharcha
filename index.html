@@ -476,6 +476,9 @@ function updateSheetBadge(){
 // ══════════════════════════════════════
 //  INPUT
 // ══════════════════════════════════════
+var _prefetchedItems=null;
+var _prefetchedText='';
+
 function onType(){
   const val=document.getElementById('expenseInput').value;
   document.getElementById('charCount').textContent=500-val.length;
@@ -483,10 +486,27 @@ function onType(){
   document.getElementById('submitBtn').disabled=!has;
   if(has) document.getElementById('hintCard').classList.add('hidden');
   else document.getElementById('hintCard').classList.remove('hidden');
+  // Reset prefetch if user edits text
+  if(val.trim() !== _prefetchedText) { _prefetchedItems=null; _prefetchedText=''; }
+}
+
+function onTextareaBlur(){
+  const val=document.getElementById('expenseInput').value.trim();
+  if(!val || val.length < 3) return;
+  if(val === _prefetchedText && _prefetchedItems) return; // already fetched
+  const cfg=loadConfig();
+  if(!cfg.apiKey||!cfg.scriptUrl) return;
+  _prefetchedText=val;
+  parseWithGemini(val, cfg.apiKey).then(function(items){
+    _prefetchedItems=items;
+  }).catch(function(){
+    _prefetchedItems=null; _prefetchedText='';
+  });
 }
 (function(){
   const ta=document.getElementById('expenseInput');
   ['input','keyup','keydown','paste','cut','change'].forEach(ev=>ta.addEventListener(ev,()=>setTimeout(onType,0)));
+  ta.addEventListener('blur', onTextareaBlur);
 })();
 
 // ══════════════════════════════════════
@@ -514,12 +534,13 @@ async function parseWithGemini(text, apiKey){
     + '\n- Day of week: ' + dayName + '\n\n'
     + 'IMPORTANT RULES:\n'
     + '1. Translate ALL Hindi/Hinglish/regional Indian words to English. Examples: chai=Tea, sabzi/sabji=Vegetables, doodh=Milk, atta=Flour, dawai/dawa=Medicine, kapde=Clothes, bijli=Electricity, petrol=Petrol, auto=Auto Rickshaw, kal=yesterday, aaj=today, parso=day before yesterday\n'
-    + '2. Detect multiple items if text has multiple expenses\n'
+    + '2. Detect multiple items if text has multiple expenses (e.g. "milk 60 bread 30" = 2 items)\n'
     + '3. Resolve ALL relative dates (kal=yesterday, etc.)\n'
-    + '4. Amount is digits only\n'
-    + '5. For category, choose ONE from: Food, Transport, Shopping, Utilities, Health, Entertainment, Other. Leave null if unsure.\n\n'
+    + '4. AMOUNT EXPRESSIONS: If the amount contains arithmetic like "2000-20", "50/2", "100+60", "200*2", keep the full expression as a STRING in the amount field. Do NOT evaluate it. Do NOT put it in shop or comment. Examples: "clothes - 2000 - 20" → item=Clothes, amount="2000-20". "metro - 50/2" → item=Metro, amount="50/2". "rapido - 100 + 60" → item=Rapido, amount="100+60"\n'
+    + '5. The format "item - amount" or "item amount" is common. Dashes between item and amount are separators, not subtraction UNLESS both sides are numbers.\n'
+    + '6. For category, choose ONE from: Food, Transport, Shopping, Utilities, Health, Entertainment, Other. Leave null if unsure.\n\n'
     + 'Return a JSON ARRAY (even for one item):\n'
-    + '[{"date":"DD Mon YYYY","item":"English description","amount":number_or_null,"shop":"name_or_null","comment":"extra_or_null","category":"Food|Transport|Shopping|Utilities|Health|Entertainment|Other|null"}]\n\n'
+    + '[{"date":"DD Mon YYYY","item":"English description","amount":"expression_or_number_or_null","shop":"name_or_null","comment":"extra_or_null","category":"Food|Transport|Shopping|Utilities|Health|Entertainment|Other|null"}]\n\n'
     + 'Return ONLY the JSON array, nothing else.';
 
   const cfg = loadConfig();
@@ -578,7 +599,13 @@ async function submitExpense(){
   btn.disabled=true;btn.classList.add('loading');
 
   try{
-    parsedItems=await parseWithGemini(text,cfg.apiKey);
+    // Use prefetched result if text matches (instant) else fetch now
+    if(_prefetchedItems && _prefetchedText===text) {
+      parsedItems=_prefetchedItems;
+    } else {
+      parsedItems=await parseWithGemini(text,cfg.apiKey);
+    }
+    _prefetchedItems=null; _prefetchedText='';
     openReview(parsedItems);
   }catch(err){
     if(err instanceof KharchaError) showErrorToast(err.title+': '+err.message);
@@ -614,7 +641,7 @@ function renderReviewChips(items,mode){
   const sheetName=isShaadi()?'Shaadi':'Expenses';
   if(mode==='merge'||mode==='single'){
     const mergedItem=items.map(i=>i.item||'').filter(Boolean).join(', ');
-    const mergedAmt=items.reduce((s,i)=>s+(parseFloat(i.amount)||0),0)||'';
+    const mergedAmt=items.reduce((s,i)=>s+(parseFloat(calcAmount(String(i.amount||'')))||0),0)||'';
     const shops=[...new Set(items.map(i=>i.shop).filter(Boolean))];
     const mergedShop=shops.length===1?shops[0]:'';
     const date=items[0]?items[0].date:'';
@@ -627,7 +654,7 @@ function renderReviewChips(items,mode){
 
 function buildChip(item,idx,total){
   var label = total ? ('Item '+(idx+1)+' of '+total) : 'Review';
-  var amtDisplay = item.amount ? ('Rs.'+item.amount) : '--';
+  var amtDisplay = item.amount ? ('Rs.'+(calcAmount(String(item.amount))||item.amount)) : '--';
   var dateDisplay = item.date || 'today';
   var dateVal = toDateInput(item.date);
   var activeCat = item._localCat || item.category || '';
