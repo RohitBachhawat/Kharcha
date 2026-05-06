@@ -682,9 +682,19 @@ function selectCat(el, idx){
 function calcAmount(val) {
   if (val === '' || val === null || val === undefined) return '';
   var str = String(val).trim();
-  if (/^d+(.d+)?$/.test(str)) return str; // plain number, return as-is
-    var safe = str.split('').filter(function(c){ return '0123456789+-*/().  '.indexOf(c) >= 0; }).join('');
-  if (!safe || !/d/.test(safe)) return '';
+  if (!str) return '';
+  // Keep only digits, operators, dot, parens, spaces
+  var safe = str.split('').filter(function(c){ return '0123456789+-*/().'.indexOf(c) >= 0; }).join('').trim();
+  if (!safe) return '';
+  // Must contain at least one digit
+  var hasDigit = false;
+  for (var i=0; i<safe.length; i++) { if (safe[i] >= '0' && safe[i] <= '9') { hasDigit = true; break; } }
+  if (!hasDigit) return '';
+  // If it looks like a plain positive number, return directly
+  var plainNum = true;
+  for (var i=0; i<safe.length; i++) { if ('+-*/'.indexOf(safe[i]) >= 0) { plainNum = false; break; } }
+  if (plainNum) return safe;
+  // Evaluate expression
   try {
     var result = Function('"use strict"; return (' + safe + ')')();
     if (typeof result !== 'number' || !isFinite(result) || isNaN(result)) return '';
