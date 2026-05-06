@@ -76,7 +76,7 @@
     .submit-btn{background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);color:#fff;border:none;border-radius:var(--radius);padding:18px;font-family:'Syne',sans-serif;font-size:16px;font-weight:800;cursor:pointer;width:100%;letter-spacing:0.03em;transition:all 0.2s;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 20px rgba(255,107,53,0.3);}
     .submit-btn:active{transform:scale(0.98);box-shadow:none;}
     .submit-btn:disabled{background:var(--surface2);color:var(--muted);cursor:not-allowed;transform:none;box-shadow:none;}
-    .submit-btn.shaadi-mode{background:linear-gradient(135deg,var(--accent2) 0%,var(--accent3) 100%);box-shadow:0 4px 20px rgba(255,60,172,0.35);}
+    /* shaadi-mode on submit btn intentionally removed — button colour stays constant */
     .btn-content{display:flex;align-items:center;justify-content:center;gap:8px;pointer-events:none;}
     .spinner{width:18px;height:18px;border:2.5px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:none;}
     @keyframes spin{to{transform:rotate(360deg);}}
@@ -357,7 +357,9 @@ const STORAGE_KEY = 'kharcha_config';
 const CAT_LEARN_KEY = 'kharcha_cat_learn';
 const HISTORY_CACHE_KEY = 'kharcha_history_cache';
 const CATS = ['Food','Transport','Shopping','Utilities','Health','Entertainment','Other'];
-const TODAY_STR = new Date().toISOString().split('T')[0]; // YYYY-MM-DD for date inputs
+// Indian time (IST = UTC+5:30)
+const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+const TODAY_STR = new Date(Date.now() + IST_OFFSET).toISOString().split('T')[0]; // YYYY-MM-DD in IST
 
 function loadConfig(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{};}catch{return{};}}
 function saveConfig(){
