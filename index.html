@@ -321,7 +321,7 @@
     <div class="edit-fields">
       <div class="edit-field"><label>Date</label><input class="edit-input" id="editDate" type="date"/></div>
       <div class="edit-field"><label>Item / Description</label><input class="edit-input" id="editItem" type="text" placeholder="e.g. Milk and bread"/></div>
-      <div class="edit-field"><label>Amount (₹)</label><input class="edit-input" id="editAmount" type="number" placeholder="e.g. 250"/></div>
+      <div class="edit-field"><label>Amount (₹) — supports 200-20, 500/2</label><input class="edit-input" id="editAmount" type="text" inputmode="decimal" placeholder="e.g. 200-20" onblur="evalAmountField(this)"/></div>
       <div class="edit-field"><label>Shop / Place</label><input class="edit-input" id="editShop" type="text" placeholder="e.g. DMart"/></div>
       <div class="edit-field"><label>Comment</label><input class="edit-input" id="editComment" type="text" placeholder="e.g. for birthday"/></div>
       <div class="edit-field"><label>Tag</label><input class="edit-input" id="editTag" type="text" placeholder="Regular or Shaadi"/></div>
@@ -675,6 +675,34 @@ function selectCat(el, idx){
   }
 }
 
+
+// ══════════════════════════════════════
+//  AMOUNT CALCULATOR
+// ══════════════════════════════════════
+function calcAmount(val) {
+  if (val === '' || val === null || val === undefined) return '';
+  var str = String(val).trim();
+  if (/^d+(.d+)?$/.test(str)) return str; // plain number, return as-is
+    var safe = str.split('').filter(function(c){ return '0123456789+-*/().  '.indexOf(c) >= 0; }).join('');
+  if (!safe || !/d/.test(safe)) return '';
+  try {
+    var result = Function('"use strict"; return (' + safe + ')')();
+    if (typeof result !== 'number' || !isFinite(result) || isNaN(result)) return '';
+    var rounded = Math.round(result * 100) / 100;
+    if (rounded < 0) return '';
+    return String(rounded);
+  } catch(e) { return ''; }
+}
+
+function evalAmountField(input) {
+  var result = calcAmount(input.value);
+  if (result !== '' && result !== String(input.value).trim()) {
+    input.value = result;
+    input.style.color = 'var(--success)';
+    setTimeout(function(){ input.style.color = ''; }, 800);
+  }
+}
+
 // ══════════════════════════════════════
 //  CONFIRM & SAVE
 // ══════════════════════════════════════
@@ -711,7 +739,7 @@ async function confirmAndSave(){
       rowsToSave.push({
         date: fromDateInput(dateVal),
         item: itemVal,
-        amount: document.getElementById('rv-amount-'+i)?document.getElementById('rv-amount-'+i).value.trim():'',
+        amount: calcAmount(document.getElementById('rv-amount-'+i)?document.getElementById('rv-amount-'+i).value:''),
         shop: shopVal,
         comment: document.getElementById('rv-comment-'+i)?document.getElementById('rv-comment-'+i).value.trim():'',
         category: catVal,
@@ -894,7 +922,7 @@ async function saveEdit(){
     action:'updateRow',rowNum:editingRow.rowNum,sheetName:editingRow.sheetName,
     date:fromDateInput(dateVal),
     item:document.getElementById('editItem').value.trim(),
-    amount:document.getElementById('editAmount').value.trim(),
+    amount:calcAmount(document.getElementById('editAmount').value),
     shop:document.getElementById('editShop').value.trim(),
     comment:document.getElementById('editComment').value.trim(),
     tag:document.getElementById('editTag').value.trim(),
