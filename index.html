@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="apple-mobile-web-app-title" content="Kharcha"/>
   <meta name="theme-color" content="#0d0d0d"/>
-  <title>Kharcha — Family Expense Tracker</title>
+  <title>Kharcha</title>
   <link rel="manifest" href="manifest.json"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
@@ -24,8 +24,6 @@
     body::before{content:'';position:fixed;top:-120px;left:-80px;width:400px;height:400px;background:radial-gradient(circle,rgba(255,107,53,0.12) 0%,transparent 70%);pointer-events:none;z-index:0;}
     body::after{content:'';position:fixed;bottom:-100px;right:-80px;width:350px;height:350px;background:radial-gradient(circle,rgba(255,60,172,0.10) 0%,transparent 70%);pointer-events:none;z-index:0;}
     .app{flex:1;display:flex;flex-direction:column;max-width:480px;margin:0 auto;width:100%;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0);position:relative;z-index:1;}
-
-    /* Header */
     header{padding:22px 20px 0;display:flex;align-items:center;justify-content:space-between;}
     .logo{display:flex;align-items:baseline;gap:6px;}
     .logo-text{font-size:24px;font-weight:800;letter-spacing:-0.5px;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
@@ -34,15 +32,11 @@
     .header-date{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted2);text-align:right;line-height:1.5;}
     .icon-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted2);width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;flex-shrink:0;}
     .icon-btn:active{background:var(--surface2);color:var(--accent);}
-
-    /* Tabs */
     .tab-bar{display:flex;gap:6px;padding:14px 16px 0;}
     .tab-btn{flex:1;padding:9px 10px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted2);font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.18s;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:6px;}
     .tab-btn.active{background:var(--surface2);border-color:var(--accent);color:var(--accent);}
     .page{display:none;flex:1;flex-direction:column;}
     .page.active{display:flex;}
-
-    /* Add page */
     .add-page{padding:14px 16px;gap:12px;}
     .hint-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 16px;font-size:12px;color:var(--muted2);font-family:'JetBrains Mono',monospace;line-height:1.7;}
     .hint-card span{color:var(--accent);}
@@ -50,11 +44,15 @@
     .input-area{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color 0.2s,box-shadow 0.2s;display:flex;flex-direction:column;}
     .input-area:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
     .input-label{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);padding:12px 16px 4px;letter-spacing:0.1em;text-transform:uppercase;}
-    textarea{background:transparent;border:none;outline:none;color:var(--text);font-family:'Syne',sans-serif;font-size:18px;font-weight:600;line-height:1.5;padding:8px 16px 14px;resize:none;min-height:110px;caret-color:var(--accent);}
+    textarea{background:transparent;border:none;outline:none;color:var(--text);font-family:'Syne',sans-serif;font-size:18px;font-weight:600;line-height:1.5;padding:8px 16px 14px;resize:none;min-height:100px;caret-color:var(--accent);}
     textarea::placeholder{color:#2e2e2e;font-weight:400;}
     .char-count{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted);text-align:right;padding:0 12px 8px;}
-
-    /* Tags — only Regular + Shaadi */
+    .input-actions{display:flex;gap:8px;}
+    .input-action-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 10px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;color:var(--muted2);font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
+    .input-action-btn:active{background:var(--surface2);color:var(--accent);}
+    #fileInput{display:none;}
+    .upload-status{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);display:flex;align-items:center;gap:6px;}
+    .upload-status.active{color:var(--accent);}
     .tags-section{display:flex;flex-direction:column;gap:8px;}
     .tags-label{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);letter-spacing:0.1em;text-transform:uppercase;display:flex;align-items:center;gap:6px;}
     .tags-label::after{content:'optional';font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:1px 6px;border-radius:4px;}
@@ -65,25 +63,24 @@
     .tag-pill.active{color:#fff;border-color:transparent;}
     .tag-pill[data-tag="Regular"].active{background:var(--accent);box-shadow:0 0 14px var(--accent-glow);}
     .tag-pill[data-tag="Shaadi"].active{background:var(--shaadi);box-shadow:0 0 14px var(--shaadi-glow);color:#fff;}
-
+    .mini-tag-toggle{display:flex;gap:6px;margin-top:6px;}
+    .mini-tag-btn{flex:1;padding:7px 10px;border-radius:100px;border:1.5px solid var(--border);background:var(--bg);color:var(--muted2);font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;text-align:center;-webkit-tap-highlight-color:transparent;}
+    .mini-tag-btn[data-tag="Shaadi"]{border-color:rgba(255,60,172,0.3);color:var(--shaadi);}
+    .mini-tag-btn.active[data-tag="Regular"]{background:var(--accent);color:#fff;border-color:var(--accent);}
+    .mini-tag-btn.active[data-tag="Shaadi"]{background:var(--shaadi);color:#fff;border-color:var(--shaadi);}
     .sheet-badge{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);padding:2px 0;transition:all 0.3s;}
     .sheet-badge .badge-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);transition:background 0.3s;}
     .sheet-badge.shaadi-mode{color:var(--shaadi);}
     .sheet-badge.shaadi-mode .badge-dot{background:var(--shaadi);}
     .divider{height:1px;background:var(--border);margin:0 -16px;}
-
-    /* Submit */
     .submit-btn{background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);color:#fff;border:none;border-radius:var(--radius);padding:18px;font-family:'Syne',sans-serif;font-size:16px;font-weight:800;cursor:pointer;width:100%;letter-spacing:0.03em;transition:all 0.2s;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 20px rgba(255,107,53,0.3);}
     .submit-btn:active{transform:scale(0.98);box-shadow:none;}
     .submit-btn:disabled{background:var(--surface2);color:var(--muted);cursor:not-allowed;transform:none;box-shadow:none;}
-    /* shaadi-mode on submit btn intentionally removed — button colour stays constant */
     .btn-content{display:flex;align-items:center;justify-content:center;gap:8px;pointer-events:none;}
     .spinner{width:18px;height:18px;border:2.5px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:none;}
     @keyframes spin{to{transform:rotate(360deg);}}
-    .submit-btn.loading .spinner,.btn-save.loading .spinner,.btn-confirm.loading .spinner{display:block;}
-    .submit-btn.loading .btn-text,.btn-save.loading .save-text,.btn-confirm.loading .confirm-text{display:none;}
-
-    /* History */
+    .submit-btn.loading .spinner,.btn-save.loading .spinner,.btn-confirm.loading .spinner,.sms-parse-btn.loading .spinner{display:block;}
+    .submit-btn.loading .btn-text,.btn-save.loading .save-text,.btn-confirm.loading .confirm-text,.sms-parse-btn.loading .parse-text{display:none;}
     .history-page{flex-direction:column;}
     .history-header{padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;}
     .history-title{font-size:16px;font-weight:800;}
@@ -97,22 +94,17 @@
     .history-list{flex:1;overflow-y:auto;padding:0 16px 20px;display:flex;flex-direction:column;gap:8px;}
     .history-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:60px 20px;color:var(--muted2);font-size:13px;font-family:'JetBrains Mono',monospace;text-align:center;}
     .history-empty .empty-icon{font-size:36px;opacity:0.4;}
-
-    /* Analytics card */
     .summary-card{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:16px;margin:0 16px 10px;display:flex;flex-direction:column;gap:10px;}
     .summary-top{display:flex;justify-content:space-between;align-items:flex-start;}
     .summary-label{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
-    .summary-amount{font-size:26px;font-weight:800;color:var(--text);}
+    .summary-amount{font-size:26px;font-weight:800;}
     .summary-delta{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:100px;}
     .summary-delta.green{background:rgba(0,229,160,0.12);color:var(--success);}
     .summary-delta.red{background:rgba(255,77,77,0.12);color:var(--danger);}
     .summary-divider{height:1px;background:var(--border);}
     .summary-bottom{display:flex;justify-content:space-between;align-items:center;}
     .week-amount{font-size:18px;font-weight:800;color:var(--accent);}
-    .last-month-block{text-align:right;}
     .last-month-amount{font-size:15px;font-weight:700;color:var(--muted2);}
-
-    /* History cards */
     .history-card{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
     .history-card:active{transform:scale(0.99);background:var(--surface2);}
     .history-card:hover{border-color:var(--accent);}
@@ -126,41 +118,37 @@
     .meta-chip.cat-chip{color:#06b6d4;}
     .history-card .edit-hint{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;text-align:right;margin-top:8px;}
     .skeleton{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;overflow:hidden;position:relative;}
-    .skeleton::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,0.04) 50%,transparent 100%);animation:shimmer 1.2s infinite;}
+    .skeleton::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent);animation:shimmer 1.2s infinite;}
     @keyframes shimmer{from{transform:translateX(-100%);}to{transform:translateX(100%);}}
     .skel-line{height:14px;background:var(--surface2);border-radius:6px;margin-bottom:8px;}
     .skel-line.w60{width:60%;}.skel-line.w40{width:40%;}.skel-line.w80{width:80%;}
-
-    /* Review bottom sheet */
-    .review-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);display:flex;align-items:flex-end;z-index:120;opacity:0;pointer-events:none;transition:opacity 0.3s;}
-    .review-overlay.show{opacity:1;pointer-events:all;}
-    .review-sheet{background:var(--surface);border:1px solid var(--border);border-radius:24px 24px 0 0;padding:20px 20px calc(16px + env(safe-area-inset-bottom,0));width:100%;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);max-height:92dvh;overflow-y:auto;}
-    .review-overlay.show .review-sheet{transform:translateY(0);}
-    .review-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px;}
-    .review-title{font-size:14px;font-weight:800;color:var(--muted2);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:14px;}
-    .multi-choice{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:14px;}
-    .multi-choice-label{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);margin-bottom:10px;}
+    .overlay-base{position:fixed;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(10px);display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity 0.3s;}
+    .overlay-base.show{opacity:1;pointer-events:all;}
+    .sheet-base{background:var(--surface);border:1px solid var(--border);border-radius:24px 24px 0 0;padding:22px 20px calc(18px + env(safe-area-inset-bottom,0));width:100%;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);max-height:92dvh;overflow-y:auto;}
+    .overlay-base.show .sheet-base{transform:translateY(0);}
+    .sheet-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px;}
+    .review-title{font-size:13px;font-weight:800;color:var(--muted2);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;}
+    .multi-choice{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px;}
+    .multi-choice-label{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);margin-bottom:8px;}
     .multi-choice-btns{display:flex;gap:8px;}
-    .multi-btn{flex:1;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--text);font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;text-align:center;}
+    .multi-btn{flex:1;padding:9px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--text);font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;text-align:center;}
     .multi-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(255,107,53,0.08);}
-    .review-items{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
-    .review-chip{background:var(--surface2);border:1.5px solid var(--border);border-radius:14px;padding:14px;}
+    .review-items{display:flex;flex-direction:column;gap:10px;margin-bottom:14px;}
+    .review-chip{background:var(--surface2);border:1.5px solid var(--border);border-radius:14px;padding:13px;}
     .review-chip:focus-within{border-color:var(--accent);}
     .review-chip-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
     .review-chip-num{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);}
     .review-chip-summary{font-size:13px;font-weight:700;color:var(--accent);}
-    .review-fields{display:flex;flex-wrap:wrap;gap:8px;}
-    .review-field{display:flex;flex-direction:column;flex:1;min-width:130px;}
-    .review-field label{font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
-    .review-input{background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-family:'Syne',sans-serif;font-size:13px;font-weight:600;outline:none;width:100%;transition:border-color 0.2s;}
+    .review-fields{display:flex;flex-wrap:wrap;gap:7px;}
+    .review-field{display:flex;flex-direction:column;flex:1;min-width:120px;}
+    .review-field label{font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;}
+    .review-input{background:var(--bg);border:1.5px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--text);font-family:'Syne',sans-serif;font-size:13px;font-weight:600;outline:none;width:100%;transition:border-color 0.2s;}
     .review-input:focus{border-color:var(--accent);}
-    .review-input.amount-input{color:var(--accent);font-size:15px;font-weight:800;}
-    /* Date picker styling */
-    input[type="date"].review-input,input[type="date"].edit-input{color-scheme:dark;appearance:none;-webkit-appearance:none;}
-    input[type="date"].review-input::-webkit-calendar-picker-indicator,input[type="date"].edit-input::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:pointer;}
-    /* Category chips in review */
-    .cat-picker{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
-    .cat-pill{padding:5px 10px;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted2);font-size:11px;font-weight:700;cursor:pointer;transition:all 0.12s;-webkit-tap-highlight-color:transparent;}
+    .review-input.amount-input{color:var(--accent);font-size:14px;font-weight:800;}
+    input[type="date"]{color-scheme:dark;appearance:none;-webkit-appearance:none;}
+    input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.6);cursor:pointer;}
+    .cat-picker{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+    .cat-pill{padding:4px 9px;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted2);font-size:10px;font-weight:700;cursor:pointer;transition:all 0.12s;-webkit-tap-highlight-color:transparent;}
     .cat-pill:active{transform:scale(0.94);}
     .cat-pill.active{color:#fff;border-color:transparent;}
     .cat-pill[data-cat="Food"].active{background:#f59e0b;}
@@ -171,47 +159,39 @@
     .cat-pill[data-cat="Entertainment"].active{background:#f97316;}
     .cat-pill[data-cat="Other"].active{background:#6b7280;}
     .review-actions{display:flex;gap:10px;margin-top:4px;}
-    .btn-cancel-review{flex:1;padding:14px;border:1.5px solid var(--border);background:transparent;color:var(--text);border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
-    .btn-confirm{flex:2;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;}
+    .btn-cancel-review{flex:1;padding:13px;border:1.5px solid var(--border);background:transparent;color:var(--text);border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .btn-confirm{flex:2;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;}
     .btn-confirm:disabled{background:var(--surface2);color:var(--muted);}
     .btn-confirm .spinner{display:none;}
-
-    /* Edit overlay */
-    .edit-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.9);backdrop-filter:blur(16px);display:flex;align-items:flex-end;z-index:150;opacity:0;pointer-events:none;transition:opacity 0.3s;}
-    .edit-overlay.show{opacity:1;pointer-events:all;}
-    .edit-sheet{background:var(--surface);border:1px solid var(--border);border-radius:24px 24px 0 0;padding:24px 20px calc(20px + env(safe-area-inset-bottom,0));width:100%;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);max-height:92dvh;overflow-y:auto;}
-    .edit-overlay.show .edit-sheet{transform:translateY(0);}
-    .edit-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 20px;}
     .edit-title{font-size:18px;font-weight:800;margin-bottom:4px;}
-    .edit-subtitle{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);margin-bottom:20px;}
-    .edit-fields{display:flex;flex-direction:column;gap:12px;margin-bottom:20px;}
-    .edit-field label{display:block;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;}
-    .edit-input{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'Syne',sans-serif;font-size:15px;font-weight:600;outline:none;transition:border-color 0.2s;}
+    .edit-subtitle{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);margin-bottom:10px;}
+    .move-warning{background:rgba(255,107,53,0.08);border:1px solid rgba(255,107,53,0.3);border-radius:10px;padding:10px 14px;font-size:12px;color:#ffaa80;font-family:'JetBrains Mono',monospace;margin-bottom:12px;display:none;line-height:1.5;}
+    .move-warning.show{display:block;}
+    .edit-fields{display:flex;flex-direction:column;gap:11px;margin-bottom:18px;}
+    .edit-field label{display:block;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:5px;}
+    .edit-input{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);font-family:'Syne',sans-serif;font-size:15px;font-weight:600;outline:none;transition:border-color 0.2s;}
     .edit-input:focus{border-color:var(--accent);}
-    .edit-input::placeholder{color:var(--muted);font-weight:400;}
-    .row-info{background:var(--surface2);border-radius:10px;padding:10px 14px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);margin-bottom:16px;line-height:1.6;}
+    .row-info{background:var(--surface2);border-radius:10px;padding:9px 13px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);margin-bottom:12px;line-height:1.6;}
     .edit-actions{display:flex;gap:10px;}
-    .btn-cancel{flex:1;padding:14px;border:1.5px solid var(--border);background:transparent;color:var(--text);border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
-    .btn-save{flex:2;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;}
+    .btn-cancel{flex:1;padding:13px;border:1.5px solid var(--border);background:transparent;color:var(--text);border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+    .btn-save{flex:2;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;}
     .btn-save:disabled{background:var(--surface2);color:var(--muted);}
     .btn-save .spinner{display:none;}
-
-    /* Config */
-    .config-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.88);backdrop-filter:blur(12px);display:flex;align-items:flex-end;z-index:200;opacity:0;pointer-events:none;transition:opacity 0.3s;}
-    .config-overlay.show{opacity:1;pointer-events:all;}
-    .config-sheet{background:var(--surface);border:1px solid var(--border);border-radius:24px 24px 0 0;padding:26px 20px calc(20px + env(safe-area-inset-bottom,0));width:100%;transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);}
-    .config-overlay.show .config-sheet{transform:translateY(0);}
-    .config-title{font-size:18px;font-weight:800;margin-bottom:20px;}
-    .config-field{margin-bottom:14px;}
-    .config-field label{display:block;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:7px;}
-    .config-input{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;transition:border-color 0.2s;}
+    .sms-title{font-size:16px;font-weight:800;margin-bottom:6px;}
+    .sms-sub{font-size:12px;color:var(--muted2);font-family:'JetBrains Mono',monospace;margin-bottom:12px;line-height:1.6;}
+    .sms-textarea{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;padding:13px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;resize:none;min-height:110px;transition:border-color 0.2s;margin-bottom:12px;}
+    .sms-textarea:focus{border-color:var(--accent);}
+    .sms-actions{display:flex;gap:10px;}
+    .btn-secondary-sm{flex:1;padding:13px;border:1.5px solid var(--border);background:transparent;color:var(--text);border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:6px;}
+    .sms-parse-btn{flex:2;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;}
+    .config-title{font-size:18px;font-weight:800;margin-bottom:18px;}
+    .config-field{margin-bottom:13px;}
+    .config-field label{display:block;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;}
+    .config-input{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;transition:border-color 0.2s;}
     .config-input:focus{border-color:var(--accent);}
-    .save-config-btn{width:100%;margin-top:6px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;padding:16px;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;cursor:pointer;}
-
-    /* Toast */
+    .save-config-btn{width:100%;margin-top:4px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;padding:15px;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;cursor:pointer;}
     .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 20px;border-radius:100px;font-size:13px;font-weight:600;opacity:0;transition:all 0.3s;white-space:nowrap;z-index:300;}
     .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-
     @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
     .add-page>*{animation:fadeUp 0.4s ease both;}
     .add-page>*:nth-child(1){animation-delay:0.04s;}.add-page>*:nth-child(2){animation-delay:0.08s;}
@@ -230,7 +210,6 @@
       </button>
     </div>
   </header>
-
   <div class="tab-bar">
     <button class="tab-btn active" id="tabAdd" onclick="switchTab('add')">
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Expense
@@ -239,15 +218,29 @@
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 0 .5-4"/><polyline points="3 3 3 7 7 7"/></svg>Recent
     </button>
   </div>
-
   <!-- ADD PAGE -->
   <div class="page add-page active" id="pageAdd">
-    <div class="hint-card" id="hintCard">Type naturally — <span>"chai 20 dmart"</span> or <span>"bijli 1200"</span> or <span>"doodh 60 kal"</span> — Hindi words auto-translated!</div>
+    <div class="hint-card" id="hintCard">Type naturally — <span>"chai 20"</span> or <span>"bijli 1200"</span> or upload a bill — Hindi auto-translated!</div>
     <div class="input-area">
       <div class="input-label">What did you spend on?</div>
-      <textarea id="expenseInput" placeholder="e.g. chai 20 tapri&#10;or: sabzi 120 subzi mandi&#10;or: petrol 500 yesterday" maxlength="500" autofocus></textarea>
+      <textarea id="expenseInput" placeholder="e.g. chai 20 tapri or sabzi 120 kal" maxlength="500" autofocus></textarea>
       <div class="char-count" id="charCount">500</div>
     </div>
+    <div class="input-actions">
+      <button class="input-action-btn" onclick="document.getElementById('fileInput').click()">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload Bill / Photo
+      </button>
+      <button class="input-action-btn" onclick="openSmsOverlay()">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Paste SMS / Bank Msg
+      </button>
+    </div>
+    <div class="upload-status" id="uploadStatus" style="display:none;">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      <span id="uploadStatusText">Reading file...</span>
+    </div>
+    <input type="file" id="fileInput" accept="image/*,.pdf" onchange="handleFileUpload(event)"/>
     <div class="tags-section">
       <div class="tags-label">Tag this expense</div>
       <div class="tags-grid">
@@ -261,11 +254,10 @@
       <div class="btn-content"><div class="spinner"></div><span class="btn-text">Submit</span></div>
     </button>
   </div>
-
   <!-- HISTORY PAGE -->
   <div class="page history-page" id="pageHistory">
     <div class="history-header">
-      <div><div class="history-title">Recent Entries</div><div class="history-subtitle">Tap any entry to edit it</div></div>
+      <div><div class="history-title">Recent Entries</div><div class="history-subtitle">Tap to edit or move between sheets</div></div>
       <button class="refresh-btn" id="refreshBtn" onclick="loadHistory()">
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh
       </button>
@@ -282,17 +274,16 @@
       <div class="summary-divider"></div>
       <div class="summary-bottom">
         <div><div class="summary-label">This Week</div><div class="week-amount" id="thisWeekAmt">₹0</div></div>
-        <div class="last-month-block"><div class="summary-label">Last Month</div><div class="last-month-amount" id="lastMonthAmt">₹0</div></div>
+        <div style="text-align:right"><div class="summary-label">Last Month</div><div class="last-month-amount" id="lastMonthAmt">₹0</div></div>
       </div>
     </div>
     <div class="history-list" id="historyList"></div>
   </div>
 </div>
-
-<!-- REVIEW SHEET -->
-<div class="review-overlay" id="reviewOverlay">
-  <div class="review-sheet">
-    <div class="review-handle"></div>
+<!-- REVIEW OVERLAY -->
+<div class="overlay-base" id="reviewOverlay" style="z-index:120;">
+  <div class="sheet-base">
+    <div class="sheet-handle"></div>
     <div class="review-title">Review before saving</div>
     <div class="multi-choice" id="multiChoice" style="display:none;">
       <div class="multi-choice-label">Multiple items detected — how to save?</div>
@@ -310,21 +301,42 @@
     </div>
   </div>
 </div>
-
+<!-- SMS OVERLAY -->
+<div class="overlay-base" id="smsOverlay" style="z-index:160;" onclick="maybeCloseSms(event)">
+  <div class="sheet-base">
+    <div class="sheet-handle"></div>
+    <div class="sms-title">📱 Paste Bank SMS / Message</div>
+    <div class="sms-sub">Copy a bank transaction SMS and paste it here. Works with HDFC, SBI, ICICI, Kotak, UPI messages.</div>
+    <textarea class="sms-textarea" id="smsText" placeholder="e.g. INR 250.00 debited from A/C XX1234. Info: ZOMATO. Avl Bal INR 12,450.00"></textarea>
+    <div class="sms-actions">
+      <button class="btn-secondary-sm" onclick="closeSmsOverlay()">Cancel</button>
+      <button class="sms-parse-btn" id="smsParseBtn" onclick="parseSmsText()">
+        <div class="spinner"></div><span class="parse-text">Extract Expenses →</span>
+      </button>
+    </div>
+  </div>
+</div>
 <!-- EDIT OVERLAY -->
-<div class="edit-overlay" id="editOverlay" onclick="maybeCloseEdit(event)">
-  <div class="edit-sheet">
-    <div class="edit-handle"></div>
+<div class="overlay-base" id="editOverlay" style="z-index:150;" onclick="maybeCloseEdit(event)">
+  <div class="sheet-base">
+    <div class="sheet-handle"></div>
     <div class="edit-title">✏️ Edit Entry</div>
     <div class="edit-subtitle" id="editSubtitle"></div>
     <div class="row-info" id="editRowInfo"></div>
+    <div class="move-warning" id="moveWarning">⚠️ Changing tag will <strong>move this entry</strong> to the other sheet.</div>
     <div class="edit-fields">
       <div class="edit-field"><label>Date</label><input class="edit-input" id="editDate" type="date"/></div>
-      <div class="edit-field"><label>Item / Description</label><input class="edit-input" id="editItem" type="text" placeholder="e.g. Milk and bread"/></div>
+      <div class="edit-field"><label>Item</label><input class="edit-input" id="editItem" type="text" placeholder="e.g. Milk and bread"/></div>
       <div class="edit-field"><label>Amount (₹) — supports 200-20, 500/2</label><input class="edit-input" id="editAmount" type="text" inputmode="decimal" placeholder="e.g. 200-20" onblur="evalAmountField(this)"/></div>
-      <div class="edit-field"><label>Shop / Place</label><input class="edit-input" id="editShop" type="text" placeholder="e.g. DMart"/></div>
-      <div class="edit-field"><label>Comment</label><input class="edit-input" id="editComment" type="text" placeholder="e.g. for birthday"/></div>
-      <div class="edit-field"><label>Tag</label><input class="edit-input" id="editTag" type="text" placeholder="Regular or Shaadi"/></div>
+      <div class="edit-field"><label>Shop</label><input class="edit-input" id="editShop" type="text" placeholder="e.g. DMart"/></div>
+      <div class="edit-field"><label>Comment</label><input class="edit-input" id="editComment" type="text"/></div>
+      <div class="edit-field">
+        <label>Tag — changing moves entry to other sheet</label>
+        <div class="mini-tag-toggle" id="editTagToggle">
+          <button class="mini-tag-btn" data-tag="Regular" onclick="selectEditTag('Regular')">🏠 Regular</button>
+          <button class="mini-tag-btn" data-tag="Shaadi" onclick="selectEditTag('Shaadi')">💍 Shaadi</button>
+        </div>
+      </div>
       <div class="edit-field"><label>Category</label><input class="edit-input" id="editCategory" type="text" placeholder="e.g. Food, Transport"/></div>
     </div>
     <div class="edit-actions">
@@ -335,663 +347,138 @@
     </div>
   </div>
 </div>
-
-<!-- CONFIG -->
-<div class="config-overlay" id="configOverlay" onclick="maybeCloseConfig(event)">
-  <div class="config-sheet">
+<!-- CONFIG OVERLAY -->
+<div class="overlay-base" id="configOverlay" style="z-index:200;" onclick="maybeCloseConfig(event)">
+  <div class="sheet-base">
+    <div class="sheet-handle"></div>
     <div class="config-title">⚙️ Setup</div>
     <div class="config-field"><label>Google Apps Script URL</label><input class="config-input" id="scriptUrl" type="url" placeholder="https://script.google.com/macros/s/..."/></div>
-    <div class="config-field"><label>Your Name</label><input class="config-input" id="userName" type="text" placeholder="e.g. Maa, Papa, Rahul"/></div>
+    <div class="config-field"><label>Your Name</label><input class="config-input" id="userName" type="text" placeholder="e.g. Maa, Papa, Rohit"/></div>
     <div class="config-field"><label>Gemini API Key (free — aistudio.google.com)</label><input class="config-input" id="apiKey" type="password" placeholder="AIza..."/></div>
     <button class="save-config-btn" onclick="saveConfig()">Save Settings</button>
   </div>
 </div>
-
 <div class="toast" id="toast"></div>
-
 <script>
-// ══════════════════════════════════════
-//  CONFIG — locked key forever
-// ══════════════════════════════════════
-const STORAGE_KEY = 'kharcha_config';
-const CAT_LEARN_KEY = 'kharcha_cat_learn';
-const HISTORY_CACHE_KEY = 'kharcha_history_cache';
-const CATS = ['Food','Transport','Shopping','Utilities','Health','Entertainment','Other'];
-// Indian time (IST = UTC+5:30)
-const IST_OFFSET = 5.5 * 60 * 60 * 1000;
-const TODAY_STR = new Date(Date.now() + IST_OFFSET).toISOString().split('T')[0]; // YYYY-MM-DD in IST
+const STORAGE_KEY='kharcha_config';
+const CAT_LEARN_KEY='kharcha_cat_learn';
+const HISTORY_CACHE_KEY='kharcha_history_cache';
+const CATS=['Food','Transport','Shopping','Utilities','Health','Entertainment','Other'];
+const IST_OFFSET=5.5*60*60*1000;
+const TODAY_STR=new Date(Date.now()+IST_OFFSET).toISOString().split('T')[0];
 
 function loadConfig(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{};}catch{return{};}}
-function saveConfig(){
-  const cfg={
-    scriptUrl:document.getElementById('scriptUrl').value.trim(),
-    userName:document.getElementById('userName').value.trim(),
-    apiKey:document.getElementById('apiKey').value.trim()
-  };
-  localStorage.setItem(STORAGE_KEY,JSON.stringify(cfg));
-  closeConfig();showToast('Settings saved ✓');
-}
-function openConfig(){
-  const cfg=loadConfig();
-  document.getElementById('scriptUrl').value=cfg.scriptUrl||'';
-  document.getElementById('userName').value=cfg.userName||'';
-  document.getElementById('apiKey').value=cfg.apiKey||'';
-  document.getElementById('configOverlay').classList.add('show');
-}
+function saveConfig(){const cfg={scriptUrl:document.getElementById('scriptUrl').value.trim(),userName:document.getElementById('userName').value.trim(),apiKey:document.getElementById('apiKey').value.trim()};localStorage.setItem(STORAGE_KEY,JSON.stringify(cfg));closeConfig();showToast('Settings saved ✓');}
+function openConfig(){const cfg=loadConfig();document.getElementById('scriptUrl').value=cfg.scriptUrl||'';document.getElementById('userName').value=cfg.userName||'';document.getElementById('apiKey').value=cfg.apiKey||'';document.getElementById('configOverlay').classList.add('show');}
 function closeConfig(){document.getElementById('configOverlay').classList.remove('show');}
 function maybeCloseConfig(e){if(e.target===document.getElementById('configOverlay'))closeConfig();}
 
-// ══════════════════════════════════════
-//  LOCAL CATEGORY LEARNING
-// ══════════════════════════════════════
 function loadCatLearn(){try{return JSON.parse(localStorage.getItem(CAT_LEARN_KEY))||{};}catch{return{};}}
-function saveCatOverride(item, shop, category){
-  const learn = loadCatLearn();
-  // Store keywords from item and shop
-  const keywords = [];
-  if(item) item.toLowerCase().split(/\s+/).forEach(w=>{if(w.length>2)keywords.push(w);});
-  if(shop) shop.toLowerCase().split(/\s+/).forEach(w=>{if(w.length>2)keywords.push(w);});
-  keywords.forEach(kw => { learn[kw] = category; });
-  localStorage.setItem(CAT_LEARN_KEY, JSON.stringify(learn));
-}
-function guessCategory(item, shop){
-  const learn = loadCatLearn();
-  const keywords = [];
-  if(item) item.toLowerCase().split(/\s+/).forEach(w=>{if(w.length>2)keywords.push(w);});
-  if(shop) shop.toLowerCase().split(/\s+/).forEach(w=>{if(w.length>2)keywords.push(w);});
-  for(const kw of keywords){
-    if(learn[kw]) return learn[kw];
-  }
-  return null;
-}
+function saveCatOverride(item,shop,cat){const l=loadCatLearn();const kws=[];if(item)item.toLowerCase().split(/\s+/).forEach(w=>{if(w.length>2)kws.push(w);});if(shop)shop.toLowerCase().split(/\s+/).forEach(w=>{if(w.length>2)kws.push(w);});kws.forEach(kw=>{l[kw]=cat;});localStorage.setItem(CAT_LEARN_KEY,JSON.stringify(l));}
+function guessCategory(item,shop){const l=loadCatLearn();const kws=[];if(item)item.toLowerCase().split(/\s+/).forEach(w=>{if(w.length>2)kws.push(w);});if(shop)shop.toLowerCase().split(/\s+/).forEach(w=>{if(w.length>2)kws.push(w);});for(const kw of kws){if(l[kw])return l[kw];}return null;}
 
-// ══════════════════════════════════════
-//  DATE HELPERS
-// ══════════════════════════════════════
-function updateDate(){
-  const now=new Date();
-  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  document.getElementById('headerDate').innerHTML=days[now.getDay()]+', '+now.getDate()+' '+months[now.getMonth()]+'<br>'+now.getFullYear();
-}
+function updateDate(){const now=new Date();const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];document.getElementById('headerDate').innerHTML=days[now.getDay()]+', '+now.getDate()+' '+months[now.getMonth()]+'<br>'+now.getFullYear();}
 updateDate();
+function toDateInput(str){if(!str)return TODAY_STR;if(/^\d{4}-\d{2}-\d{2}$/.test(str))return str;const M={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};const m=str.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);if(m)return m[3]+'-'+(M[m[2]]||'01')+'-'+m[1].padStart(2,'0');const d=new Date(str);if(!isNaN(d))return d.toISOString().split('T')[0];return TODAY_STR;}
+function fromDateInput(val){if(!val)return '';const[y,m,d]=val.split('-');const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return d+' '+M[parseInt(m)-1]+' '+y;}
+function validateDate(val){if(!val)return 'Please select a date';if(val>TODAY_STR)return 'Future dates not allowed';return null;}
 
-// Convert "03 May 2025" → "2025-05-03" for date input
-function toDateInput(str){
-  if(!str) return TODAY_STR;
-  if(/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-  const months={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
-  const m = str.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
-  if(m) return m[3]+'-'+(months[m[2]]||'01')+'-'+m[1].padStart(2,'0');
-  const d = new Date(str);
-  if(!isNaN(d)) return d.toISOString().split('T')[0];
-  return TODAY_STR;
-}
-// Convert "2025-05-03" → "03 May 2025" for display/sheet
-function fromDateInput(val){
-  if(!val) return '';
-  const [y,m,d] = val.split('-');
-  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return d+' '+months[parseInt(m)-1]+' '+y;
-}
-function validateDate(val){
-  if(!val) return 'Please select a date';
-  if(val > TODAY_STR) return 'Future dates not allowed';
-  return null;
-}
+function switchTab(tab){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));const t=tab.charAt(0).toUpperCase()+tab.slice(1);document.getElementById('tab'+t).classList.add('active');document.getElementById('page'+t).classList.add('active');if(tab==='history')loadHistory();}
 
-// ══════════════════════════════════════
-//  TABS
-// ══════════════════════════════════════
-function switchTab(tab){
-  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  const t=tab.charAt(0).toUpperCase()+tab.slice(1);
-  document.getElementById('tab'+t).classList.add('active');
-  document.getElementById('page'+t).classList.add('active');
-  if(tab==='history') loadHistory();
-}
-
-// ══════════════════════════════════════
-//  TAGS
-// ══════════════════════════════════════
 let selectedTag=null;
-function toggleTag(el){
-  const was=selectedTag===el.dataset.tag;
-  document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));
-  selectedTag=was?null:el.dataset.tag;
-  if(!was) el.classList.add('active');
-  updateSheetBadge();
-}
+function toggleTag(el){const was=selectedTag===el.dataset.tag;document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=was?null:el.dataset.tag;if(!was)el.classList.add('active');updateSheetBadge();}
 function getTag(){return selectedTag||'';}
 function isShaadi(){return selectedTag==='Shaadi';}
-function updateSheetBadge(){
-  const badge=document.getElementById('sheetBadge');
-  const text=document.getElementById('sheetBadgeText');
-  const btn=document.getElementById('submitBtn');
-  if(isShaadi()){badge.classList.add('shaadi-mode');btn.classList.add('shaadi-mode');text.textContent='Will save to → Shaadi sheet 💍';}
-  else{badge.classList.remove('shaadi-mode');btn.classList.remove('shaadi-mode');text.textContent='Will save to → Expenses sheet';}
-}
+function updateSheetBadge(){const badge=document.getElementById('sheetBadge');const text=document.getElementById('sheetBadgeText');if(isShaadi()){badge.classList.add('shaadi-mode');text.textContent='Will save to → Shaadi sheet 💍';}else{badge.classList.remove('shaadi-mode');text.textContent='Will save to → Expenses sheet';}}
 
-// ══════════════════════════════════════
-//  INPUT
-// ══════════════════════════════════════
-var _prefetchedItems=null;
-var _prefetchedText='';
+var _prefetchedItems=null,_prefetchedText='';
+function onType(){const val=document.getElementById('expenseInput').value;document.getElementById('charCount').textContent=500-val.length;const has=val.trim().length>0;document.getElementById('submitBtn').disabled=!has;if(has)document.getElementById('hintCard').classList.add('hidden');else document.getElementById('hintCard').classList.remove('hidden');if(val.trim()!==_prefetchedText){_prefetchedItems=null;_prefetchedText='';}}
+function onTextareaBlur(){const val=document.getElementById('expenseInput').value.trim();if(!val||val.length<3)return;if(val===_prefetchedText&&_prefetchedItems)return;const cfg=loadConfig();if(!cfg.apiKey||!cfg.scriptUrl)return;_prefetchedText=val;parseWithGemini(val,cfg.apiKey).then(function(items){_prefetchedItems=items;}).catch(function(){_prefetchedItems=null;_prefetchedText='';});}
+(function(){const ta=document.getElementById('expenseInput');['input','keyup','keydown','paste','cut','change'].forEach(ev=>ta.addEventListener(ev,()=>setTimeout(onType,0)));ta.addEventListener('blur',onTextareaBlur);})();
 
-function onType(){
-  const val=document.getElementById('expenseInput').value;
-  document.getElementById('charCount').textContent=500-val.length;
-  const has=val.trim().length>0;
-  document.getElementById('submitBtn').disabled=!has;
-  if(has) document.getElementById('hintCard').classList.add('hidden');
-  else document.getElementById('hintCard').classList.remove('hidden');
-  // Reset prefetch if user edits text
-  if(val.trim() !== _prefetchedText) { _prefetchedItems=null; _prefetchedText=''; }
-}
+class KharchaError extends Error{constructor(t,m,h){super(m);this.title=t;this.hint=h;}}
 
-function onTextareaBlur(){
-  const val=document.getElementById('expenseInput').value.trim();
-  if(!val || val.length < 3) return;
-  if(val === _prefetchedText && _prefetchedItems) return; // already fetched
-  const cfg=loadConfig();
-  if(!cfg.apiKey||!cfg.scriptUrl) return;
-  _prefetchedText=val;
-  parseWithGemini(val, cfg.apiKey).then(function(items){
-    _prefetchedItems=items;
-  }).catch(function(){
-    _prefetchedItems=null; _prefetchedText='';
-  });
-}
-(function(){
-  const ta=document.getElementById('expenseInput');
-  ['input','keyup','keydown','paste','cut','change'].forEach(ev=>ta.addEventListener(ev,()=>setTimeout(onType,0)));
-  ta.addEventListener('blur', onTextareaBlur);
-})();
+function buildExpensePrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);const d2=new Date(now);d2.setDate(now.getDate()-2);const d3=new Date(now);d3.setDate(now.getDate()-3);const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];return 'You are a family expense parser for an Indian family. Return ONLY a valid JSON array, no markdown.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+', 2daysago='+fmt(d2)+', 3daysago='+fmt(d3)+', Day='+dn+'\n\nRules:\n1. Translate Hindi/Hinglish to English: chai=Tea, sabzi=Vegetables, doodh=Milk, dawai=Medicine, kapde=Clothes, bijli=Electricity, auto=Auto Rickshaw, kal=yesterday, aaj=today\n2. Detect multiple items if multiple expenses in text\n3. Resolve relative dates\n4. AMOUNT EXPRESSIONS: keep arithmetic as string: "clothes-2000-20" => amount="2000-20", "metro-50/2" => amount="50/2". Dashes between item and amount are separators not subtraction unless both sides are numbers.\n5. Category: Food/Transport/Shopping/Utilities/Health/Entertainment/Other or null if unsure\n\nReturn: [{"date":"DD Mon YYYY","item":"English name","amount":"expr_or_number_or_null","shop":"name_or_null","comment":"extra_or_null","category":"cat_or_null"}]\n\nOnly JSON array.';}
 
-// ══════════════════════════════════════
-//  ERRORS
-// ══════════════════════════════════════
-class KharchaError extends Error{
-  constructor(title,message,hint){super(message);this.title=title;this.hint=hint;}
-}
+async function callGeminiProxy(prompt){const cfg=loadConfig();if(!cfg.scriptUrl)throw new KharchaError('Script URL Missing','No Apps Script URL.','Tap settings.');let res;try{const p=new URLSearchParams({action:'geminiProxy',apiKey:cfg.apiKey,prompt});res=await fetch(cfg.scriptUrl+'?'+p.toString());}catch(e){throw new KharchaError('Network Error','Could not reach Apps Script: '+e.message,'Check internet and Script URL.');}if(!res.ok)throw new KharchaError('Proxy Error','Apps Script HTTP '+res.status,'Redeploy as Web App, access=Anyone.');let data;try{data=await res.json();}catch(e){throw new KharchaError('Response Error','Could not read response.','Deploy latest Code.gs.');}if(!data.success){const m=data.error||'Unknown';if(m.includes('400')||m.toLowerCase().includes('api key'))throw new KharchaError('Invalid API Key',m,'Get key at aistudio.google.com.');if(m.includes('429'))throw new KharchaError('Rate Limit',m,'Wait 1 min.');throw new KharchaError('Gemini Error',m,'Check API key in settings.');}return data.result||'';}
 
-// ══════════════════════════════════════
-//  GEMINI via Apps Script proxy
-// ══════════════════════════════════════
-async function parseWithGemini(text, apiKey){
-  const now = new Date();
-  const fmt = d => d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
-  const y=new Date(now);y.setDate(now.getDate()-1);
-  const d2=new Date(now);d2.setDate(now.getDate()-2);
-  const d3=new Date(now);d3.setDate(now.getDate()-3);
-  const dayName=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];
+async function parseWithGemini(text,apiKey){const raw=await callGeminiProxy(buildExpensePrompt(text));const clean=raw.replace(/```json|```/g,'').trim();try{const p=JSON.parse(clean);const arr=Array.isArray(p)?p:[p];return arr.map(item=>{const lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});}catch{throw new KharchaError('Parse Error','Bad JSON: '+clean.substring(0,80),'Try simpler text.');}}
 
-  const prompt = 'You are a family expense parser for an Indian family. Parse the text and return ONLY a valid JSON array. No markdown, no explanation, no code fences.\n\n'
-    + 'Text: "' + text.replace(/"/g,'\\"') + '"\n\n'
-    + 'Date reference:\n- Today: ' + fmt(now) + '\n- Yesterday: ' + fmt(y)
-    + '\n- 2 days ago: ' + fmt(d2) + '\n- 3 days ago: ' + fmt(d3)
-    + '\n- Day of week: ' + dayName + '\n\n'
-    + 'IMPORTANT RULES:\n'
-    + '1. Translate ALL Hindi/Hinglish/regional Indian words to English. Examples: chai=Tea, sabzi/sabji=Vegetables, doodh=Milk, atta=Flour, dawai/dawa=Medicine, kapde=Clothes, bijli=Electricity, petrol=Petrol, auto=Auto Rickshaw, kal=yesterday, aaj=today, parso=day before yesterday\n'
-    + '2. Detect multiple items if text has multiple expenses (e.g. "milk 60 bread 30" = 2 items)\n'
-    + '3. Resolve ALL relative dates (kal=yesterday, etc.)\n'
-    + '4. AMOUNT EXPRESSIONS: If the amount contains arithmetic like "2000-20", "50/2", "100+60", "200*2", keep the full expression as a STRING in the amount field. Do NOT evaluate it. Do NOT put it in shop or comment. Examples: "clothes - 2000 - 20" → item=Clothes, amount="2000-20". "metro - 50/2" → item=Metro, amount="50/2". "rapido - 100 + 60" → item=Rapido, amount="100+60"\n'
-    + '5. The format "item - amount" or "item amount" is common. Dashes between item and amount are separators, not subtraction UNLESS both sides are numbers.\n'
-    + '6. For category, choose ONE from: Food, Transport, Shopping, Utilities, Health, Entertainment, Other. Leave null if unsure.\n\n'
-    + 'Return a JSON ARRAY (even for one item):\n'
-    + '[{"date":"DD Mon YYYY","item":"English description","amount":"expression_or_number_or_null","shop":"name_or_null","comment":"extra_or_null","category":"Food|Transport|Shopping|Utilities|Health|Entertainment|Other|null"}]\n\n'
-    + 'Return ONLY the JSON array, nothing else.';
+async function handleFileUpload(event){const file=event.target.files[0];if(!file)return;const cfg=loadConfig();if(!cfg.apiKey||!cfg.scriptUrl){openConfig();showToast('Set up API key first');return;}const statusEl=document.getElementById('uploadStatus');const statusText=document.getElementById('uploadStatusText');statusEl.style.display='flex';statusEl.classList.add('active');statusText.textContent='Reading '+file.name+'...';try{const base64=await fileToBase64(file);const mimeType=file.type||'image/jpeg';statusText.textContent='Extracting expenses...';const p=new URLSearchParams({action:'geminiVision',apiKey:cfg.apiKey,mimeType,base64Data:base64.split(',')[1]||base64});const res=await fetch(cfg.scriptUrl+'?'+p.toString());if(!res.ok)throw new Error('HTTP '+res.status);const data=await res.json();if(!data.success)throw new Error(data.error||'Vision error');const raw=(data.result||'').replace(/```json|```/g,'').trim();const arr=JSON.parse(raw);const items=Array.isArray(arr)?arr:[arr];statusEl.classList.remove('active');statusText.textContent='Found '+items.length+' item(s) from '+file.name;document.getElementById('expenseInput').value=items.map(i=>(i.item||'')+' '+(i.amount||'')).join(', ');onType();parsedItems=items.map(item=>{const lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});openReview(parsedItems);}catch(err){statusEl.classList.remove('active');statusText.textContent='Failed: '+err.message;showToast('Upload failed: '+err.message,4000);}event.target.value='';}
+function fileToBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});}
 
-  const cfg = loadConfig();
-  if(!cfg.scriptUrl) throw new KharchaError('Script URL Missing','No Apps Script URL set.','Tap ⚙️ and add your Script URL.');
+function openSmsOverlay(){document.getElementById('smsText').value='';document.getElementById('smsOverlay').classList.add('show');}
+function closeSmsOverlay(){document.getElementById('smsOverlay').classList.remove('show');}
+function maybeCloseSms(e){if(e.target===document.getElementById('smsOverlay'))closeSmsOverlay();}
+async function parseSmsText(){const text=document.getElementById('smsText').value.trim();if(!text){showToast('Please paste a message first');return;}const cfg=loadConfig();if(!cfg.apiKey||!cfg.scriptUrl){closeSmsOverlay();openConfig();return;}const btn=document.getElementById('smsParseBtn');btn.classList.add('loading');btn.disabled=true;try{const smsPrompt='Extract expense from this bank SMS. Return ONLY JSON array.\n\nSMS: "'+text.replace(/"/g,'\\"')+'"\n\nReturn: [{"date":"DD Mon YYYY","item":"merchant in English","amount":number_or_null,"shop":"merchant_or_null","comment":null,"category":"Food|Transport|Shopping|Utilities|Health|Entertainment|Other|null"}]\n\nOnly JSON array.';const raw=await callGeminiProxy(smsPrompt);const clean=raw.replace(/```json|```/g,'').trim();const arr=JSON.parse(clean);const items=Array.isArray(arr)?arr:[arr];closeSmsOverlay();document.getElementById('expenseInput').value=items.map(i=>(i.item||'')+' '+(i.amount||'')).join(', ');onType();parsedItems=items.map(item=>{const lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});openReview(parsedItems);}catch(err){showToast('Could not parse SMS: '+err.message,4000);}finally{btn.classList.remove('loading');btn.disabled=false;}}
 
-  let res;
-  try {
-    const params = new URLSearchParams({action:'geminiProxy', apiKey, prompt});
-    res = await fetch(cfg.scriptUrl + '?' + params.toString());
-  } catch(fetchErr) {
-    throw new KharchaError('Network Error','Could not reach Apps Script: '+fetchErr.message,'Check your internet and Script URL in ⚙️.');
-  }
+let parsedItems=[],multiMode='separate';
+async function submitExpense(){const cfg=loadConfig();if(!cfg.scriptUrl){openConfig();showToast('Add Script URL first');return;}if(!cfg.apiKey){openConfig();showToast('Add Gemini API key');return;}const text=document.getElementById('expenseInput').value.trim();if(!text)return;const btn=document.getElementById('submitBtn');btn.disabled=true;btn.classList.add('loading');try{if(_prefetchedItems&&_prefetchedText===text){parsedItems=_prefetchedItems;}else{parsedItems=await parseWithGemini(text,cfg.apiKey);}_prefetchedItems=null;_prefetchedText='';openReview(parsedItems);}catch(err){if(err instanceof KharchaError)showErrorToast(err.title+': '+err.message);else showErrorToast(err.message||'Something went wrong');}finally{btn.classList.remove('loading');btn.disabled=document.getElementById('expenseInput').value.trim().length===0;}}
 
-  if(!res.ok) throw new KharchaError('Proxy Error','Apps Script returned HTTP '+res.status,'Redeploy your Apps Script — access must be set to Anyone.');
-
-  let data;
-  try{data=await res.json();}
-  catch(e){throw new KharchaError('Response Error','Could not read Apps Script response.','Make sure you deployed the latest Code.gs.');}
-
-  if(!data.success){
-    const m=data.error||'Unknown error';
-    if(m.includes('400')||m.toLowerCase().includes('api key')) throw new KharchaError('Invalid Gemini API Key',m,'Go to aistudio.google.com → API Keys → create a new key.');
-    if(m.includes('429')) throw new KharchaError('Rate Limit',m,'Wait a minute. Free tier = 15 req/min.');
-    throw new KharchaError('Gemini Error',m,'Check your Gemini API key in ⚙️.');
-  }
-
-  const raw=(data.result||'').replace(/```json|```/g,'').trim();
-  try{
-    const parsed=JSON.parse(raw);
-    const arr=Array.isArray(parsed)?parsed:[parsed];
-    // Apply local learning override
-    return arr.map(item=>{
-      const localCat = guessCategory(item.item, item.shop);
-      if(localCat) item._localCat = localCat; // local suggestion, user sees it pre-selected
-      return item;
-    });
-  }catch{
-    throw new KharchaError('Parse Error','Bad JSON from Gemini: '+raw.substring(0,80),'Try simpler text.');
-  }
-}
-
-// ══════════════════════════════════════
-//  SUBMIT
-// ══════════════════════════════════════
-let parsedItems=[];
-let multiMode='separate';
-
-async function submitExpense(){
-  const cfg=loadConfig();
-  if(!cfg.scriptUrl){openConfig();showToast('Please add your Script URL first');return;}
-  if(!cfg.apiKey){openConfig();showToast('Please add your Gemini API key');return;}
-  const text=document.getElementById('expenseInput').value.trim();
-  if(!text) return;
-
-  const btn=document.getElementById('submitBtn');
-  btn.disabled=true;btn.classList.add('loading');
-
-  try{
-    // Use prefetched result if text matches (instant) else fetch now
-    if(_prefetchedItems && _prefetchedText===text) {
-      parsedItems=_prefetchedItems;
-    } else {
-      parsedItems=await parseWithGemini(text,cfg.apiKey);
-    }
-    _prefetchedItems=null; _prefetchedText='';
-    openReview(parsedItems);
-  }catch(err){
-    if(err instanceof KharchaError) showErrorToast(err.title+': '+err.message);
-    else showErrorToast(err.message||'Something went wrong');
-  }finally{
-    btn.classList.remove('loading');
-    btn.disabled=document.getElementById('expenseInput').value.trim().length===0;
-  }
-}
-
-// ══════════════════════════════════════
-//  REVIEW SHEET
-// ══════════════════════════════════════
-function openReview(items){
-  multiMode='separate';
-  const isMulti=items.length>1;
-  document.getElementById('multiChoice').style.display=isMulti?'block':'none';
-  document.getElementById('btnSeparate').classList.add('active');
-  document.getElementById('btnMerge').classList.remove('active');
-  renderReviewChips(items, isMulti?'separate':'single');
-  document.getElementById('reviewOverlay').classList.add('show');
-}
+var reviewChipTags={};
+function openReview(items){multiMode='separate';const isMulti=items.length>1;document.getElementById('multiChoice').style.display=isMulti?'block':'none';document.getElementById('btnSeparate').classList.add('active');document.getElementById('btnMerge').classList.remove('active');items.forEach((_,i)=>{reviewChipTags[i]=getTag()||'Regular';});renderReviewChips(items,isMulti?'separate':'single');document.getElementById('reviewOverlay').classList.add('show');}
 function closeReview(){document.getElementById('reviewOverlay').classList.remove('show');}
-function setMultiMode(mode){
-  multiMode=mode;
-  document.getElementById('btnSeparate').classList.toggle('active',mode==='separate');
-  document.getElementById('btnMerge').classList.toggle('active',mode==='merge');
-  renderReviewChips(parsedItems,mode);
-}
+function setMultiMode(mode){multiMode=mode;document.getElementById('btnSeparate').classList.toggle('active',mode==='separate');document.getElementById('btnMerge').classList.toggle('active',mode==='merge');renderReviewChips(parsedItems,mode);}
+function renderReviewChips(items,mode){const container=document.getElementById('reviewItems');const defTag=getTag()||'Regular';if(mode==='merge'||mode==='single'){reviewChipTags[0]=defTag;const mItem=items.map(i=>i.item||'').filter(Boolean).join(', ');const mAmt=items.reduce((s,i)=>s+(parseFloat(calcAmount(String(i.amount||'')))||0),0)||'';const shops=[...new Set(items.map(i=>i.shop).filter(Boolean))];const mShop=shops.length===1?shops[0]:'';const cat=items[0]?items[0]._localCat||items[0].category||'':'';container.innerHTML=buildChip({date:items[0]?items[0].date:'',item:mItem,amount:mAmt,shop:mShop,comment:'',category:cat},0,null,defTag);}else{container.innerHTML=items.map((item,i)=>buildChip(item,i,items.length,reviewChipTags[i]||defTag)).join('');}}
 
-function renderReviewChips(items,mode){
-  const container=document.getElementById('reviewItems');
-  const sheetName=isShaadi()?'Shaadi':'Expenses';
-  if(mode==='merge'||mode==='single'){
-    const mergedItem=items.map(i=>i.item||'').filter(Boolean).join(', ');
-    const mergedAmt=items.reduce((s,i)=>s+(parseFloat(calcAmount(String(i.amount||'')))||0),0)||'';
-    const shops=[...new Set(items.map(i=>i.shop).filter(Boolean))];
-    const mergedShop=shops.length===1?shops[0]:'';
-    const date=items[0]?items[0].date:'';
-    const cat=items[0]?items[0]._localCat||items[0].category||'':'';
-    container.innerHTML=buildChip({date,item:mergedItem,amount:mergedAmt,shop:mergedShop,comment:'',category:cat,sheetName},0,null);
-  } else {
-    container.innerHTML=items.map((item,i)=>buildChip(item,i,items.length)).join('');
-  }
-}
-
-function buildChip(item,idx,total){
-  var label = total ? ('Item '+(idx+1)+' of '+total) : 'Review';
-  var amtDisplay = item.amount ? ('Rs.'+(calcAmount(String(item.amount))||item.amount)) : '--';
-  var dateDisplay = item.date || 'today';
-  var dateVal = toDateInput(item.date);
-  var activeCat = item._localCat || item.category || '';
-
-  var catPills = CATS.map(function(c){
-    var isActive = (activeCat === c) ? ' active' : '';
-    return '<button class="cat-pill'+isActive+'" data-cat="'+c+'" onclick="selectCat(this,'+idx+')" type="button">'+c+'</button>';
-  }).join('');
-
+function buildChip(item,idx,total,chipTag){
+  var label=total?('Item '+(idx+1)+' of '+total):'Review';
+  var amtDisplay=item.amount?('Rs.'+(calcAmount(String(item.amount))||item.amount)):'--';
+  var dateVal=toDateInput(item.date);
+  var activeCat=item._localCat||item.category||'';
+  var tag=chipTag||'Regular';
+  var catPills=CATS.map(function(c){return '<button class="cat-pill'+(activeCat===c?' active':'')+'" data-cat="'+c+'" onclick="selectCat(this,'+idx+')" type="button">'+c+'</button>';}).join('');
+  var tagHtml='<div style="margin-top:8px;">'
+    +'<div style="font-size:9px;font-family:\'JetBrains Mono\',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">Sheet</div>'
+    +'<div class="mini-tag-toggle">'
+    +'<button class="mini-tag-btn'+(tag==='Regular'?' active':'')+'" data-tag="Regular" onclick="selectReviewTag(this,'+idx+')" type="button">🏠 Regular</button>'
+    +'<button class="mini-tag-btn'+(tag==='Shaadi'?' active':'')+'" data-tag="Shaadi" onclick="selectReviewTag(this,'+idx+')" type="button">💍 Shaadi</button>'
+    +'</div>'
+    +'<input type="hidden" id="rv-tag-'+idx+'" value="'+tag+'"/>'
+    +'</div>';
   return '<div class="review-chip" id="chip-'+idx+'">'
-    + '<div class="review-chip-header">'
-    + '<span class="review-chip-num">'+label+'</span>'
-    + '<span class="review-chip-summary">'+amtDisplay+' · '+dateDisplay+'</span>'
-    + '</div>'
-    + '<div class="review-fields">'
-    + '<div class="review-field" style="flex:2;min-width:180px;"><label>Item</label>'
-    + '<input class="review-input" id="rv-item-'+idx+'" value="'+esc(item.item||'')+'" placeholder="Item"/></div>'
-    + '<div class="review-field" style="min-width:90px;"><label>Amount ₹</label>'
-    + '<input class="review-input amount-input" id="rv-amount-'+idx+'" type="number" value="'+(item.amount||'')+'" placeholder="0"/></div>'
-    + '<div class="review-field"><label>Date</label>'
-    + '<input class="review-input" id="rv-date-'+idx+'" type="date" value="'+dateVal+'" max="'+TODAY_STR+'"/></div>'
-    + '<div class="review-field"><label>Shop</label>'
-    + '<input class="review-input" id="rv-shop-'+idx+'" value="'+esc(item.shop||'')+'" placeholder="optional"/></div>'
-    + '<div class="review-field" style="flex:2;min-width:180px;"><label>Comment</label>'
-    + '<input class="review-input" id="rv-comment-'+idx+'" value="'+esc(item.comment||'')+'" placeholder="optional"/></div>'
-    + '</div>'
-    + '<div style="margin-top:8px;"><div style="font-size:9px;font-family:\'JetBrains Mono\',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Category</div>'
-    + '<div class="cat-picker" id="catpicker-'+idx+'">'+catPills+'</div>'
-    + '<input type="hidden" id="rv-cat-'+idx+'" value="'+esc(activeCat)+'"/>'
-    + '</div>'
-    + '</div>';
+    +'<div class="review-chip-header"><span class="review-chip-num">'+label+'</span><span class="review-chip-summary">'+amtDisplay+' · '+(item.date||'today')+'</span></div>'
+    +'<div class="review-fields">'
+    +'<div class="review-field" style="flex:2;min-width:180px;"><label>Item</label><input class="review-input" id="rv-item-'+idx+'" value="'+esc(item.item||'')+'" placeholder="Item"/></div>'
+    +'<div class="review-field" style="min-width:90px;"><label>Amount ₹</label><input class="review-input amount-input" id="rv-amount-'+idx+'" type="text" inputmode="decimal" value="'+(item.amount||'')+'" placeholder="0" onblur="evalAmountField(this)" oninput="this.style.color=\'\'"/></div>'
+    +'<div class="review-field"><label>Date</label><input class="review-input" id="rv-date-'+idx+'" type="date" value="'+dateVal+'" max="'+TODAY_STR+'"/></div>'
+    +'<div class="review-field"><label>Shop</label><input class="review-input" id="rv-shop-'+idx+'" value="'+esc(item.shop||'')+'" placeholder="optional"/></div>'
+    +'<div class="review-field" style="flex:2;min-width:180px;"><label>Comment</label><input class="review-input" id="rv-comment-'+idx+'" value="'+esc(item.comment||'')+'" placeholder="optional"/></div>'
+    +'</div>'
+    +'<div style="margin-top:8px;"><div style="font-size:9px;font-family:\'JetBrains Mono\',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">Category</div>'
+    +'<div class="cat-picker" id="catpicker-'+idx+'">'+catPills+'</div>'
+    +'<input type="hidden" id="rv-cat-'+idx+'" value="'+esc(activeCat)+'"/>'
+    +'</div>'
+    +tagHtml+'</div>';
 }
+function selectReviewTag(el,idx){var wrap=el.closest('.mini-tag-toggle');wrap.querySelectorAll('.mini-tag-btn').forEach(function(b){b.classList.remove('active');});el.classList.add('active');document.getElementById('rv-tag-'+idx).value=el.dataset.tag;reviewChipTags[idx]=el.dataset.tag;}
+function selectCat(el,idx){var picker=document.getElementById('catpicker-'+idx);var hidden=document.getElementById('rv-cat-'+idx);var isActive=el.classList.contains('active');picker.querySelectorAll('.cat-pill').forEach(function(p){p.classList.remove('active');});if(!isActive){el.classList.add('active');hidden.value=el.dataset.cat;}else{hidden.value='';}}
 
-function selectCat(el, idx){
-  // Toggle: tap active cat to deselect
-  var picker = document.getElementById('catpicker-'+idx);
-  var hidden = document.getElementById('rv-cat-'+idx);
-  var isActive = el.classList.contains('active');
-  picker.querySelectorAll('.cat-pill').forEach(function(p){p.classList.remove('active');});
-  if(!isActive){
-    el.classList.add('active');
-    hidden.value = el.dataset.cat;
-  } else {
-    hidden.value = '';
-  }
-}
+function calcAmount(val){if(val===''||val===null||val===undefined)return '';var str=String(val).trim();if(!str)return '';var safe=str.split('').filter(function(c){return '0123456789+-*/().'.indexOf(c)>=0;}).join('').trim();if(!safe)return '';var hasDigit=false;for(var i=0;i<safe.length;i++){if(safe[i]>='0'&&safe[i]<='9'){hasDigit=true;break;}}if(!hasDigit)return '';var plainNum=true;for(var i=0;i<safe.length;i++){if('+-*/'.indexOf(safe[i])>=0){plainNum=false;break;}}if(plainNum)return safe;try{var result=Function('"use strict"; return ('+safe+')')();if(typeof result!=='number'||!isFinite(result)||isNaN(result))return '';var rounded=Math.round(result*100)/100;if(rounded<0)return '';return String(rounded);}catch(e){return '';}}
+function evalAmountField(input){var r=calcAmount(input.value);if(r!==''&&r!==String(input.value).trim()){input.value=r;input.style.color='var(--success)';setTimeout(function(){input.style.color='';},800);}}
 
+async function confirmAndSave(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Script URL not set');return;}var count=multiMode==='merge'||parsedItems.length===1?1:parsedItems.length;for(var i=0;i<count;i++){var dv=document.getElementById('rv-date-'+i);if(dv){var err=validateDate(dv.value);if(err){showToast('❌ '+err);return;}}}const btn=document.getElementById('confirmBtn');btn.classList.add('loading');btn.disabled=true;const loggedBy=cfg.userName||'Unknown';const rawText=document.getElementById('expenseInput').value.trim();try{var rows=[];for(var i=0;i<count;i++){var dateVal=document.getElementById('rv-date-'+i)?document.getElementById('rv-date-'+i).value:'';var catVal=document.getElementById('rv-cat-'+i)?document.getElementById('rv-cat-'+i).value:'';var tagVal=document.getElementById('rv-tag-'+i)?document.getElementById('rv-tag-'+i).value:'Regular';var itemVal=document.getElementById('rv-item-'+i)?document.getElementById('rv-item-'+i).value.trim():'';var shopVal=document.getElementById('rv-shop-'+i)?document.getElementById('rv-shop-'+i).value.trim():'';if(catVal&&(parsedItems[i]?parsedItems[i].category:null)!==catVal)saveCatOverride(itemVal,shopVal,catVal);rows.push({date:fromDateInput(dateVal),item:itemVal,amount:calcAmount(document.getElementById('rv-amount-'+i)?document.getElementById('rv-amount-'+i).value:''),shop:shopVal,comment:document.getElementById('rv-comment-'+i)?document.getElementById('rv-comment-'+i).value.trim():'',category:catVal,tag:tagVal,loggedBy,rawText,sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses'});}for(var j=0;j<rows.length;j++){await fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(rows[j])});}closeReview();resetAddForm();showToast(rows.length>1?('✅ '+rows.length+' entries saved!'):'✅ Saved!',5000);}catch(err){showToast('Save failed — try again');}finally{btn.classList.remove('loading');btn.disabled=false;}}
+function resetAddForm(){document.getElementById('expenseInput').value='';document.getElementById('charCount').textContent='500';document.getElementById('submitBtn').disabled=true;document.getElementById('hintCard').classList.remove('hidden');document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=null;updateSheetBadge();document.getElementById('uploadStatus').style.display='none';}
 
-// ══════════════════════════════════════
-//  AMOUNT CALCULATOR
-// ══════════════════════════════════════
-function calcAmount(val) {
-  if (val === '' || val === null || val === undefined) return '';
-  var str = String(val).trim();
-  if (!str) return '';
-  // Keep only digits, operators, dot, parens, spaces
-  var safe = str.split('').filter(function(c){ return '0123456789+-*/().'.indexOf(c) >= 0; }).join('').trim();
-  if (!safe) return '';
-  // Must contain at least one digit
-  var hasDigit = false;
-  for (var i=0; i<safe.length; i++) { if (safe[i] >= '0' && safe[i] <= '9') { hasDigit = true; break; } }
-  if (!hasDigit) return '';
-  // If it looks like a plain positive number, return directly
-  var plainNum = true;
-  for (var i=0; i<safe.length; i++) { if ('+-*/'.indexOf(safe[i]) >= 0) { plainNum = false; break; } }
-  if (plainNum) return safe;
-  // Evaluate expression
-  try {
-    var result = Function('"use strict"; return (' + safe + ')')();
-    if (typeof result !== 'number' || !isFinite(result) || isNaN(result)) return '';
-    var rounded = Math.round(result * 100) / 100;
-    if (rounded < 0) return '';
-    return String(rounded);
-  } catch(e) { return ''; }
-}
-
-function evalAmountField(input) {
-  var result = calcAmount(input.value);
-  if (result !== '' && result !== String(input.value).trim()) {
-    input.value = result;
-    input.style.color = 'var(--success)';
-    setTimeout(function(){ input.style.color = ''; }, 800);
-  }
-}
-
-// ══════════════════════════════════════
-//  CONFIRM & SAVE
-// ══════════════════════════════════════
-async function confirmAndSave(){
-  const cfg=loadConfig();
-  if(!cfg.scriptUrl){showToast('Script URL not set');return;}
-
-  // Validate dates
-  for(var i=0;i<(multiMode==='merge'||parsedItems.length===1?1:parsedItems.length);i++){
-    var dv=document.getElementById('rv-date-'+i);
-    if(dv){var err=validateDate(dv.value);if(err){showToast('❌ '+err);return;}}
-  }
-
-  const btn=document.getElementById('confirmBtn');
-  btn.classList.add('loading');btn.disabled=true;
-
-  const tag=getTag();
-  const loggedBy=cfg.userName||'Unknown';
-  const sheetName=isShaadi()?'Shaadi':'Expenses';
-  const rawText=document.getElementById('expenseInput').value.trim();
-
-  try{
-    var rowsToSave=[];
-    var count=multiMode==='merge'||parsedItems.length===1?1:parsedItems.length;
-    for(var i=0;i<count;i++){
-      var dateVal=document.getElementById('rv-date-'+i)?document.getElementById('rv-date-'+i).value:'';
-      var catVal=document.getElementById('rv-cat-'+i)?document.getElementById('rv-cat-'+i).value:'';
-      var itemVal=document.getElementById('rv-item-'+i)?document.getElementById('rv-item-'+i).value.trim():'';
-      var shopVal=document.getElementById('rv-shop-'+i)?document.getElementById('rv-shop-'+i).value.trim():'';
-      // Save override to local learning
-      if(catVal && (parsedItems[i]?parsedItems[i].category:null) !== catVal){
-        saveCatOverride(itemVal, shopVal, catVal);
-      }
-      rowsToSave.push({
-        date: fromDateInput(dateVal),
-        item: itemVal,
-        amount: calcAmount(document.getElementById('rv-amount-'+i)?document.getElementById('rv-amount-'+i).value:''),
-        shop: shopVal,
-        comment: document.getElementById('rv-comment-'+i)?document.getElementById('rv-comment-'+i).value.trim():'',
-        category: catVal,
-        tag, loggedBy, rawText, sheetName
-      });
-    }
-
-    for(var j=0;j<rowsToSave.length;j++){
-      await fetch(cfg.scriptUrl,{
-        method:'POST',mode:'no-cors',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(rowsToSave[j])
-      });
-    }
-
-    closeReview();
-    resetAddForm();
-    showToast(rowsToSave.length>1?('✅ '+rowsToSave.length+' entries saved!'):'✅ Saved!', 5000);
-
-  }catch(err){
-    showToast('Save failed — try again');
-  }finally{
-    btn.classList.remove('loading');btn.disabled=false;
-  }
-}
-
-function resetAddForm(){
-  document.getElementById('expenseInput').value='';
-  document.getElementById('charCount').textContent='500';
-  document.getElementById('submitBtn').disabled=true;
-  document.getElementById('hintCard').classList.remove('hidden');
-  document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));
-  selectedTag=null;
-  updateSheetBadge();
-}
-
-// ══════════════════════════════════════
-//  HISTORY & ANALYTICS
-// ══════════════════════════════════════
-let currentSheetTab='Expenses';
-let historyData=[];
-
-function switchSheetTab(name){
-  currentSheetTab=name;
-  document.getElementById('sheetTabExpenses').classList.toggle('active',name==='Expenses');
-  document.getElementById('sheetTabShaadi').classList.toggle('active',name==='Shaadi');
-  loadHistory();
-}
-
-async function loadHistory(){
-  const cfg=loadConfig();
-  if(!cfg.scriptUrl){showToast('Set up Script URL in ⚙️ first');return;}
-
-  const list=document.getElementById('historyList');
-  const refresh=document.getElementById('refreshBtn');
-  refresh.classList.add('spinning');
-  document.getElementById('summaryCard').style.display='none';
-
-  // Show cached data immediately if available
-  const cacheKey=HISTORY_CACHE_KEY+'_'+currentSheetTab;
-  try{
-    const cached=JSON.parse(localStorage.getItem(cacheKey));
-    if(cached&&cached.rows){historyData=cached.rows;renderHistory();}
-    if(cached&&cached.summary&&currentSheetTab==='Expenses') renderSummaryCard(cached.summary);
-  }catch(e){}
-
-  // Show skeletons only if no cache
-  if(!historyData.length){
-    list.innerHTML=Array(4).fill(0).map(()=>'<div class="skeleton"><div class="skel-line w60"></div><div class="skel-line w40"></div><div class="skel-line w80"></div></div>').join('');
-  }
-
-  try{
-    const [recentRes,summaryRes]=await Promise.all([
-      fetch(cfg.scriptUrl+'?action=getRecent&sheet='+encodeURIComponent(currentSheetTab)+'&n=10'),
-      currentSheetTab==='Expenses'?fetch(cfg.scriptUrl+'?action=getSummary'):Promise.resolve(null)
-    ]);
-
-    if(!recentRes.ok) throw new Error('HTTP '+recentRes.status);
-    const recentData=await recentRes.json();
-    if(!recentData.success) throw new Error(recentData.error||'Script error');
-    historyData=recentData.rows||[];
-    renderHistory();
-
-    var summaryData=null;
-    if(summaryRes&&summaryRes.ok){
-      const sData=await summaryRes.json();
-      if(sData.success){renderSummaryCard(sData);summaryData=sData;}
-    }
-
-    // Update cache
-    localStorage.setItem(cacheKey,JSON.stringify({rows:historyData,summary:summaryData,ts:Date.now()}));
-
-  }catch(err){
-    if(!historyData.length){
-      list.innerHTML='<div class="history-empty"><div class="empty-icon">⚠️</div><div>Could not load history</div><div style="font-size:11px;margin-top:4px;color:var(--muted)">'+err.message+'</div></div>';
-    } else {
-      showToast('Refresh failed — showing cached data');
-    }
-  }finally{
-    refresh.classList.remove('spinning');
-  }
-}
-
-function renderSummaryCard(data){
-  const card=document.getElementById('summaryCard');
-  card.style.display='block';
-  const thisMonth=data.thisMonth||0,lastMonth=data.lastMonth||0,thisWeek=data.thisWeek||0;
-  document.getElementById('thisMonthAmt').textContent='₹'+thisMonth.toLocaleString('en-IN');
-  document.getElementById('thisWeekAmt').textContent='₹'+thisWeek.toLocaleString('en-IN');
-  document.getElementById('lastMonthAmt').textContent='₹'+lastMonth.toLocaleString('en-IN');
-  const delta=document.getElementById('summaryDelta');
-  if(lastMonth>0){
-    const pct=Math.round(((thisMonth-lastMonth)/lastMonth)*100);
-    const less=pct<0;
-    delta.textContent=(less?'▼ ':'▲ ')+Math.abs(pct)+'% '+(less?'less':'more');
-    delta.className='summary-delta '+(less?'green':'red');
-  }else{delta.textContent='First month!';delta.className='summary-delta green';}
-}
-
-function renderHistory(){
-  const list=document.getElementById('historyList');
-  if(!historyData.length){list.innerHTML='<div class="history-empty"><div class="empty-icon">📭</div><div>No entries yet in '+currentSheetTab+'</div></div>';return;}
-  const isSh=currentSheetTab==='Shaadi';
-  list.innerHTML=historyData.map((row,i)=>{
-    var updatedInfo='';
-    if(row.lastUpdated&&row.lastUpdated!==row.timestamp){
-      updatedInfo='<div style="font-size:10px;color:var(--muted);font-family:\'JetBrains Mono\',monospace;margin-top:4px;">✏️ Updated: '+esc(row.lastUpdated)+'</div>';
-    }
-    return '<div class="history-card" onclick="openEdit('+i+')">'
-      +'<div class="history-card-top">'
-      +'<div class="history-item">'+esc(row.item||'—')+'</div>'
-      +'<div class="history-amount'+(isSh?' shaadi-amount':'')+'">'+( row.amount?'₹'+row.amount:'—')+'</div>'
-      +'</div>'
-      +'<div class="history-card-meta">'
-      +'<span class="meta-chip">📅 '+esc(row.date||'—')+'</span>'
-      +(row.shop?'<span class="meta-chip">🏪 '+esc(row.shop)+'</span>':'')
-      +(row.category?'<span class="meta-chip cat-chip">'+esc(row.category)+'</span>':'')
-      +(row.tag?'<span class="meta-chip tag-chip">🏷 '+esc(row.tag)+'</span>':'')
-      +(row.loggedBy?'<span class="meta-chip">👤 '+esc(row.loggedBy)+'</span>':'')
-      +'</div>'
-      +(row.comment?'<div style="font-size:12px;color:var(--muted2);margin-top:6px;font-family:\'JetBrains Mono\',monospace">💬 '+esc(row.comment)+'</div>':'')
-      +updatedInfo
-      +'<div class="edit-hint">Tap to edit →</div>'
-      +'</div>';
-  }).join('');
-}
-
+let currentSheetTab='Expenses',historyData=[];
+function switchSheetTab(name){currentSheetTab=name;document.getElementById('sheetTabExpenses').classList.toggle('active',name==='Expenses');document.getElementById('sheetTabShaadi').classList.toggle('active',name==='Shaadi');loadHistory();}
+async function loadHistory(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Set up Script URL in settings first');return;}const list=document.getElementById('historyList');const refresh=document.getElementById('refreshBtn');refresh.classList.add('spinning');document.getElementById('summaryCard').style.display='none';const cacheKey=HISTORY_CACHE_KEY+'_'+currentSheetTab;try{const cached=JSON.parse(localStorage.getItem(cacheKey));if(cached&&cached.rows){historyData=cached.rows;renderHistory();}if(cached&&cached.summary&&currentSheetTab==='Expenses')renderSummaryCard(cached.summary);}catch(e){}if(!historyData.length){list.innerHTML=Array(4).fill(0).map(()=>'<div class="skeleton"><div class="skel-line w60"></div><div class="skel-line w40"></div><div class="skel-line w80"></div></div>').join('');}try{const[recentRes,summaryRes]=await Promise.all([fetch(cfg.scriptUrl+'?action=getRecent&sheet='+encodeURIComponent(currentSheetTab)+'&n=10'),currentSheetTab==='Expenses'?fetch(cfg.scriptUrl+'?action=getSummary'):Promise.resolve(null)]);if(!recentRes.ok)throw new Error('HTTP '+recentRes.status);const rd=await recentRes.json();if(!rd.success)throw new Error(rd.error||'Script error');historyData=rd.rows||[];renderHistory();var sd=null;if(summaryRes&&summaryRes.ok){const s=await summaryRes.json();if(s.success){renderSummaryCard(s);sd=s;}}localStorage.setItem(cacheKey,JSON.stringify({rows:historyData,summary:sd,ts:Date.now()}));}catch(err){if(!historyData.length){list.innerHTML='<div class="history-empty"><div class="empty-icon">⚠️</div><div>Could not load</div><div style="font-size:11px;margin-top:4px;color:var(--muted)">'+err.message+'</div></div>';}else showToast('Refresh failed — showing cached data');}finally{refresh.classList.remove('spinning');}}
+function renderSummaryCard(d){const card=document.getElementById('summaryCard');card.style.display='block';const tm=d.thisMonth||0,lm=d.lastMonth||0,tw=d.thisWeek||0;document.getElementById('thisMonthAmt').textContent='₹'+tm.toLocaleString('en-IN');document.getElementById('thisWeekAmt').textContent='₹'+tw.toLocaleString('en-IN');document.getElementById('lastMonthAmt').textContent='₹'+lm.toLocaleString('en-IN');const delta=document.getElementById('summaryDelta');if(lm>0){const pct=Math.round(((tm-lm)/lm)*100);const less=pct<0;delta.textContent=(less?'▼ ':'▲ ')+Math.abs(pct)+'% '+(less?'less':'more');delta.className='summary-delta '+(less?'green':'red');}else{delta.textContent='First month!';delta.className='summary-delta green';}}
+function renderHistory(){const list=document.getElementById('historyList');if(!historyData.length){list.innerHTML='<div class="history-empty"><div class="empty-icon">📭</div><div>No entries yet in '+currentSheetTab+'</div></div>';return;}const isSh=currentSheetTab==='Shaadi';list.innerHTML=historyData.map((row,i)=>{var upd='';if(row.lastUpdated&&row.lastUpdated!==row.timestamp){upd='<div style="font-size:10px;color:var(--muted);font-family:\'JetBrains Mono\',monospace;margin-top:4px;">✏️ '+esc(row.lastUpdated)+'</div>';}return '<div class="history-card" onclick="openEdit('+i+')">'+'<div class="history-card-top"><div class="history-item">'+esc(row.item||'—')+'</div><div class="history-amount'+(isSh?' shaadi-amount':'')+'">'+( row.amount?'₹'+row.amount:'—')+'</div></div>'+'<div class="history-card-meta">'+'<span class="meta-chip">📅 '+esc(row.date||'—')+'</span>'+(row.shop?'<span class="meta-chip">🏪 '+esc(row.shop)+'</span>':'')+(row.category?'<span class="meta-chip cat-chip">'+esc(row.category)+'</span>':'')+(row.tag?'<span class="meta-chip tag-chip">🏷 '+esc(row.tag)+'</span>':'')+(row.loggedBy?'<span class="meta-chip">👤 '+esc(row.loggedBy)+'</span>':'')+'</div>'+(row.comment?'<div style="font-size:12px;color:var(--muted2);margin-top:6px;font-family:\'JetBrains Mono\',monospace">💬 '+esc(row.comment)+'</div>':'')+upd+'<div class="edit-hint">Tap to edit →</div></div>';}).join('');}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-// ══════════════════════════════════════
-//  EDIT
-// ══════════════════════════════════════
-let editingRow=null;
-function openEdit(index){
-  const row=historyData[index];if(!row)return;editingRow=row;
-  document.getElementById('editSubtitle').textContent='Row '+row.rowNum+' in "'+row.sheetName+'" sheet';
-  document.getElementById('editRowInfo').innerHTML='<strong>Original:</strong> "'+esc(row.rawText||row.item||'')+'"';
-  document.getElementById('editDate').value=toDateInput(row.date||'');
-  document.getElementById('editDate').max=TODAY_STR;
-  document.getElementById('editItem').value=row.item||'';
-  document.getElementById('editAmount').value=row.amount||'';
-  document.getElementById('editShop').value=row.shop||'';
-  document.getElementById('editComment').value=row.comment||'';
-  document.getElementById('editTag').value=row.tag||'';
-  document.getElementById('editCategory').value=row.category||'';
-  document.getElementById('saveEditBtn').disabled=false;
-  document.getElementById('editOverlay').classList.add('show');
-}
-function closeEdit(){document.getElementById('editOverlay').classList.remove('show');editingRow=null;}
+let editingRow=null,editOriginalTag=null;
+function selectEditTag(tag){document.querySelectorAll('#editTagToggle .mini-tag-btn').forEach(b=>b.classList.remove('active'));document.querySelector('#editTagToggle [data-tag="'+tag+'"]').classList.add('active');const warn=document.getElementById('moveWarning');if(editOriginalTag&&tag!==editOriginalTag)warn.classList.add('show');else warn.classList.remove('show');}
+function getEditTag(){var a=document.querySelector('#editTagToggle .mini-tag-btn.active');return a?a.dataset.tag:'Regular';}
+function openEdit(index){const row=historyData[index];if(!row)return;editingRow=row;editOriginalTag=row.tag||'Regular';document.getElementById('editSubtitle').textContent='Row '+row.rowNum+' in "'+row.sheetName+'" sheet';document.getElementById('editRowInfo').innerHTML='<strong>Original:</strong> "'+esc(row.rawText||row.item||'')+'"';document.getElementById('moveWarning').classList.remove('show');document.getElementById('editDate').value=toDateInput(row.date||'');document.getElementById('editDate').max=TODAY_STR;document.getElementById('editItem').value=row.item||'';document.getElementById('editAmount').value=row.amount||'';document.getElementById('editShop').value=row.shop||'';document.getElementById('editComment').value=row.comment||'';document.getElementById('editCategory').value=row.category||'';document.querySelectorAll('#editTagToggle .mini-tag-btn').forEach(b=>b.classList.remove('active'));const tagBtn=document.querySelector('#editTagToggle [data-tag="'+(row.tag||'Regular')+'"]');if(tagBtn)tagBtn.classList.add('active');document.getElementById('saveEditBtn').disabled=false;document.getElementById('editOverlay').classList.add('show');}
+function closeEdit(){document.getElementById('editOverlay').classList.remove('show');editingRow=null;editOriginalTag=null;}
 function maybeCloseEdit(e){if(e.target===document.getElementById('editOverlay'))closeEdit();}
+async function saveEdit(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Script URL not set');return;}if(!editingRow)return;const dateVal=document.getElementById('editDate').value;const dateErr=validateDate(dateVal);if(dateErr){showToast('❌ '+dateErr);return;}const newTag=getEditTag();const tagChanged=newTag!==(editOriginalTag||'Regular');const btn=document.getElementById('saveEditBtn');btn.classList.add('loading');btn.disabled=true;try{if(tagChanged){const mp={action:'moveRow',rowNum:editingRow.rowNum,fromSheet:editingRow.sheetName,toSheet:newTag==='Shaadi'?'Shaadi':'Expenses',date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||''};await fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(mp)});historyData.splice(historyData.indexOf(editingRow),1);localStorage.removeItem(HISTORY_CACHE_KEY+'_'+editingRow.sheetName);localStorage.removeItem(HISTORY_CACHE_KEY+'_'+(newTag==='Shaadi'?'Shaadi':'Expenses'));renderHistory();closeEdit();showToast('Moved to '+mp.toSheet+' sheet ✓');}else{const upd={action:'updateRow',rowNum:editingRow.rowNum,sheetName:editingRow.sheetName,date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||''};await fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(upd)});Object.assign(editingRow,upd);localStorage.removeItem(HISTORY_CACHE_KEY+'_'+editingRow.sheetName);renderHistory();closeEdit();showToast('Entry updated ✓');}}catch(err){showToast('Failed — try again');}finally{btn.classList.remove('loading');btn.disabled=false;}}
 
-async function saveEdit(){
-  const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Script URL not set');return;}if(!editingRow)return;
-  const dateVal=document.getElementById('editDate').value;
-  const dateErr=validateDate(dateVal);
-  if(dateErr){showToast('❌ '+dateErr);return;}
-
-  const btn=document.getElementById('saveEditBtn');btn.classList.add('loading');btn.disabled=true;
-  const updated={
-    action:'updateRow',rowNum:editingRow.rowNum,sheetName:editingRow.sheetName,
-    date:fromDateInput(dateVal),
-    item:document.getElementById('editItem').value.trim(),
-    amount:calcAmount(document.getElementById('editAmount').value),
-    shop:document.getElementById('editShop').value.trim(),
-    comment:document.getElementById('editComment').value.trim(),
-    tag:document.getElementById('editTag').value.trim(),
-    category:document.getElementById('editCategory').value.trim(),
-    loggedBy:editingRow.loggedBy||cfg.userName||'',
-    rawText:editingRow.rawText||''
-  };
-  try{
-    await fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(updated)});
-    Object.assign(editingRow,updated);
-    // Invalidate cache
-    localStorage.removeItem(HISTORY_CACHE_KEY+'_'+editingRow.sheetName);
-    renderHistory();closeEdit();showToast('Entry updated ✓');
-  }catch(err){showToast('Update failed — try again');}
-  finally{btn.classList.remove('loading');btn.disabled=false;}
-}
-
-// ══════════════════════════════════════
-//  TOAST
-// ══════════════════════════════════════
 let toastTimer=null;
-function showToast(msg,duration=2500){
-  const t=document.getElementById('toast');
-  t.textContent=msg;t.classList.add('show');
-  if(toastTimer)clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>t.classList.remove('show'),duration);
-}
+function showToast(msg,duration=2500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');if(toastTimer)clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),duration);}
 function showErrorToast(msg){showToast('❌ '+msg,5000);}
 
-// ══════════════════════════════════════
-//  INIT
-// ══════════════════════════════════════
 const _cfg=loadConfig();
 if(!_cfg.scriptUrl||!_cfg.apiKey)setTimeout(()=>showToast('Tap ⚙️ to set up your app'),800);
 </script>
