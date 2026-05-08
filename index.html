@@ -559,7 +559,72 @@ function selectCat(el,idx){var picker=document.getElementById('catpicker-'+idx);
 function calcAmount(val){if(val===''||val===null||val===undefined)return '';var str=String(val).trim();if(!str)return '';var safe=str.split('').filter(function(c){return '0123456789+-*/().'.indexOf(c)>=0;}).join('').trim();if(!safe)return '';var hasDigit=false;for(var i=0;i<safe.length;i++){if(safe[i]>='0'&&safe[i]<='9'){hasDigit=true;break;}}if(!hasDigit)return '';var plainNum=true;for(var i=0;i<safe.length;i++){if('+-*/'.indexOf(safe[i])>=0){plainNum=false;break;}}if(plainNum)return safe;try{var result=Function('"use strict"; return ('+safe+')')();if(typeof result!=='number'||!isFinite(result)||isNaN(result))return '';var rounded=Math.round(result*100)/100;if(rounded<0)return '';return String(rounded);}catch(e){return '';}}
 function evalAmountField(input){var r=calcAmount(input.value);if(r!==''&&r!==String(input.value).trim()){input.value=r;input.style.color='var(--success)';setTimeout(function(){input.style.color='';},800);}}
 
-async function confirmAndSave(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Script URL not set');return;}var count=multiMode==='merge'||parsedItems.length===1?1:parsedItems.length;for(var i=0;i<count;i++){var dv=document.getElementById('rv-date-'+i);if(dv){var err=validateDate(dv.value);if(err){showToast('❌ '+err);return;}}}const btn=document.getElementById('confirmBtn');btn.classList.add('loading');btn.disabled=true;const loggedBy=cfg.userName||'Unknown';const rawText=document.getElementById('expenseInput').value.trim();try{var rows=[];for(var i=0;i<count;i++){var dateVal=document.getElementById('rv-date-'+i)?document.getElementById('rv-date-'+i).value:'';var catVal=document.getElementById('rv-cat-'+i)?document.getElementById('rv-cat-'+i).value:'';var tagVal=document.getElementById('rv-tag-'+i)?document.getElementById('rv-tag-'+i).value:'Regular';var itemVal=document.getElementById('rv-item-'+i)?document.getElementById('rv-item-'+i).value.trim():'';var shopVal=document.getElementById('rv-shop-'+i)?document.getElementById('rv-shop-'+i).value.trim():'';if(catVal&&(parsedItems[i]?parsedItems[i].category:null)!==catVal)saveCatOverride(itemVal,shopVal,catVal);rows.push({date:fromDateInput(dateVal),item:itemVal,amount:calcAmount(document.getElementById('rv-amount-'+i)?document.getElementById('rv-amount-'+i).value:''),shop:shopVal,comment:document.getElementById('rv-comment-'+i)?document.getElementById('rv-comment-'+i).value.trim():'',category:catVal,tag:tagVal,loggedBy,rawText,sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses'});}for(var j=0;j<rows.length;j++){fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(rows[j])});}closeReview();resetAddForm();showToast(rows.length>1?('✅ '+rows.length+' entries saved!'):'✅ Saved!',5000);}catch(err){showToast('Save failed — try again');}finally{btn.classList.remove('loading');btn.disabled=false;}}
+async function confirmAndSave(){
+  const cfg=loadConfig();
+  if(!cfg.scriptUrl){showToast('Script URL not set');return;}
+
+  // Validate dates first
+  var count=multiMode==='merge'||parsedItems.length===1?1:parsedItems.length;
+  for(var i=0;i<count;i++){
+    var dv=document.getElementById('rv-date-'+i);
+    if(dv){var err=validateDate(dv.value);if(err){showToast('❌ '+err);return;}}
+  }
+
+  const btn=document.getElementById('confirmBtn');
+  btn.classList.add('loading');btn.disabled=true;
+  const loggedBy=cfg.userName||'Unknown';
+  const rawText=document.getElementById('expenseInput').value.trim();
+
+  try{
+    // Read ALL row data from DOM first before any async ops
+    var rows=[];
+    for(var i=0;i<count;i++){
+      var getVal=function(id){var el=document.getElementById(id);return el?el.value:'';};
+      var dateVal=getVal('rv-date-'+i);
+      var catVal=getVal('rv-cat-'+i);
+      var tagVal=getVal('rv-tag-'+i)||'Regular';
+      var itemVal=(getVal('rv-item-'+i)||'').trim();
+      var shopVal=(getVal('rv-shop-'+i)||'').trim();
+      var commentVal=(getVal('rv-comment-'+i)||'').trim();
+      var amtRaw=getVal('rv-amount-'+i);
+      if(catVal&&(parsedItems[i]?parsedItems[i].category:null)!==catVal)saveCatOverride(itemVal,shopVal,catVal);
+      rows.push({
+        date:fromDateInput(dateVal),
+        item:itemVal,
+        amount:calcAmount(amtRaw),
+        shop:shopVal,
+        comment:commentVal,
+        category:catVal,
+        tag:tagVal,
+        loggedBy:loggedBy,
+        rawText:rawText,
+        sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses'
+      });
+    }
+
+    // Fire saves with small stagger to avoid Apps Script throttling
+    // Stagger: 0ms, 300ms, 600ms... so 10 items = last one fires at 2.7s
+    rows.forEach(function(row, idx){
+      setTimeout(function(){
+        fetch(cfg.scriptUrl,{
+          method:'POST',
+          mode:'no-cors',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(row)
+        });
+      }, idx * 300);
+    });
+
+    closeReview();
+    resetAddForm();
+    showToast(rows.length>1?('✅ '+rows.length+' entries saving...'):'✅ Saved!',5000);
+
+  }catch(err){
+    showToast('Save failed — try again');
+  }finally{
+    btn.classList.remove('loading');btn.disabled=false;
+  }
+}
 function resetAddForm(){document.getElementById('expenseInput').value='';document.getElementById('charCount').textContent='500';document.getElementById('submitBtn').disabled=true;document.getElementById('hintCard').classList.remove('hidden');document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=null;updateSheetBadge();document.getElementById('uploadStatus').style.display='none';}
 
 let currentSheetTab='Expenses',historyData=[];
