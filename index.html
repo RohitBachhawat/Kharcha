@@ -391,16 +391,41 @@ function getTag(){return selectedTag||'';}
 function isShaadi(){return selectedTag==='Shaadi';}
 function updateSheetBadge(){const badge=document.getElementById('sheetBadge');const text=document.getElementById('sheetBadgeText');if(isShaadi()){badge.classList.add('shaadi-mode');text.textContent='Will save to → Shaadi sheet 💍';}else{badge.classList.remove('shaadi-mode');text.textContent='Will save to → Expenses sheet';}}
 
-var _prefetchedItems=null,_prefetchedText='';
-function onType(){const val=document.getElementById('expenseInput').value;document.getElementById('charCount').textContent=500-val.length;const has=val.trim().length>0;document.getElementById('submitBtn').disabled=!has;if(has)document.getElementById('hintCard').classList.add('hidden');else document.getElementById('hintCard').classList.remove('hidden');if(val.trim()!==_prefetchedText){_prefetchedItems=null;_prefetchedText='';}}
-function onTextareaBlur(){const val=document.getElementById('expenseInput').value.trim();if(!val||val.length<3)return;if(val===_prefetchedText&&_prefetchedItems)return;const cfg=loadConfig();if(!cfg.apiKey||!cfg.scriptUrl)return;_prefetchedText=val;parseWithGemini(val,cfg.apiKey).then(function(items){_prefetchedItems=items;}).catch(function(){_prefetchedItems=null;_prefetchedText='';});}
-(function(){const ta=document.getElementById('expenseInput');['input','keyup','keydown','paste','cut','change'].forEach(ev=>ta.addEventListener(ev,()=>setTimeout(onType,0)));ta.addEventListener('blur',onTextareaBlur);})();
+function onType(){const val=document.getElementById('expenseInput').value;document.getElementById('charCount').textContent=500-val.length;const has=val.trim().length>0;document.getElementById('submitBtn').disabled=!has;if(has)document.getElementById('hintCard').classList.add('hidden');else document.getElementById('hintCard').classList.remove('hidden');}
+(function(){const ta=document.getElementById('expenseInput');['input','keyup','keydown','paste','cut','change'].forEach(ev=>ta.addEventListener(ev,()=>setTimeout(onType,0)));})();
 
 class KharchaError extends Error{constructor(t,m,h){super(m);this.title=t;this.hint=h;}}
 
 function buildExpensePrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);const d2=new Date(now);d2.setDate(now.getDate()-2);const d3=new Date(now);d3.setDate(now.getDate()-3);const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];return 'You are a family expense parser for an Indian family. Return ONLY a valid JSON array, no markdown.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+', 2daysago='+fmt(d2)+', 3daysago='+fmt(d3)+', Day='+dn+'\n\nRules:\n1. Translate Hindi/Hinglish to English: chai=Tea, sabzi=Vegetables, doodh=Milk, dawai=Medicine, kapde=Clothes, bijli=Electricity, auto=Auto Rickshaw, kal=yesterday, aaj=today\n2. Detect multiple items if multiple expenses in text\n3. Resolve relative dates\n4. AMOUNT EXPRESSIONS: keep arithmetic as string: "clothes-2000-20" => amount="2000-20", "metro-50/2" => amount="50/2". Dashes between item and amount are separators not subtraction unless both sides are numbers.\n5. Category: Food/Transport/Shopping/Utilities/Health/Entertainment/Other or null if unsure\n\nReturn: [{"date":"DD Mon YYYY","item":"English name","amount":"expr_or_number_or_null","shop":"name_or_null","comment":"extra_or_null","category":"cat_or_null"}]\n\nOnly JSON array.';}
 
-async function callGeminiProxy(prompt){const cfg=loadConfig();if(!cfg.scriptUrl)throw new KharchaError('Script URL Missing','No Apps Script URL.','Tap settings.');let res;try{const p=new URLSearchParams({action:'geminiProxy',apiKey:cfg.apiKey,prompt});res=await fetch(cfg.scriptUrl+'?'+p.toString());}catch(e){throw new KharchaError('Network Error','Could not reach Apps Script: '+e.message,'Check internet and Script URL.');}if(!res.ok)throw new KharchaError('Proxy Error','Apps Script HTTP '+res.status,'Redeploy as Web App, access=Anyone.');let data;try{data=await res.json();}catch(e){throw new KharchaError('Response Error','Could not read response.','Deploy latest Code.gs.');}if(!data.success){const m=data.error||'Unknown';if(m.includes('400')||m.toLowerCase().includes('api key'))throw new KharchaError('Invalid API Key',m,'Get key at aistudio.google.com.');if(m.includes('429'))throw new KharchaError('Rate Limit',m,'Wait 1 min.');throw new KharchaError('Gemini Error',m,'Check API key in settings.');}return data.result||'';}
+async function callGeminiProxy(prompt){
+  const cfg=loadConfig();
+  if(!cfg.scriptUrl)throw new KharchaError('Script URL Missing','No Apps Script URL.','Tap settings.');
+  const MAX_RETRIES=3;
+  for(var attempt=1;attempt<=MAX_RETRIES;attempt++){
+    let res;
+    try{const p=new URLSearchParams({action:'geminiProxy',apiKey:cfg.apiKey,prompt});res=await fetch(cfg.scriptUrl+'?'+p.toString());}
+    catch(e){throw new KharchaError('Network Error','Could not reach Apps Script: '+e.message,'Check internet and Script URL.');}
+    if(!res.ok)throw new KharchaError('Proxy Error','Apps Script HTTP '+res.status,'Redeploy as Web App, access=Anyone.');
+    let data;
+    try{data=await res.json();}catch(e){throw new KharchaError('Response Error','Could not read response.','Deploy latest Code.gs.');}
+    if(!data.success){
+      const m=data.error||'Unknown';
+      if(m.includes('429')){
+        if(attempt<MAX_RETRIES){
+          const wait=attempt*10000;
+          showToast('Rate limit — retrying in '+attempt*10+'s ('+attempt+'/'+MAX_RETRIES+')...',wait);
+          await new Promise(r=>setTimeout(r,wait));
+          continue;
+        }
+        throw new KharchaError('Rate Limit','Too many requests. All '+MAX_RETRIES+' retries failed.','Wait a minute and try again.');
+      }
+      if(m.includes('400')||m.toLowerCase().includes('api key'))throw new KharchaError('Invalid API Key',m,'Get key at aistudio.google.com.');
+      throw new KharchaError('Gemini Error',m,'Check API key in settings.');
+    }
+    return data.result||'';
+  }
+}
 
 async function parseWithGemini(text,apiKey){const raw=await callGeminiProxy(buildExpensePrompt(text));const clean=raw.replace(/```json|```/g,'').trim();try{const p=JSON.parse(clean);const arr=Array.isArray(p)?p:[p];return arr.map(item=>{const lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});}catch{throw new KharchaError('Parse Error','Bad JSON: '+clean.substring(0,80),'Try simpler text.');}}
 
@@ -413,7 +438,7 @@ function maybeCloseSms(e){if(e.target===document.getElementById('smsOverlay'))cl
 async function parseSmsText(){const text=document.getElementById('smsText').value.trim();if(!text){showToast('Please paste a message first');return;}const cfg=loadConfig();if(!cfg.apiKey||!cfg.scriptUrl){closeSmsOverlay();openConfig();return;}const btn=document.getElementById('smsParseBtn');btn.classList.add('loading');btn.disabled=true;try{const smsPrompt='Extract expense from this bank SMS. Return ONLY JSON array.\n\nSMS: "'+text.replace(/"/g,'\\"')+'"\n\nReturn: [{"date":"DD Mon YYYY","item":"merchant in English","amount":number_or_null,"shop":"merchant_or_null","comment":null,"category":"Food|Transport|Shopping|Utilities|Health|Entertainment|Other|null"}]\n\nOnly JSON array.';const raw=await callGeminiProxy(smsPrompt);const clean=raw.replace(/```json|```/g,'').trim();const arr=JSON.parse(clean);const items=Array.isArray(arr)?arr:[arr];closeSmsOverlay();document.getElementById('expenseInput').value=items.map(i=>(i.item||'')+' '+(i.amount||'')).join(', ');onType();parsedItems=items.map(item=>{const lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});openReview(parsedItems);}catch(err){showToast('Could not parse SMS: '+err.message,4000);}finally{btn.classList.remove('loading');btn.disabled=false;}}
 
 let parsedItems=[],multiMode='separate';
-async function submitExpense(){const cfg=loadConfig();if(!cfg.scriptUrl){openConfig();showToast('Add Script URL first');return;}if(!cfg.apiKey){openConfig();showToast('Add Gemini API key');return;}const text=document.getElementById('expenseInput').value.trim();if(!text)return;const btn=document.getElementById('submitBtn');btn.disabled=true;btn.classList.add('loading');try{if(_prefetchedItems&&_prefetchedText===text){parsedItems=_prefetchedItems;}else{parsedItems=await parseWithGemini(text,cfg.apiKey);}_prefetchedItems=null;_prefetchedText='';openReview(parsedItems);}catch(err){if(err instanceof KharchaError)showErrorToast(err.title+': '+err.message);else showErrorToast(err.message||'Something went wrong');}finally{btn.classList.remove('loading');btn.disabled=document.getElementById('expenseInput').value.trim().length===0;}}
+async function submitExpense(){const cfg=loadConfig();if(!cfg.scriptUrl){openConfig();showToast('Add Script URL first');return;}if(!cfg.apiKey){openConfig();showToast('Add Gemini API key');return;}const text=document.getElementById('expenseInput').value.trim();if(!text)return;const btn=document.getElementById('submitBtn');btn.disabled=true;btn.classList.add('loading');try{parsedItems=await parseWithGemini(text,cfg.apiKey);openReview(parsedItems);}catch(err){if(err instanceof KharchaError)showErrorToast(err.title+': '+err.message);else showErrorToast(err.message||'Something went wrong');}finally{btn.classList.remove('loading');btn.disabled=document.getElementById('expenseInput').value.trim().length===0;}}
 
 var reviewChipTags={};
 function openReview(items){multiMode='separate';const isMulti=items.length>1;document.getElementById('multiChoice').style.display=isMulti?'block':'none';document.getElementById('btnSeparate').classList.add('active');document.getElementById('btnMerge').classList.remove('active');items.forEach((_,i)=>{reviewChipTags[i]=getTag()||'Regular';});renderReviewChips(items,isMulti?'separate':'single');document.getElementById('reviewOverlay').classList.add('show');}
