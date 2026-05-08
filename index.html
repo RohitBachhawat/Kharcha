@@ -432,35 +432,43 @@ async function parseWithGemini(text,apiKey){const raw=await callGeminiProxy(buil
 async function handleFileUpload(event){
   const file=event.target.files[0];if(!file)return;
   const cfg=loadConfig();
-  if(!cfg.apiKey||!cfg.scriptUrl){openConfig();showToast('Set up API key first');return;}
+  if(!cfg.apiKey){openConfig();showToast('Add Gemini API key first');return;}
   const statusEl=document.getElementById('uploadStatus');
   const statusText=document.getElementById('uploadStatusText');
   statusEl.style.display='flex';statusEl.classList.add('active');
-  statusText.textContent='Reading '+file.name+'...';
+  statusText.textContent='Compressing...';
   try{
-    // Compress image to keep base64 small
     const compressed=await compressImage(file);
     const base64Data=compressed.split(',')[1];
-    const mimeType='image/jpeg';
-    statusText.textContent='Extracting expenses...';
-    // POST with JSON body — readable response
-    const res=await fetch(cfg.scriptUrl,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'geminiVision',apiKey:cfg.apiKey,mimeType,base64Data})
-    });
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    const data=await res.json();
-    if(!data.success)throw new Error(data.error||'Vision error');
-    const raw=(data.result||'').replace(/```json|```/g,'').trim();
-    const arr=JSON.parse(raw);
-    const items=Array.isArray(arr)?arr:[arr];
-    statusEl.classList.remove('active');
-    statusText.textContent='Found '+items.length+' item(s)';
-    document.getElementById('expenseInput').value=items.map(i=>(i.item||'')+' '+(i.amount||'')).join(', ');
-    onType();
-    parsedItems=items.map(item=>{const lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});
-    openReview(parsedItems);
+    statusText.textContent='Reading bill...';
+    const prompt='Extract ALL expense items from this bill/receipt/passbook image. Return ONLY a valid JSON array, no markdown. Format: [{"date":"DD Mon YYYY or today","item":"English description","amount":number_or_null,"shop":"merchant or null","comment":"note or null","category":"Food|Transport|Shopping|Utilities|Health|Entertainment|Other|null"}]. Multiple items = multiple objects. ONLY JSON array.';
+    const MAX_RETRIES=3;
+    for(var attempt=1;attempt<=MAX_RETRIES;attempt++){
+      let res;
+      try{
+        res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key='+cfg.apiKey,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:base64Data}}]}],generationConfig:{maxOutputTokens:1000}})
+        });
+      }catch(e){throw new Error('Network error: '+e.message);}
+      if(res.status===429){
+        if(attempt<MAX_RETRIES){const w=attempt*10000;showToast('Rate limit, retrying in '+attempt*10+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}
+        throw new Error('Rate limit. Wait a minute and try again.');
+      }
+      if(!res.ok){const eb=await res.json().catch(()=>({}));throw new Error('Vision error '+ res.status+': '+(eb&&eb.error?eb.error.message:'Unknown'));}
+      const data=await res.json();
+      const raw=(data.candidates[0].content.parts[0].text||'').replace(/```json|```/g,'').trim();
+      const arr=JSON.parse(raw);
+      const items=Array.isArray(arr)?arr:[arr];
+      statusEl.classList.remove('active');
+      statusText.textContent='Found '+items.length+' item(s) from '+file.name;
+      document.getElementById('expenseInput').value=items.map(function(i){return (i.item||'')+' '+(i.amount||'');}).join(', ');
+      onType();
+      parsedItems=items.map(function(item){var lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});
+      openReview(parsedItems);
+      return;
+    }
   }catch(err){
     statusEl.classList.remove('active');
     statusText.textContent='Failed: '+err.message;
@@ -469,7 +477,6 @@ async function handleFileUpload(event){
   event.target.value='';
 }
 
-function fileToBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsDataURL(file);});}
 
 async function compressImage(file){
   return new Promise((resolve,reject)=>{
