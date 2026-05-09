@@ -158,6 +158,7 @@
     .cat-pill[data-cat="Health"].active{background:#ef4444;}
     .cat-pill[data-cat="Entertainment"].active{background:#f97316;}
     .cat-pill[data-cat="Other"].active{background:#6b7280;}
+    .cat-pill[data-cat="UPI/Online"].active{background:#0ea5e9;}
     .review-actions{display:flex;gap:10px;margin-top:4px;}
     .btn-cancel-review{flex:1;padding:13px;border:1.5px solid var(--border);background:transparent;color:var(--text);border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
     .btn-confirm{flex:2;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;}
@@ -177,13 +178,13 @@
     .btn-save{flex:2;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;}
     .btn-save:disabled{background:var(--surface2);color:var(--muted);}
     .btn-save .spinner{display:none;}
-    .sms-title{font-size:16px;font-weight:800;margin-bottom:6px;}
-    .sms-sub{font-size:12px;color:var(--muted2);font-family:'JetBrains Mono',monospace;margin-bottom:12px;line-height:1.6;}
-    .sms-textarea{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:12px;padding:13px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;resize:none;min-height:110px;transition:border-color 0.2s;margin-bottom:12px;}
-    .sms-textarea:focus{border-color:var(--accent);}
-    .sms-actions{display:flex;gap:10px;}
+    
+    
+    
+    
+    
     .btn-secondary-sm{flex:1;padding:13px;border:1.5px solid var(--border);background:transparent;color:var(--text);border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:6px;}
-    .sms-parse-btn{flex:2;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;}
+    
     .config-title{font-size:18px;font-weight:800;margin-bottom:18px;}
     .config-field{margin-bottom:13px;}
     .config-field label{display:block;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;}
@@ -231,10 +232,7 @@
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Upload Bill / Photo
       </button>
-      <button class="input-action-btn" onclick="openSmsOverlay()">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        Paste SMS / Bank Msg
-      </button>
+
     </div>
     <div class="upload-status" id="uploadStatus" style="display:none;">
       <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
@@ -301,21 +299,7 @@
     </div>
   </div>
 </div>
-<!-- SMS OVERLAY -->
-<div class="overlay-base" id="smsOverlay" style="z-index:160;" onclick="maybeCloseSms(event)">
-  <div class="sheet-base">
-    <div class="sheet-handle"></div>
-    <div class="sms-title">📱 Paste Bank SMS / Message</div>
-    <div class="sms-sub">Copy a bank transaction SMS and paste it here. Works with HDFC, SBI, ICICI, Kotak, UPI messages.</div>
-    <textarea class="sms-textarea" id="smsText" placeholder="e.g. INR 250.00 debited from A/C XX1234. Info: ZOMATO. Avl Bal INR 12,450.00"></textarea>
-    <div class="sms-actions">
-      <button class="btn-secondary-sm" onclick="closeSmsOverlay()">Cancel</button>
-      <button class="sms-parse-btn" id="smsParseBtn" onclick="parseSmsText()">
-        <div class="spinner"></div><span class="parse-text">Extract Expenses →</span>
-      </button>
-    </div>
-  </div>
-</div>
+
 <!-- EDIT OVERLAY -->
 <div class="overlay-base" id="editOverlay" style="z-index:150;" onclick="maybeCloseEdit(event)">
   <div class="sheet-base">
@@ -363,7 +347,7 @@
 const STORAGE_KEY='kharcha_config';
 const CAT_LEARN_KEY='kharcha_cat_learn';
 const HISTORY_CACHE_KEY='kharcha_history_cache';
-const CATS=['Food','Transport','Shopping','Utilities','Health','Entertainment','Other'];
+const CATS=['Food','Transport','Shopping','Utilities','Health','Entertainment','UPI/Online','Other'];
 const IST_OFFSET=5.5*60*60*1000;
 const TODAY_STR=new Date(Date.now()+IST_OFFSET).toISOString().split('T')[0];
 
@@ -398,6 +382,10 @@ class KharchaError extends Error{constructor(t,m,h){super(m);this.title=t;this.h
 
 function buildExpensePrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);const d2=new Date(now);d2.setDate(now.getDate()-2);const d3=new Date(now);d3.setDate(now.getDate()-3);const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];return 'You are a family expense parser for an Indian family. Return ONLY a valid JSON array, no markdown.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+', 2daysago='+fmt(d2)+', 3daysago='+fmt(d3)+', Day='+dn+'\n\nRules:\n1. Translate Hindi/Hinglish to English: chai=Tea, sabzi=Vegetables, doodh=Milk, dawai=Medicine, kapde=Clothes, bijli=Electricity, auto=Auto Rickshaw, kal=yesterday, aaj=today\n2. Detect multiple items if multiple expenses in text\n3. Resolve relative dates\n4. AMOUNT EXPRESSIONS: keep arithmetic as string: "clothes-2000-20" => amount="2000-20", "metro-50/2" => amount="50/2". Dashes between item and amount are separators not subtraction unless both sides are numbers.\n5. Category: Food/Transport/Shopping/Utilities/Health/Entertainment/Other or null if unsure\n\nReturn: [{"date":"DD Mon YYYY","item":"English name","amount":"expr_or_number_or_null","shop":"name_or_null","comment":"extra_or_null","category":"cat_or_null"}]\n\nOnly JSON array.';}
 
+function isBankSms(text){const t=text.toLowerCase();return t.includes('debited')||t.includes('a/c')||t.includes('sent rs')||t.includes('spent rs')||t.includes('upi ref');}
+function buildSmsPrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});return 'You are an expense parser. This is a bank SMS. Return ONLY a valid JSON array, no markdown.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDate context: Today='+fmt(now)+'\n\nReturn: [{"date":"DD Mon YYYY", "item":"Merchant or Person paid", "amount":"number", "shop":"Merchant", "comment":"SMS", "category":"UPI/Online"}]';}
+function autoSetUpiCategory(text){const t=text.toLowerCase();if(t.includes('upi')||t.includes('paytm')||t.includes('gpay')||t.includes('phonepe')||isBankSms(text)){for(var i=0;i<parsedItems.length;i++){var hidden=document.getElementById('rv-cat-'+i);if(!hidden||hidden.value)continue;var pill=document.querySelector('#catpicker-'+i+' .cat-pill[data-cat="UPI/Online"]');if(pill){document.querySelectorAll('#catpicker-'+i+' .cat-pill').forEach(p=>p.classList.remove('active'));pill.classList.add('active');hidden.value='UPI/Online';}}}}
+
 async function callGeminiProxy(prompt){
   const cfg=loadConfig();
   if(!cfg.scriptUrl)throw new KharchaError('Script URL Missing','No Apps Script URL.','Tap settings.');
@@ -427,7 +415,9 @@ async function callGeminiProxy(prompt){
   }
 }
 
-async function parseWithGemini(text,apiKey){const raw=await callGeminiProxy(buildExpensePrompt(text));const clean=raw.replace(/```json|```/g,'').trim();try{const p=JSON.parse(clean);const arr=Array.isArray(p)?p:[p];return arr.map(item=>{const lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});}catch{throw new KharchaError('Parse Error','Bad JSON: '+clean.substring(0,80),'Try simpler text.');}}
+async function parseWithGemini(text,apiKey){
+  var prompt=isBankSms(text)?buildSmsPrompt(text):buildExpensePrompt(text);
+  const raw=await callGeminiProxy(prompt);const clean=raw.replace(/```json|```/g,'').trim();try{const p=JSON.parse(clean);const arr=Array.isArray(p)?p:[p];return arr.map(item=>{const lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});}catch{throw new KharchaError('Parse Error','Bad JSON: '+clean.substring(0,80),'Try simpler text.');}}
 
 async function handleFileUpload(event){
   const file=event.target.files[0];if(!file)return;
@@ -466,7 +456,7 @@ async function handleFileUpload(event){
       document.getElementById('expenseInput').value=items.map(function(i){return (i.item||'')+' '+(i.amount||'');}).join(', ');
       onType();
       parsedItems=items.map(function(item){var lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});
-      openReview(parsedItems);
+      openReview(parsedItems);setTimeout(function(){autoSetUpiCategory(document.getElementById("expenseInput").value);},100);
       return;
     }
   }catch(err){
@@ -509,13 +499,9 @@ async function compressImage(file){
   });
 }
 
-function openSmsOverlay(){document.getElementById('smsText').value='';document.getElementById('smsOverlay').classList.add('show');}
-function closeSmsOverlay(){document.getElementById('smsOverlay').classList.remove('show');}
-function maybeCloseSms(e){if(e.target===document.getElementById('smsOverlay'))closeSmsOverlay();}
-async function parseSmsText(){const text=document.getElementById('smsText').value.trim();if(!text){showToast('Please paste a message first');return;}const cfg=loadConfig();if(!cfg.apiKey||!cfg.scriptUrl){closeSmsOverlay();openConfig();return;}const btn=document.getElementById('smsParseBtn');btn.classList.add('loading');btn.disabled=true;try{const smsPrompt='Extract expense from this bank SMS. Return ONLY JSON array.\n\nSMS: "'+text.replace(/"/g,'\\"')+'"\n\nReturn: [{"date":"DD Mon YYYY","item":"merchant in English","amount":number_or_null,"shop":"merchant_or_null","comment":null,"category":"Food|Transport|Shopping|Utilities|Health|Entertainment|Other|null"}]\n\nOnly JSON array.';const raw=await callGeminiProxy(smsPrompt);const clean=raw.replace(/```json|```/g,'').trim();const arr=JSON.parse(clean);const items=Array.isArray(arr)?arr:[arr];closeSmsOverlay();document.getElementById('expenseInput').value=items.map(i=>(i.item||'')+' '+(i.amount||'')).join(', ');onType();parsedItems=items.map(item=>{const lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});openReview(parsedItems);}catch(err){showToast('Could not parse SMS: '+err.message,4000);}finally{btn.classList.remove('loading');btn.disabled=false;}}
 
 let parsedItems=[],multiMode='separate';
-async function submitExpense(){const cfg=loadConfig();if(!cfg.scriptUrl){openConfig();showToast('Add Script URL first');return;}if(!cfg.apiKey){openConfig();showToast('Add Gemini API key');return;}const text=document.getElementById('expenseInput').value.trim();if(!text)return;const btn=document.getElementById('submitBtn');btn.disabled=true;btn.classList.add('loading');try{parsedItems=await parseWithGemini(text,cfg.apiKey);openReview(parsedItems);}catch(err){if(err instanceof KharchaError)showErrorToast(err.title+': '+err.message);else showErrorToast(err.message||'Something went wrong');}finally{btn.classList.remove('loading');btn.disabled=document.getElementById('expenseInput').value.trim().length===0;}}
+async function submitExpense(){const cfg=loadConfig();if(!cfg.scriptUrl){openConfig();showToast('Add Script URL first');return;}if(!cfg.apiKey){openConfig();showToast('Add Gemini API key');return;}const text=document.getElementById('expenseInput').value.trim();if(!text)return;const btn=document.getElementById('submitBtn');btn.disabled=true;btn.classList.add('loading');try{parsedItems=await parseWithGemini(text,cfg.apiKey);openReview(parsedItems);setTimeout(function(){autoSetUpiCategory(text);},100);}catch(err){if(err instanceof KharchaError)showErrorToast(err.title+': '+err.message);else showErrorToast(err.message||'Something went wrong');}finally{btn.classList.remove('loading');btn.disabled=document.getElementById('expenseInput').value.trim().length===0;}}
 
 var reviewChipTags={};
 function openReview(items){multiMode='separate';const isMulti=items.length>1;document.getElementById('multiChoice').style.display=isMulti?'block':'none';document.getElementById('btnSeparate').classList.add('active');document.getElementById('btnMerge').classList.remove('active');items.forEach((_,i)=>{reviewChipTags[i]=getTag()||'Regular';});renderReviewChips(items,isMulti?'separate':'single');document.getElementById('reviewOverlay').classList.add('show');}
