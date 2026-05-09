@@ -804,10 +804,10 @@ async function confirmAndSave(){
       if(catVal&&(parsedItems[i]?parsedItems[i].category:null)!==catVal)saveCatOverride(itemVal,shopVal,catVal);
       rows.push({date:fromDateInput(dateVal),item:itemVal,amount:calcAmount(amtRaw),shop:shopVal,comment:commentVal,category:catVal,tag:tagVal,loggedBy:loggedBy,rawText:rawText,sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses'});
     }
-    rows.forEach(function(row,idx){setTimeout(function(){fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)});},idx*300);});
-    closeReview();
-    resetAddForm();
-    showToast(rows.length>1?('✅ '+rows.length+' entries saving...'):'✅ Saved!',5000);
+    var totalWait=rows.length*400+800;
+    rows.forEach(function(row,idx){setTimeout(function(){fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)});},idx*400);});
+    showToast(rows.length>1?('✅ '+rows.length+' entries saving...'):'✅ Saved!',totalWait);
+    setTimeout(function(){closeReview();resetAddForm();},totalWait);
   }catch(err){showToast('Save failed — try again');}
   finally{btn.classList.remove('loading');btn.disabled=false;}
 }
