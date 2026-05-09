@@ -41,16 +41,15 @@
     .hint-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 16px;font-size:12px;color:var(--muted2);font-family:'JetBrains Mono',monospace;line-height:1.7;}
     .hint-card span{color:var(--accent);}
     .hint-card.hidden{display:none;}
-    .input-area{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color 0.2s,box-shadow 0.2s;display:flex;flex-direction:column;}
+    .input-area{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color 0.2s,box-shadow 0.2s;display:flex;flex-direction:column;position:relative;}
     .input-area:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
     .input-label{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);padding:12px 16px 4px;letter-spacing:0.1em;text-transform:uppercase;}
-    textarea{background:transparent;border:none;outline:none;color:var(--text);font-family:'Syne',sans-serif;font-size:18px;font-weight:600;line-height:1.5;padding:8px 16px 14px;resize:none;min-height:100px;caret-color:var(--accent);}
+    textarea{background:transparent;border:none;outline:none;color:var(--text);font-family:'Syne',sans-serif;font-size:18px;font-weight:600;line-height:1.5;padding:8px 16px 44px;resize:none;min-height:110px;caret-color:var(--accent);width:100%;}
     textarea::placeholder{color:#2e2e2e;font-weight:400;}
-    .char-count{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted);text-align:right;padding:0 12px 8px;}
-    .input-actions{display:flex;gap:8px;}
-    .input-action-btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:9px 10px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;color:var(--muted2);font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
-    .input-action-btn:active{background:var(--surface2);color:var(--accent);}
-    #fileInput{display:none;}
+    .char-count{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted);text-align:right;padding:0 12px 6px;}
+    .attach-btn{position:absolute;bottom:10px;left:10px;width:32px;height:32px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--muted2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;z-index:2;}
+    .attach-btn:active{background:var(--border);color:var(--accent);}
+    .attach-btn.has-file{border-color:var(--accent);color:var(--accent);}
     .upload-status{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);display:flex;align-items:center;gap:6px;}
     .upload-status.active{color:var(--accent);}
     .tags-section{display:flex;flex-direction:column;gap:8px;}
@@ -178,13 +177,7 @@
     .btn-save{flex:2;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;}
     .btn-save:disabled{background:var(--surface2);color:var(--muted);}
     .btn-save .spinner{display:none;}
-    
-    
-    
-    
-    
     .btn-secondary-sm{flex:1;padding:13px;border:1.5px solid var(--border);background:transparent;color:var(--text);border-radius:12px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:6px;}
-    
     .config-title{font-size:18px;font-weight:800;margin-bottom:18px;}
     .config-field{margin-bottom:13px;}
     .config-field label{display:block;font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;}
@@ -219,26 +212,25 @@
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 0 .5-4"/><polyline points="3 3 3 7 7 7"/></svg>Recent
     </button>
   </div>
+
   <!-- ADD PAGE -->
   <div class="page add-page active" id="pageAdd">
-    <div class="hint-card" id="hintCard">Type naturally — <span>"chai 20"</span> or <span>"bijli 1200"</span> or upload a bill — Hindi auto-translated!</div>
+    <div class="hint-card" id="hintCard">Type naturally — <span>"chai 20"</span> or <span>"bijli 1200"</span> or paste a bank SMS — Hindi auto-translated!</div>
     <div class="input-area">
       <div class="input-label">What did you spend on?</div>
       <textarea id="expenseInput" placeholder="e.g. chai 20 tapri or sabzi 120 kal" maxlength="500" autofocus></textarea>
       <div class="char-count" id="charCount">500</div>
-    </div>
-    <div class="input-actions">
-      <button class="input-action-btn" onclick="document.getElementById('fileInput').click()">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Upload Bill / Photo
+      <button class="attach-btn" id="attachBtn" onclick="document.getElementById('fileInput').click()" title="Upload bill or photo" type="button">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.41 17.41a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
       </button>
-
     </div>
     <div class="upload-status" id="uploadStatus" style="display:none;">
       <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
       <span id="uploadStatusText">Reading file...</span>
     </div>
-    <input type="file" id="fileInput" accept="image/*,.pdf" onchange="handleFileUpload(event)"/>
+    <input type="file" id="fileInput" accept="image/*,.pdf" onchange="handleFileUpload(event)" style="display:none;"/>
     <div class="tags-section">
       <div class="tags-label">Tag this expense</div>
       <div class="tags-grid">
@@ -252,6 +244,7 @@
       <div class="btn-content"><div class="spinner"></div><span class="btn-text">Submit</span></div>
     </button>
   </div>
+
   <!-- HISTORY PAGE -->
   <div class="page history-page" id="pageHistory">
     <div class="history-header">
@@ -278,6 +271,7 @@
     <div class="history-list" id="historyList"></div>
   </div>
 </div>
+
 <!-- REVIEW OVERLAY -->
 <div class="overlay-base" id="reviewOverlay" style="z-index:120;">
   <div class="sheet-base">
@@ -331,6 +325,7 @@
     </div>
   </div>
 </div>
+
 <!-- CONFIG OVERLAY -->
 <div class="overlay-base" id="configOverlay" style="z-index:200;" onclick="maybeCloseConfig(event)">
   <div class="sheet-base">
@@ -342,7 +337,9 @@
     <button class="save-config-btn" onclick="saveConfig()">Save Settings</button>
   </div>
 </div>
+
 <div class="toast" id="toast"></div>
+
 <script>
 const STORAGE_KEY='kharcha_config';
 const CAT_LEARN_KEY='kharcha_cat_learn';
@@ -380,11 +377,240 @@ function onType(){const val=document.getElementById('expenseInput').value;docume
 
 class KharchaError extends Error{constructor(t,m,h){super(m);this.title=t;this.hint=h;}}
 
-function buildExpensePrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);const d2=new Date(now);d2.setDate(now.getDate()-2);const d3=new Date(now);d3.setDate(now.getDate()-3);const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];return 'You are a family expense parser for an Indian family. Return ONLY a valid JSON array, no markdown.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+', 2daysago='+fmt(d2)+', 3daysago='+fmt(d3)+', Day='+dn+'\n\nRules:\n1. Translate Hindi/Hinglish to English: chai=Tea, sabzi=Vegetables, doodh=Milk, dawai=Medicine, kapde=Clothes, bijli=Electricity, auto=Auto Rickshaw, kal=yesterday, aaj=today\n2. Detect multiple items if multiple expenses in text\n3. Resolve relative dates\n4. AMOUNT EXPRESSIONS: keep arithmetic as string: "clothes-2000-20" => amount="2000-20", "metro-50/2" => amount="50/2". Dashes between item and amount are separators not subtraction unless both sides are numbers.\n5. Category: Food/Transport/Shopping/Utilities/Health/Entertainment/Other or null if unsure\n\nReturn: [{"date":"DD Mon YYYY","item":"English name","amount":"expr_or_number_or_null","shop":"name_or_null","comment":"extra_or_null","category":"cat_or_null"}]\n\nOnly JSON array.';}
+/* ═══════════════════════════════════════════════════════
+   LOCAL FAST PARSER — handles ~80% of inputs instantly
+   No network call, runs in < 5ms
+   ═══════════════════════════════════════════════════════ */
 
-function isBankSms(text){const t=text.toLowerCase();return t.includes('debited')||t.includes('a/c')||t.includes('sent rs')||t.includes('spent rs')||t.includes('upi ref');}
-function buildSmsPrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});return 'You are an expense parser. This is a bank SMS. Return ONLY a valid JSON array, no markdown.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDate context: Today='+fmt(now)+'\n\nReturn: [{"date":"DD Mon YYYY", "item":"Merchant or Person paid", "amount":"number", "shop":"Merchant", "comment":"SMS", "category":"UPI/Online"}]';}
-function autoSetUpiCategory(text){const t=text.toLowerCase();if(t.includes('upi')||t.includes('paytm')||t.includes('gpay')||t.includes('phonepe')||isBankSms(text)){for(var i=0;i<parsedItems.length;i++){var hidden=document.getElementById('rv-cat-'+i);if(!hidden||hidden.value)continue;var pill=document.querySelector('#catpicker-'+i+' .cat-pill[data-cat="UPI/Online"]');if(pill){document.querySelectorAll('#catpicker-'+i+' .cat-pill').forEach(p=>p.classList.remove('active'));pill.classList.add('active');hidden.value='UPI/Online';}}}}
+// Hinglish → English + category map
+const HINGLISH_MAP = {
+  // Food & drink
+  'chai':'Tea','tea':'Tea','chay':'Tea',
+  'coffee':'Coffee','cafe':'Coffee',
+  'sabzi':'Vegetables','sabji':'Vegetables','bhaji':'Vegetables',
+  'doodh':'Milk','milk':'Milk',
+  'atta':'Flour','maida':'Flour',
+  'chawal':'Rice','rice':'Rice',
+  'dal':'Dal','daal':'Dal',
+  'roti':'Roti','bread':'Bread',
+  'namak':'Salt','cheeni':'Sugar','sugar':'Sugar',
+  'tel':'Oil','ghee':'Ghee','butter':'Butter',
+  'anda':'Eggs','egg':'Eggs','eggs':'Eggs',
+  'murgi':'Chicken','chicken':'Chicken','gosht':'Meat','mutton':'Mutton',
+  'machli':'Fish','fish':'Fish',
+  'paneer':'Paneer','dahi':'Curd','curd':'Curd',
+  'fruit':'Fruit','fruits':'Fruit','kela':'Banana','seb':'Apple','tamatar':'Tomatoes',
+  'pyaaz':'Onions','aloo':'Potatoes','lahsun':'Garlic','adrak':'Ginger',
+  'khana':'Food','lunch':'Lunch','dinner':'Dinner','breakfast':'Breakfast',
+  'nashta':'Breakfast','snacks':'Snacks','snack':'Snacks',
+  'biscuit':'Biscuits','namkeen':'Namkeen','chips':'Chips',
+  'pizza':'Pizza','burger':'Burger','maggi':'Maggi','noodles':'Noodles',
+  'mango':'Mango','aam':'Mango',
+  // Transport
+  'auto':'Auto Rickshaw','autorickshaw':'Auto Rickshaw',
+  'rickshaw':'Rickshaw','rikshaw':'Rickshaw',
+  'metro':'Metro','bus':'Bus','taxi':'Taxi','cab':'Cab',
+  'uber':'Uber','ola':'Ola','rapido':'Rapido',
+  'petrol':'Petrol','diesel':'Diesel','fuel':'Fuel',
+  'parking':'Parking','toll':'Toll',
+  'train':'Train','rail':'Train',
+  // Utilities
+  'bijli':'Electricity','electricity':'Electricity','light':'Electricity bill',
+  'paani':'Water','water':'Water',
+  'gas':'Gas','cylinder':'Gas Cylinder','lpg':'Gas Cylinder',
+  'internet':'Internet','wifi':'Internet','broadband':'Internet',
+  'mobile':'Mobile Recharge','recharge':'Mobile Recharge','sim':'SIM',
+  'dth':'DTH','cable':'Cable TV',
+  // Shopping & household
+  'kapde':'Clothes','clothes':'Clothes','shirt':'Shirt','pant':'Pants',
+  'juta':'Shoes','shoes':'Shoes','chappal':'Slippers',
+  'sabun':'Soap','soap':'Soap','shampoo':'Shampoo',
+  'toothpaste':'Toothpaste','toothbrush':'Toothbrush',
+  'detergent':'Detergent','phenyl':'Phenyl','broom':'Broom',
+  'jhadoo':'Broom','mop':'Mop',
+  // Health
+  'dawai':'Medicine','medicine':'Medicine','dawa':'Medicine',
+  'tablet':'Tablet','capsule':'Medicine',
+  'doctor':'Doctor','hospital':'Hospital','clinic':'Clinic',
+  'checkup':'Medical Checkup','xray':'X-Ray',
+  // Entertainment
+  'movie':'Movie','cinema':'Cinema','film':'Movie',
+  'ott':'OTT Subscription','netflix':'Netflix','amazon':'Amazon Prime',
+  // Other common
+  'kiraya':'Rent','rent':'Rent',
+  'dhobi':'Laundry','laundry':'Laundry',
+  'barber':'Haircut','salon':'Salon','haircut':'Haircut',
+  'gift':'Gift','charity':'Donation',
+  'school':'School Fee','fees':'Fees','tuition':'Tuition',
+  'courier':'Courier','delivery':'Delivery',
+};
+
+// Category inference from English item name
+const CAT_KEYWORDS = {
+  Food: ['tea','coffee','milk','vegetables','rice','dal','roti','bread','eggs','chicken','fish','paneer','curd','fruit','banana','apple','tomatoes','onions','potatoes','food','lunch','dinner','breakfast','snacks','biscuits','namkeen','pizza','burger','maggi','noodles','mango','flour','sugar','salt','oil','ghee','butter','meat','mutton'],
+  Transport: ['auto rickshaw','rickshaw','metro','bus','taxi','cab','uber','ola','rapido','petrol','diesel','fuel','parking','toll','train'],
+  Utilities: ['electricity','water','gas','gas cylinder','internet','mobile recharge','dth','cable tv'],
+  Shopping: ['clothes','shirt','pants','shoes','slippers','soap','shampoo','toothpaste','toothbrush','detergent','phenyl','broom','mop'],
+  Health: ['medicine','tablet','doctor','hospital','clinic','medical checkup','x-ray'],
+  Entertainment: ['movie','cinema','netflix','amazon prime','ott subscription'],
+};
+
+function inferCategory(item) {
+  if (!item) return null;
+  const lower = item.toLowerCase();
+  for (const [cat, kws] of Object.entries(CAT_KEYWORDS)) {
+    if (kws.some(kw => lower.includes(kw))) return cat;
+  }
+  return null;
+}
+
+// Resolve relative dates quickly
+function resolveDate(token) {
+  const now = new Date(Date.now() + IST_OFFSET);
+  const t = (token || '').toLowerCase().trim();
+  if (!t || t === 'aaj' || t === 'today') return TODAY_STR;
+  if (t === 'kal' || t === 'yesterday' || t === 'kal raat') {
+    const d = new Date(now); d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  }
+  if (t === 'parso' || t === '2 days ago') {
+    const d = new Date(now); d.setDate(d.getDate() - 2);
+    return d.toISOString().split('T')[0];
+  }
+  return TODAY_STR;
+}
+
+// Detect comma/semicolon-separated multi-items that need Gemini
+function looksMultiItem(text) {
+  // More than one amount-item pair separated by comma/semicolon/newline
+  const separators = text.split(/[,;\n]+/).map(s => s.trim()).filter(s => s.length > 1);
+  if (separators.length > 1) {
+    // Check that each segment has a number — if so it's truly multi-item
+    const withNums = separators.filter(s => /\d/.test(s));
+    if (withNums.length > 1) return true;
+  }
+  return false;
+}
+
+// The main local parser
+// Returns an array of parsed items, or null if it can't handle the input
+function localParse(text) {
+  const t = text.trim();
+
+  // Bail immediately on bank SMS — always use Gemini
+  if (isBankSms(t)) return null;
+
+  // Multi-item with commas/newlines — let Gemini handle
+  if (looksMultiItem(t)) return null;
+
+  // Tokenise
+  const tokens = t.toLowerCase().split(/\s+/);
+
+  // Look for a date token
+  let dateToken = TODAY_STR;
+  let cleanTokens = [];
+  for (const tok of tokens) {
+    if (['kal','parso','yesterday','aaj','today'].includes(tok)) {
+      dateToken = resolveDate(tok);
+    } else {
+      cleanTokens.push(tok);
+    }
+  }
+
+  // Find amount — could be arithmetic like 50+30, 200-20, 500/2
+  // Amount is the token that starts with a digit or is purely numeric arithmetic
+  let amountRaw = null;
+  let amountIdx = -1;
+  for (let i = 0; i < cleanTokens.length; i++) {
+    const tok = cleanTokens[i];
+    // Pure amount: starts with digit, contains only digits and arithmetic operators
+    if (/^\d[\d\.\+\-\*\/]*$/.test(tok)) {
+      amountRaw = tok;
+      amountIdx = i;
+      break;
+    }
+    // Amount prefixed with ₹ or rs
+    if (/^[₹rs]\d+/i.test(tok)) {
+      amountRaw = tok.replace(/^[₹rs]+/i, '');
+      amountIdx = i;
+      break;
+    }
+  }
+
+  // Remove amount token
+  if (amountIdx >= 0) cleanTokens.splice(amountIdx, 1);
+
+  // Everything remaining is the item + shop description
+  const itemTokens = cleanTokens.filter(tok =>
+    tok.length > 0 &&
+    !/^(at|from|for|in|on|and|ka|ki|ke|se|par|mein|ko)$/.test(tok)
+  );
+
+  if (itemTokens.length === 0 && !amountRaw) return null; // Can't parse at all
+
+  // Translate Hinglish tokens
+  const translatedParts = itemTokens.map(tok => HINGLISH_MAP[tok] || tok);
+
+  // Deduplicate consecutive identical translations
+  const deduped = [];
+  for (const p of translatedParts) {
+    if (deduped[deduped.length - 1] !== p) deduped.push(p);
+  }
+
+  // Capitalise first letter of each word
+  const itemName = deduped
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+
+  // If we still have no recognisable item and no amount, bail to Gemini
+  // (e.g. user typed something completely unrecognisable)
+  if (!itemName && !amountRaw) return null;
+
+  // Guess category from item name or learned overrides
+  const learnedCat = guessCategory(itemName, '');
+  const inferredCat = inferCategory(itemName);
+  const category = learnedCat || inferredCat || null;
+
+  // Calculate amount
+  const amountCalc = amountRaw ? (calcAmount(amountRaw) || amountRaw) : '';
+
+  return [{
+    date: fromDateInput(dateToken),
+    item: itemName || 'Expense',
+    amount: amountCalc,
+    shop: '',
+    comment: '',
+    category: category,
+    _localParsed: true,
+  }];
+}
+
+// Gate: should we skip local parser and go straight to Gemini?
+function needsGemini(text) {
+  const t = text.trim().toLowerCase();
+  if (isBankSms(text)) return true;                        // bank SMS
+  if (looksMultiItem(text)) return true;                   // multi-item
+  if (text.length > 120) return true;                      // long description
+  // Only a number with no item name
+  if (/^\d[\d\s\.\+\-\*\/]*$/.test(t)) return true;
+  return false;
+}
+
+/* ── SMS detection ── */
+function isBankSms(text){
+  if(!text||text.length<20)return false;
+  const t=text.toLowerCase();
+  const hasMoney=/rs\.?\s*\d|inr\s*\d|\u20b9\s*\d|\d+\.\d{2}/.test(t);
+  const hasVerb=/debited|credited|spent|paid|payment|transferred|sent|received|withdrawn|deducted/.test(t);
+  const hasRef=/ref\s*(no|num|#)?\.?\s*\d|txn|upi|imps|neft|rtgs|avbl bal|available bal|a\/c/.test(t);
+  return hasMoney&&(hasVerb||hasRef);
+}
+
+function buildSmsPrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);return 'You are parsing a bank/UPI transaction SMS for an Indian family expense tracker. Return ONLY a valid JSON array, no markdown.\n\nSMS: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+'\n\nRules:\n1. Extract the debit/payment amount only (ignore credited amounts — those are money received, not expenses)\n2. merchant/UPI handle = shop field\n3. If SMS says "debited" or "spent" it is an expense; if only "credited" skip or return empty array []\n4. Ref number, UPI ID, or transaction ID → put in comment field\n5. Date: use date in SMS if present, else today\n6. Category: UPI/Online for UPI transactions, otherwise guess from merchant name\n7. item: short description like "UPI Payment" or merchant name\n\nReturn: [{"date":"DD Mon YYYY","item":"description","amount":number,"shop":"merchant_or_null","comment":"ref_or_null","category":"UPI/Online"}]\n\nOnly JSON array.';}
+
+function autoSetUpiCategory(text){if(!isBankSms(text))return;document.querySelectorAll('.cat-picker').forEach(function(picker){var idx=picker.id.replace('catpicker-','');var hidden=document.getElementById('rv-cat-'+idx);if(!hidden||hidden.value)return;picker.querySelectorAll('.cat-pill').forEach(function(p){p.classList.remove('active');});var upiPill=picker.querySelector('[data-cat="UPI/Online"]');if(upiPill){upiPill.classList.add('active');hidden.value='UPI/Online';}});}
+
+function buildExpensePrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);const d2=new Date(now);d2.setDate(now.getDate()-2);const d3=new Date(now);d3.setDate(now.getDate()-3);const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];return 'You are a family expense parser for an Indian family. Return ONLY a valid JSON array, no markdown.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+', 2daysago='+fmt(d2)+', 3daysago='+fmt(d3)+', Day='+dn+'\n\nRules:\n1. Translate Hindi/Hinglish to English: chai=Tea, sabzi=Vegetables, doodh=Milk, dawai=Medicine, kapde=Clothes, bijli=Electricity, auto=Auto Rickshaw, kal=yesterday, aaj=today\n2. Detect multiple items if multiple expenses in text\n3. Resolve relative dates\n4. AMOUNT EXPRESSIONS: keep arithmetic as string: "clothes-2000-20" => amount="2000-20", "metro-50/2" => amount="50/2". Dashes between item and amount are separators not subtraction unless both sides are numbers.\n5. Category: Food/Transport/Shopping/Utilities/Health/Entertainment/Other or null if unsure\n\nReturn: [{"date":"DD Mon YYYY","item":"English name","amount":"expr_or_number_or_null","shop":"name_or_null","comment":"extra_or_null","category":"cat_or_null"}]\n\nOnly JSON array.';}
 
 async function callGeminiProxy(prompt){
   const cfg=loadConfig();
@@ -400,12 +626,7 @@ async function callGeminiProxy(prompt){
     if(!data.success){
       const m=data.error||'Unknown';
       if(m.includes('429')){
-        if(attempt<MAX_RETRIES){
-          const wait=attempt*10000;
-          showToast('Rate limit — retrying in '+attempt*10+'s ('+attempt+'/'+MAX_RETRIES+')...',wait);
-          await new Promise(r=>setTimeout(r,wait));
-          continue;
-        }
+        if(attempt<MAX_RETRIES){const wait=attempt*10000;showToast('Rate limit — retrying in '+attempt*10+'s ('+attempt+'/'+MAX_RETRIES+')...',wait);await new Promise(r=>setTimeout(r,wait));continue;}
         throw new KharchaError('Rate Limit','Too many requests. All '+MAX_RETRIES+' retries failed.','Wait a minute and try again.');
       }
       if(m.includes('400')||m.toLowerCase().includes('api key'))throw new KharchaError('Invalid API Key',m,'Get key at aistudio.google.com.');
@@ -415,9 +636,21 @@ async function callGeminiProxy(prompt){
   }
 }
 
-async function parseWithGemini(text,apiKey){
+async function parseWithGemini(text){
   var prompt=isBankSms(text)?buildSmsPrompt(text):buildExpensePrompt(text);
-  const raw=await callGeminiProxy(prompt);const clean=raw.replace(/```json|```/g,'').trim();try{const p=JSON.parse(clean);const arr=Array.isArray(p)?p:[p];return arr.map(item=>{const lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});}catch{throw new KharchaError('Parse Error','Bad JSON: '+clean.substring(0,80),'Try simpler text.');}}
+  const raw=await callGeminiProxy(prompt);
+  const clean=raw.replace(/```json|```/g,'').trim();
+  try{
+    const p=JSON.parse(clean);
+    const arr=Array.isArray(p)?p:[p];
+    return arr.map(item=>{
+      const lc=guessCategory(item.item,item.shop);
+      if(lc)item._localCat=lc;
+      if(isBankSms(text)&&!item.category&&!lc)item.category='UPI/Online';
+      return item;
+    });
+  }catch{throw new KharchaError('Parse Error','Bad JSON: '+clean.substring(0,80),'Try simpler text.');}
+}
 
 async function handleFileUpload(event){
   const file=event.target.files[0];if(!file)return;
@@ -425,6 +658,7 @@ async function handleFileUpload(event){
   if(!cfg.apiKey){openConfig();showToast('Add Gemini API key first');return;}
   const statusEl=document.getElementById('uploadStatus');
   const statusText=document.getElementById('uploadStatusText');
+  const attachBtn=document.getElementById('attachBtn');
   statusEl.style.display='flex';statusEl.classList.add('active');
   statusText.textContent='Compressing...';
   try{
@@ -435,28 +669,22 @@ async function handleFileUpload(event){
     const MAX_RETRIES=3;
     for(var attempt=1;attempt<=MAX_RETRIES;attempt++){
       let res;
-      try{
-        res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key='+cfg.apiKey,{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:base64Data}}]}],generationConfig:{maxOutputTokens:1000}})
-        });
-      }catch(e){throw new Error('Network error: '+e.message);}
-      if(res.status===429){
-        if(attempt<MAX_RETRIES){const w=attempt*10000;showToast('Rate limit, retrying in '+attempt*10+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}
-        throw new Error('Rate limit. Wait a minute and try again.');
-      }
-      if(!res.ok){const eb=await res.json().catch(()=>({}));throw new Error('Vision error '+ res.status+': '+(eb&&eb.error?eb.error.message:'Unknown'));}
+      try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key='+cfg.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:base64Data}}]}],generationConfig:{maxOutputTokens:1000}})});}
+      catch(e){throw new Error('Network error: '+e.message);}
+      if(res.status===429){if(attempt<MAX_RETRIES){const w=attempt*10000;showToast('Rate limit, retrying in '+attempt*10+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}throw new Error('Rate limit. Wait a minute and try again.');}
+      if(!res.ok){const eb=await res.json().catch(()=>({}));throw new Error('Vision error '+res.status+': '+(eb&&eb.error?eb.error.message:'Unknown'));}
       const data=await res.json();
       const raw=(data.candidates[0].content.parts[0].text||'').replace(/```json|```/g,'').trim();
       const arr=JSON.parse(raw);
       const items=Array.isArray(arr)?arr:[arr];
       statusEl.classList.remove('active');
       statusText.textContent='Found '+items.length+' item(s) from '+file.name;
+      attachBtn.classList.add('has-file');
       document.getElementById('expenseInput').value=items.map(function(i){return (i.item||'')+' '+(i.amount||'');}).join(', ');
       onType();
       parsedItems=items.map(function(item){var lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});
-      openReview(parsedItems);setTimeout(function(){autoSetUpiCategory(document.getElementById("expenseInput").value);},100);
+      openReview(parsedItems);
+      setTimeout(function(){autoSetUpiCategory(document.getElementById('expenseInput').value);},100);
       return;
     }
   }catch(err){
@@ -467,41 +695,49 @@ async function handleFileUpload(event){
   event.target.value='';
 }
 
-
-async function compressImage(file){
-  return new Promise((resolve,reject)=>{
-    // For PDFs, just convert to base64 directly — Apps Script handles PDF bytes
-    if(file.type==='application/pdf'){
-      const r=new FileReader();
-      r.onload=e=>resolve(e.target.result);
-      r.onerror=reject;
-      r.readAsDataURL(file);
-      return;
-    }
-    const img=new Image();
-    const url=URL.createObjectURL(file);
-    img.onload=function(){
-      URL.revokeObjectURL(url);
-      const canvas=document.createElement('canvas');
-      // Max 800px on longest side to keep base64 small
-      const MAX=800;
-      let w=img.width,h=img.height;
-      if(w>h&&w>MAX){h=Math.round(h*MAX/w);w=MAX;}
-      else if(h>w&&h>MAX){w=Math.round(w*MAX/h);h=MAX;}
-      else if(w>MAX&&h>MAX){w=MAX;h=MAX;}
-      canvas.width=w;canvas.height=h;
-      const ctx=canvas.getContext('2d');
-      ctx.drawImage(img,0,0,w,h);
-      resolve(canvas.toDataURL('image/jpeg',0.7));
-    };
-    img.onerror=reject;
-    img.src=url;
-  });
-}
-
+async function compressImage(file){return new Promise((resolve,reject)=>{if(file.type==='application/pdf'){const r=new FileReader();r.onload=e=>resolve(e.target.result);r.onerror=reject;r.readAsDataURL(file);return;}const img=new Image();const url=URL.createObjectURL(file);img.onload=function(){URL.revokeObjectURL(url);const canvas=document.createElement('canvas');const MAX=800;let w=img.width,h=img.height;if(w>h&&w>MAX){h=Math.round(h*MAX/w);w=MAX;}else if(h>w&&h>MAX){w=Math.round(w*MAX/h);h=MAX;}else if(w>MAX&&h>MAX){w=MAX;h=MAX;}canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0,w,h);resolve(canvas.toDataURL('image/jpeg',0.7));};img.onerror=reject;img.src=url;});}
 
 let parsedItems=[],multiMode='separate';
-async function submitExpense(){const cfg=loadConfig();if(!cfg.scriptUrl){openConfig();showToast('Add Script URL first');return;}if(!cfg.apiKey){openConfig();showToast('Add Gemini API key');return;}const text=document.getElementById('expenseInput').value.trim();if(!text)return;const btn=document.getElementById('submitBtn');btn.disabled=true;btn.classList.add('loading');try{parsedItems=await parseWithGemini(text,cfg.apiKey);openReview(parsedItems);setTimeout(function(){autoSetUpiCategory(text);},100);}catch(err){if(err instanceof KharchaError)showErrorToast(err.title+': '+err.message);else showErrorToast(err.message||'Something went wrong');}finally{btn.classList.remove('loading');btn.disabled=document.getElementById('expenseInput').value.trim().length===0;}}
+
+/* ═══════════════════════════════════════════════════════
+   OPTIMISED submitExpense — local-first, Gemini fallback
+   ═══════════════════════════════════════════════════════ */
+async function submitExpense(){
+  const cfg=loadConfig();
+  if(!cfg.scriptUrl){openConfig();showToast('Add Script URL first');return;}
+  const text=document.getElementById('expenseInput').value.trim();
+  if(!text)return;
+
+  const btn=document.getElementById('submitBtn');
+
+  // ── Fast path: try local parser first ──
+  if(!needsGemini(text)){
+    const local=localParse(text);
+    if(local&&local.length>0){
+      // Instant — no spinner, no network
+      parsedItems=local;
+      openReview(parsedItems);
+      return;
+    }
+  }
+
+  // ── Slow path: Gemini required ──
+  if(!cfg.apiKey){openConfig();showToast('Add Gemini API key');return;}
+  btn.disabled=true;btn.classList.add('loading');
+  if(isBankSms(text))showToast('📱 Bank SMS detected — parsing...',2000);
+  else showToast('✨ Complex input — asking AI...', 2000);
+  try{
+    parsedItems=await parseWithGemini(text);
+    openReview(parsedItems);
+    setTimeout(function(){autoSetUpiCategory(text);},100);
+  }catch(err){
+    if(err instanceof KharchaError)showErrorToast(err.title+': '+err.message);
+    else showErrorToast(err.message||'Something went wrong');
+  }finally{
+    btn.classList.remove('loading');
+    btn.disabled=document.getElementById('expenseInput').value.trim().length===0;
+  }
+}
 
 var reviewChipTags={};
 function openReview(items){multiMode='separate';const isMulti=items.length>1;document.getElementById('multiChoice').style.display=isMulti?'block':'none';document.getElementById('btnSeparate').classList.add('active');document.getElementById('btnMerge').classList.remove('active');items.forEach((_,i)=>{reviewChipTags[i]=getTag()||'Regular';});renderReviewChips(items,isMulti?'separate':'single');document.getElementById('reviewOverlay').classList.add('show');}
@@ -548,21 +784,13 @@ function evalAmountField(input){var r=calcAmount(input.value);if(r!==''&&r!==Str
 async function confirmAndSave(){
   const cfg=loadConfig();
   if(!cfg.scriptUrl){showToast('Script URL not set');return;}
-
-  // Validate dates first
   var count=multiMode==='merge'||parsedItems.length===1?1:parsedItems.length;
-  for(var i=0;i<count;i++){
-    var dv=document.getElementById('rv-date-'+i);
-    if(dv){var err=validateDate(dv.value);if(err){showToast('❌ '+err);return;}}
-  }
-
+  for(var i=0;i<count;i++){var dv=document.getElementById('rv-date-'+i);if(dv){var err=validateDate(dv.value);if(err){showToast('❌ '+err);return;}}}
   const btn=document.getElementById('confirmBtn');
   btn.classList.add('loading');btn.disabled=true;
   const loggedBy=cfg.userName||'Unknown';
   const rawText=document.getElementById('expenseInput').value.trim();
-
   try{
-    // Read ALL row data from DOM first before any async ops
     var rows=[];
     for(var i=0;i<count;i++){
       var getVal=function(id){var el=document.getElementById(id);return el?el.value:'';};
@@ -574,44 +802,17 @@ async function confirmAndSave(){
       var commentVal=(getVal('rv-comment-'+i)||'').trim();
       var amtRaw=getVal('rv-amount-'+i);
       if(catVal&&(parsedItems[i]?parsedItems[i].category:null)!==catVal)saveCatOverride(itemVal,shopVal,catVal);
-      rows.push({
-        date:fromDateInput(dateVal),
-        item:itemVal,
-        amount:calcAmount(amtRaw),
-        shop:shopVal,
-        comment:commentVal,
-        category:catVal,
-        tag:tagVal,
-        loggedBy:loggedBy,
-        rawText:rawText,
-        sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses'
-      });
+      rows.push({date:fromDateInput(dateVal),item:itemVal,amount:calcAmount(amtRaw),shop:shopVal,comment:commentVal,category:catVal,tag:tagVal,loggedBy:loggedBy,rawText:rawText,sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses'});
     }
-
-    // Fire saves with small stagger to avoid Apps Script throttling
-    // Stagger: 0ms, 300ms, 600ms... so 10 items = last one fires at 2.7s
-    rows.forEach(function(row, idx){
-      setTimeout(function(){
-        fetch(cfg.scriptUrl,{
-          method:'POST',
-          mode:'no-cors',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify(row)
-        });
-      }, idx * 300);
-    });
-
+    rows.forEach(function(row,idx){setTimeout(function(){fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)});},idx*300);});
     closeReview();
     resetAddForm();
     showToast(rows.length>1?('✅ '+rows.length+' entries saving...'):'✅ Saved!',5000);
-
-  }catch(err){
-    showToast('Save failed — try again');
-  }finally{
-    btn.classList.remove('loading');btn.disabled=false;
-  }
+  }catch(err){showToast('Save failed — try again');}
+  finally{btn.classList.remove('loading');btn.disabled=false;}
 }
-function resetAddForm(){document.getElementById('expenseInput').value='';document.getElementById('charCount').textContent='500';document.getElementById('submitBtn').disabled=true;document.getElementById('hintCard').classList.remove('hidden');document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=null;updateSheetBadge();document.getElementById('uploadStatus').style.display='none';}
+
+function resetAddForm(){document.getElementById('expenseInput').value='';document.getElementById('charCount').textContent='500';document.getElementById('submitBtn').disabled=true;document.getElementById('hintCard').classList.remove('hidden');document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=null;updateSheetBadge();document.getElementById('uploadStatus').style.display='none';document.getElementById('attachBtn').classList.remove('has-file');}
 
 let currentSheetTab='Expenses',historyData=[];
 function switchSheetTab(name){currentSheetTab=name;document.getElementById('sheetTabExpenses').classList.toggle('active',name==='Expenses');document.getElementById('sheetTabShaadi').classList.toggle('active',name==='Shaadi');loadHistory();}
