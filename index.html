@@ -86,36 +86,64 @@
     .history-subtitle{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);margin-top:2px;}
     .refresh-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted2);padding:8px 14px;border-radius:10px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:6px;}
     .refresh-btn.spinning svg{animation:spin 0.7s linear infinite;}
-    .sheet-tabs{display:flex;gap:6px;padding:0 16px 10px;}
-    .sheet-tab{padding:6px 14px;border-radius:100px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted2);font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
-    .sheet-tab.active{border-color:var(--accent);color:var(--accent);background:var(--surface2);}
-    .sheet-tab.shaadi.active{border-color:var(--shaadi);color:var(--shaadi);}
+    /* filter bar */
+    .filter-bar{display:flex;gap:6px;padding:0 16px 10px;flex-wrap:wrap;}
+    .filter-pill{padding:6px 14px;border-radius:100px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted2);font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;white-space:nowrap;}
+    .filter-pill.active{border-color:var(--accent);color:var(--accent);background:var(--surface2);}
+    .filter-pill.shaadi-active{border-color:var(--shaadi);color:var(--shaadi);background:var(--surface2);}
+    .filter-date-row{display:flex;gap:6px;padding:0 16px 10px;align-items:center;}
+    .filter-date-input{background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:7px 10px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;outline:none;flex:1;transition:border-color 0.2s;}
+    .filter-date-input:focus{border-color:var(--accent);}
+    .filter-date-sep{font-size:11px;color:var(--muted2);font-family:'JetBrains Mono',monospace;}
+    .filter-clear-btn{padding:6px 12px;border-radius:100px;border:1px solid var(--border);background:transparent;color:var(--muted2);font-size:11px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;}
+    /* history list */
     .history-list{flex:1;overflow-y:auto;padding:0 16px 20px;display:flex;flex-direction:column;gap:8px;}
     .history-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:60px 20px;color:var(--muted2);font-size:13px;font-family:'JetBrains Mono',monospace;text-align:center;}
     .history-empty .empty-icon{font-size:36px;opacity:0.4;}
-    .summary-card{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:16px;margin:0 16px 10px;display:flex;flex-direction:column;gap:10px;}
-    .summary-top{display:flex;justify-content:space-between;align-items:flex-start;}
-    .summary-label{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
-    .summary-amount{font-size:26px;font-weight:800;}
-    .summary-delta{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:100px;}
-    .summary-delta.green{background:rgba(0,229,160,0.12);color:var(--success);}
-    .summary-delta.red{background:rgba(255,77,77,0.12);color:var(--danger);}
-    .summary-divider{height:1px;background:var(--border);}
-    .summary-bottom{display:flex;justify-content:space-between;align-items:center;}
-    .week-amount{font-size:18px;font-weight:800;color:var(--accent);}
-    .last-month-amount{font-size:15px;font-weight:700;color:var(--muted2);}
+    .load-more-btn{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:13px;color:var(--muted2);font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;width:100%;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.15s;}
+    .load-more-btn:active{background:var(--surface2);}
+    .load-more-btn:disabled{opacity:0.4;cursor:not-allowed;}
+    /* history cards */
     .history-card{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
     .history-card:active{transform:scale(0.99);background:var(--surface2);}
     .history-card:hover{border-color:var(--accent);}
+    .history-card.shaadi-card{border-color:rgba(255,60,172,0.25);}
     .history-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;}
     .history-item{font-size:15px;font-weight:700;flex:1;}
     .history-amount{font-size:16px;font-weight:800;color:var(--accent);white-space:nowrap;}
     .history-amount.shaadi-amount{color:var(--shaadi);}
     .history-card-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
     .meta-chip{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);background:var(--surface2);padding:3px 9px;border-radius:6px;}
-    .meta-chip.tag-chip{color:var(--accent);}
-    .meta-chip.cat-chip{color:#06b6d4;}
+    .meta-chip.shaadi-chip{color:var(--shaadi);}
     .history-card .edit-hint{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;text-align:right;margin-top:8px;}
+    /* summary page */
+    .summary-page{flex-direction:column;overflow-y:auto;}
+    .summary-page-inner{padding:14px 16px 24px;display:flex;flex-direction:column;gap:14px;}
+    .sum-filter-row{display:flex;gap:6px;}
+    .sum-filter-pill{flex:1;padding:9px 10px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted2);font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;text-align:center;transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
+    .sum-filter-pill.active{background:var(--surface2);border-color:var(--accent);color:var(--accent);}
+    .sum-filter-pill.shaadi-active{border-color:var(--shaadi);color:var(--shaadi);background:var(--surface2);}
+    .sum-date-row{display:flex;gap:6px;align-items:center;}
+    .sum-block{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:16px;}
+    .sum-block-label{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
+    .sum-block-amount{font-size:32px;font-weight:800;letter-spacing:-1px;}
+    .sum-months-grid{display:flex;flex-direction:column;gap:8px;}
+    .sum-month-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--surface2);border-radius:10px;}
+    .sum-month-label{font-size:13px;font-weight:700;}
+    .sum-month-amt{font-size:14px;font-weight:800;color:var(--accent);}
+    .sum-month-amt.shaadi-c{color:var(--shaadi);}
+    /* bar chart */
+    .bar-chart{display:flex;align-items:flex-end;gap:8px;height:100px;padding:0 4px;}
+    .bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;}
+    .bar{width:100%;border-radius:6px 6px 0 0;transition:height 0.4s ease;min-height:4px;}
+    .bar.exp-bar{background:linear-gradient(180deg,var(--accent),rgba(255,107,53,0.5));}
+    .bar.sha-bar{background:linear-gradient(180deg,var(--shaadi),rgba(255,60,172,0.5));}
+    .bar-month-label{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--muted2);}
+    .bar-amt-label{font-size:9px;font-family:'JetBrains Mono',monospace;color:var(--muted2);}
+    /* payment mode pills */
+    .pay-pill{padding:4px 9px;border-radius:100px;border:1px solid var(--border);background:var(--bg);color:var(--muted2);font-size:10px;font-weight:700;cursor:pointer;transition:all 0.12s;-webkit-tap-highlight-color:transparent;}
+    .pay-pill:active{transform:scale(0.94);}
+    .pay-pill.active{color:#fff;border-color:transparent;background:#0ea5e9;}
     .skeleton{background:var(--surface);border:1.5px solid var(--border);border-radius:14px;padding:14px 16px;overflow:hidden;position:relative;}
     .skeleton::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.04),transparent);animation:shimmer 1.2s infinite;}
     @keyframes shimmer{from{transform:translateX(-100%);}to{transform:translateX(100%);}}
@@ -206,10 +234,13 @@
   </header>
   <div class="tab-bar">
     <button class="tab-btn active" id="tabAdd" onclick="switchTab('add')">
-      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Expense
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add
     </button>
     <button class="tab-btn" id="tabHistory" onclick="switchTab('history')">
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="12 8 12 12 14 14"/><path d="M3.05 11a9 9 0 1 0 .5-4"/><polyline points="3 3 3 7 7 7"/></svg>Recent
+    </button>
+    <button class="tab-btn" id="tabSummary" onclick="switchTab('summary')">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Summary
     </button>
   </div>
 
@@ -248,27 +279,63 @@
   <!-- HISTORY PAGE -->
   <div class="page history-page" id="pageHistory">
     <div class="history-header">
-      <div><div class="history-title">Recent Entries</div><div class="history-subtitle">Tap to edit or move between sheets</div></div>
-      <button class="refresh-btn" id="refreshBtn" onclick="loadHistory()">
+      <div><div class="history-title">Recent Entries</div><div class="history-subtitle" id="historySubtitle">Last 10 entries</div></div>
+      <button class="refresh-btn" id="refreshBtn" onclick="loadHistory(true)">
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh
       </button>
     </div>
-    <div class="sheet-tabs">
-      <button class="sheet-tab active" id="sheetTabExpenses" onclick="switchSheetTab('Expenses')">📋 Expenses</button>
-      <button class="sheet-tab shaadi" id="sheetTabShaadi" onclick="switchSheetTab('Shaadi')">💍 Shaadi</button>
+    <!-- Type filter -->
+    <div class="filter-bar">
+      <button class="filter-pill active" id="fAll" onclick="setTypeFilter('all')">All</button>
+      <button class="filter-pill" id="fExp" onclick="setTypeFilter('expenses')">🏠 Expenses</button>
+      <button class="filter-pill" id="fSha" onclick="setTypeFilter('shaadi')">💍 Shaadi</button>
     </div>
-    <div class="summary-card" id="summaryCard" style="display:none;">
-      <div class="summary-top">
-        <div><div class="summary-label">This Month</div><div class="summary-amount" id="thisMonthAmt">₹0</div></div>
-        <div class="summary-delta" id="summaryDelta"></div>
-      </div>
-      <div class="summary-divider"></div>
-      <div class="summary-bottom">
-        <div><div class="summary-label">This Week</div><div class="week-amount" id="thisWeekAmt">₹0</div></div>
-        <div style="text-align:right"><div class="summary-label">Last Month</div><div class="last-month-amount" id="lastMonthAmt">₹0</div></div>
-      </div>
+    <!-- Date range filter -->
+    <div class="filter-date-row">
+      <input class="filter-date-input" type="date" id="filterFrom" onchange="applyFilters()" placeholder="From"/>
+      <span class="filter-date-sep">→</span>
+      <input class="filter-date-input" type="date" id="filterTo" onchange="applyFilters()" placeholder="To"/>
+      <button class="filter-clear-btn" onclick="clearFilters()">Clear</button>
     </div>
     <div class="history-list" id="historyList"></div>
+  </div>
+
+  <!-- SUMMARY PAGE -->
+  <div class="page summary-page" id="pageSummary">
+    <div class="summary-page-inner">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+        <div style="font-size:16px;font-weight:800;">Summary</div>
+      </div>
+      <!-- Type filter -->
+      <div class="sum-filter-row">
+        <button class="sum-filter-pill active" id="sfAll" onclick="setSumFilter('all')">All</button>
+        <button class="sum-filter-pill" id="sfExp" onclick="setSumFilter('expenses')">🏠 Expenses</button>
+        <button class="sum-filter-pill" id="sfSha" onclick="setSumFilter('shaadi')">💍 Shaadi</button>
+      </div>
+      <!-- Date range -->
+      <div class="sum-date-row">
+        <input class="filter-date-input" type="date" id="sumFrom" onchange="renderSummaryPage()"/>
+        <span class="filter-date-sep">→</span>
+        <input class="filter-date-input" type="date" id="sumTo" onchange="renderSummaryPage()"/>
+        <button class="filter-clear-btn" onclick="clearSumFilters()">Clear</button>
+      </div>
+      <!-- Total block -->
+      <div class="sum-block">
+        <div class="sum-block-label">Total Spend</div>
+        <div class="sum-block-amount" id="sumTotalAmt">₹0</div>
+        <div style="font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--muted2);margin-top:4px;" id="sumTotalSub"></div>
+      </div>
+      <!-- 3-month bar chart -->
+      <div class="sum-block">
+        <div class="sum-block-label">Last 3 Months</div>
+        <div class="bar-chart" id="sumBarChart"></div>
+      </div>
+      <!-- Monthly breakdown -->
+      <div class="sum-block">
+        <div class="sum-block-label">Monthly Breakdown</div>
+        <div class="sum-months-grid" id="sumMonthsGrid"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -344,7 +411,9 @@
 const STORAGE_KEY='kharcha_config';
 const CAT_LEARN_KEY='kharcha_cat_learn';
 const HISTORY_CACHE_KEY='kharcha_history_cache';
-const CATS=['Food','Transport','Shopping','Utilities','Health','Entertainment','UPI/Online','Other'];
+const CATS=['Food','Transport','Shopping','Utilities','Health','Entertainment','Other'];
+const PAY_MODES=['Cash','Online'];
+const ONLINE_KEYWORDS=/\b(upi|gpay|phonepe|paytm|card|debit|credit|online|neft|imps|rtgs|net.?banking|razorpay|amazon.?pay|bhim)\b/i;
 const IST_OFFSET=5.5*60*60*1000;
 const TODAY_STR=new Date(Date.now()+IST_OFFSET).toISOString().split('T')[0];
 
@@ -503,13 +572,20 @@ function localParse(text) {
   // Multi-item with commas/newlines — let Gemini handle
   if (looksMultiItem(t)) return null;
 
-  // Tokenise
-  const tokens = t.toLowerCase().split(/\s+/);
-
-  // Look for a date token
+  // Look for a date token — including "date DD/MM" or "date D/M" patterns
   let dateToken = TODAY_STR;
   let cleanTokens = [];
-  for (const tok of tokens) {
+  // Check for explicit "date DD/MM" pattern first
+  const datePat = t.match(/\bdate\s+(\d{1,2})[\/\-](\d{1,2})\b/i);
+  if(datePat){
+    const now2=new Date(Date.now()+IST_OFFSET);
+    const dd=datePat[1].padStart(2,'0');
+    const mm=datePat[2].padStart(2,'0');
+    const yr=now2.getUTCFullYear();
+    dateToken=yr+'-'+mm+'-'+dd;
+  }
+  const textForTokens=datePat?t.replace(/\bdate\s+\d{1,2}[\/\-]\d{1,2}\b/i,''):t;
+  for (const tok of textForTokens.toLowerCase().split(/\s+/)) {
     if (['kal','parso','yesterday','aaj','today'].includes(tok)) {
       dateToken = resolveDate(tok);
     } else {
@@ -778,7 +854,12 @@ function buildChip(item,idx,total,chipTag){
   var dateVal=toDateInput(item.date);
   var activeCat=item._localCat||item.category||'';
   var tag=chipTag||'Regular';
+  // Payment mode: detect from raw text or item category
+  var rawLower=(item.comment||'')+' '+(item.shop||'')+' '+(item.rawText||'');
+  var defaultPay=(ONLINE_KEYWORDS.test(rawLower)||activeCat==='UPI/Online')?'Online':'Cash';
+  var activePay=item._payMode||defaultPay;
   var catPills=CATS.map(function(c){return '<button class="cat-pill'+(activeCat===c?' active':'')+'" data-cat="'+c+'" onclick="selectCat(this,'+idx+')" type="button">'+c+'</button>';}).join('');
+  var payPills=PAY_MODES.map(function(p){return '<button class="pay-pill'+(activePay===p?' active':'')+'" data-pay="'+p+'" onclick="selectPay(this,'+idx+')" type="button">'+p+'</button>';}).join('');
   var tagHtml='<div style="margin-top:8px;">'
     +'<div style="font-size:9px;font-family:\'JetBrains Mono\',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">Sheet</div>'
     +'<div class="mini-tag-toggle">'
@@ -796,15 +877,19 @@ function buildChip(item,idx,total,chipTag){
     +'<div class="review-field"><label>Shop</label><input class="review-input" id="rv-shop-'+idx+'" value="'+esc(item.shop||'')+'" placeholder="optional"/></div>'
     +'<div class="review-field" style="flex:2;min-width:180px;"><label>Comment</label><input class="review-input" id="rv-comment-'+idx+'" value="'+esc(item.comment||'')+'" placeholder="optional"/></div>'
     +'</div>'
-    +'<div style="margin-top:8px;"><div style="font-size:9px;font-family:\'JetBrains Mono\',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">Category</div>'
+    +'<div style="margin-top:8px;"><div style="font-size:9px;font-family:\'JetBrains Mono\',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">Type</div>'
     +'<div class="cat-picker" id="catpicker-'+idx+'">'+catPills+'</div>'
-    +'<input type="hidden" id="rv-cat-'+idx+'" value="'+esc(activeCat)+'"/>'
+    +'<input type="hidden" id="rv-cat-'+idx+'" value="'+esc(activeCat==='UPI/Online'?'':activeCat)+'"/>'
+    +'</div>'
+    +'<div style="margin-top:8px;"><div style="font-size:9px;font-family:\'JetBrains Mono\',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">Payment Mode</div>'
+    +'<div class="cat-picker" id="paypicker-'+idx+'">'+payPills+'</div>'
+    +'<input type="hidden" id="rv-pay-'+idx+'" value="'+esc(activePay)+'"/>'
     +'</div>'
     +tagHtml+'</div>';
 }
 function selectReviewTag(el,idx){var wrap=el.closest('.mini-tag-toggle');wrap.querySelectorAll('.mini-tag-btn').forEach(function(b){b.classList.remove('active');});el.classList.add('active');document.getElementById('rv-tag-'+idx).value=el.dataset.tag;reviewChipTags[idx]=el.dataset.tag;}
 function selectCat(el,idx){var picker=document.getElementById('catpicker-'+idx);var hidden=document.getElementById('rv-cat-'+idx);var isActive=el.classList.contains('active');picker.querySelectorAll('.cat-pill').forEach(function(p){p.classList.remove('active');});if(!isActive){el.classList.add('active');hidden.value=el.dataset.cat;}else{hidden.value='';}}
-
+function selectPay(el,idx){var picker=document.getElementById('paypicker-'+idx);var hidden=document.getElementById('rv-pay-'+idx);picker.querySelectorAll('.pay-pill').forEach(function(p){p.classList.remove('active');});el.classList.add('active');hidden.value=el.dataset.pay;}
 function calcAmount(val){if(val===''||val===null||val===undefined)return '';var str=String(val).trim();if(!str)return '';var safe=str.split('').filter(function(c){return '0123456789+-*/().'.indexOf(c)>=0;}).join('').trim();if(!safe)return '';var hasDigit=false;for(var i=0;i<safe.length;i++){if(safe[i]>='0'&&safe[i]<='9'){hasDigit=true;break;}}if(!hasDigit)return '';var plainNum=true;for(var i=0;i<safe.length;i++){if('+-*/'.indexOf(safe[i])>=0){plainNum=false;break;}}if(plainNum)return safe;try{var result=Function('"use strict"; return ('+safe+')')();if(typeof result!=='number'||!isFinite(result)||isNaN(result))return '';var rounded=Math.round(result*100)/100;if(rounded<0)return '';return String(rounded);}catch(e){return '';}}
 function evalAmountField(input){var r=calcAmount(input.value);if(r!==''&&r!==String(input.value).trim()){input.value=r;input.style.color='var(--success)';setTimeout(function(){input.style.color='';},800);}}
 
@@ -828,12 +913,13 @@ async function confirmAndSave(){
       var shopVal=(getVal('rv-shop-'+i)||'').trim();
       var commentVal=(getVal('rv-comment-'+i)||'').trim();
       var amtRaw=getVal('rv-amount-'+i);
+      var payVal=getVal('rv-pay-'+i)||'Cash';
       // Mandatory field validation
       if(!itemVal){showToast('❌ Item name is required for entry '+(count>1?i+1:''));btn.classList.remove('loading');btn.disabled=false;return;}
       var amtCalc=calcAmount(amtRaw);
       if(!amtCalc||parseFloat(amtCalc)<=0){showToast('❌ Valid amount is required for entry '+(count>1?i+1:''));btn.classList.remove('loading');btn.disabled=false;return;}
       if(catVal&&(parsedItems[i]?parsedItems[i].category:null)!==catVal)saveCatOverride(itemVal,shopVal,catVal);
-      rows.push({date:fromDateInput(dateVal),item:itemVal,amount:amtCalc,shop:shopVal,comment:commentVal,category:catVal,tag:tagVal,loggedBy:loggedBy,rawText:rawText,sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses'});
+      rows.push({date:fromDateInput(dateVal),item:itemVal,amount:amtCalc,shop:shopVal,comment:commentVal,category:catVal,payMode:payVal,tag:tagVal,loggedBy:loggedBy,rawText:rawText,sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses'});
     }
     var totalWait=rows.length*400+800;
     rows.forEach(function(row,idx){setTimeout(function(){fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)});},idx*400);});
@@ -847,34 +933,267 @@ async function confirmAndSave(){
 
 function resetAddForm(){const ta=document.getElementById('expenseInput');ta.value='';ta.dataset.imageParsed='';document.getElementById('charCount').textContent='500';document.getElementById('submitBtn').disabled=true;document.getElementById('hintCard').classList.remove('hidden');document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=null;updateSheetBadge();document.getElementById('uploadStatus').style.display='none';document.getElementById('attachBtn').classList.remove('has-file');}
 
-let currentSheetTab='Expenses',historyData=[];
-function switchSheetTab(name){currentSheetTab=name;document.getElementById('sheetTabExpenses').classList.toggle('active',name==='Expenses');document.getElementById('sheetTabShaadi').classList.toggle('active',name==='Shaadi');loadHistory();}
-async function loadHistory(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Set up Script URL in settings first');return;}const list=document.getElementById('historyList');const refresh=document.getElementById('refreshBtn');refresh.classList.add('spinning');document.getElementById('summaryCard').style.display='none';const cacheKey=HISTORY_CACHE_KEY+'_'+currentSheetTab;try{const cached=JSON.parse(localStorage.getItem(cacheKey));if(cached&&cached.rows){historyData=cached.rows;renderHistory();}if(cached&&cached.summary&&currentSheetTab==='Expenses')renderSummaryCard(cached.summary);}catch(e){}if(!historyData.length){list.innerHTML=Array(4).fill(0).map(()=>'<div class="skeleton"><div class="skel-line w60"></div><div class="skel-line w40"></div><div class="skel-line w80"></div></div>').join('');}try{const[recentRes,summaryRes]=await Promise.all([fetch(cfg.scriptUrl+'?action=getRecent&sheet='+encodeURIComponent(currentSheetTab)+'&n=10'),currentSheetTab==='Expenses'?fetch(cfg.scriptUrl+'?action=getSummary'):Promise.resolve(null)]);if(!recentRes.ok)throw new Error('HTTP '+recentRes.status);const rd=await recentRes.json();if(!rd.success)throw new Error(rd.error||'Script error');historyData=rd.rows||[];renderHistory();var sd=null;if(summaryRes&&summaryRes.ok){const s=await summaryRes.json();if(s.success){renderSummaryCard(s);sd=s;}}localStorage.setItem(cacheKey,JSON.stringify({rows:historyData,summary:sd,ts:Date.now()}));}catch(err){if(!historyData.length){list.innerHTML='<div class="history-empty"><div class="empty-icon">⚠️</div><div>Could not load</div><div style="font-size:11px;margin-top:4px;color:var(--muted)">'+err.message+'</div></div>';}else showToast('Refresh failed — showing cached data');}finally{refresh.classList.remove('spinning');}}
-function renderSummaryCard(d){const card=document.getElementById('summaryCard');card.style.display='block';const tm=d.thisMonth||0,lm=d.lastMonth||0,tw=d.thisWeek||0;document.getElementById('thisMonthAmt').textContent='₹'+tm.toLocaleString('en-IN');document.getElementById('thisWeekAmt').textContent='₹'+tw.toLocaleString('en-IN');document.getElementById('lastMonthAmt').textContent='₹'+lm.toLocaleString('en-IN');const delta=document.getElementById('summaryDelta');if(lm>0){const pct=Math.round(((tm-lm)/lm)*100);const less=pct<0;delta.textContent=(less?'▼ ':'▲ ')+Math.abs(pct)+'% '+(less?'less':'more');delta.className='summary-delta '+(less?'green':'red');}else{delta.textContent='First month!';delta.className='summary-delta green';}}
-function renderHistory(){const list=document.getElementById('historyList');if(!historyData.length){list.innerHTML='<div class="history-empty"><div class="empty-icon">📭</div><div>No entries yet in '+currentSheetTab+'</div></div>';return;}const isSh=currentSheetTab==='Shaadi';list.innerHTML=historyData.map((row,i)=>{return '<div class="history-card" onclick="openEdit('+i+')">'+'<div class="history-card-top"><div class="history-item">'+esc(row.item||'—')+'</div><div class="history-amount'+(isSh?' shaadi-amount':'')+'">'+( row.amount?'₹'+row.amount:'—')+'</div></div>'+'<div class="history-card-meta">'+'<span class="meta-chip">📅 '+esc(row.date||'—')+'</span>'+(row.loggedBy?'<span class="meta-chip">👤 '+esc(row.loggedBy)+'</span>':'')+'</div>'+'<div class="edit-hint">Tap to edit →</div></div>';}).join('');}
+// ── Tab switching ─────────────────────────────────────────
+function switchTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const t=tab.charAt(0).toUpperCase()+tab.slice(1);
+  document.getElementById('tab'+t).classList.add('active');
+  document.getElementById('page'+t).classList.add('active');
+  if(tab==='history')loadHistory(true);
+  if(tab==='summary')loadSummaryPage();
+}
+
+// ── All rows store (both sheets merged) ──────────────────
+let allRows=[],historyOffset=0,historyLoading=false;
+let filterType='all',filterFrom='',filterTo='';
+let sumFilterType='all',sumFilterFrom='',sumFilterTo='';
+
+function setTypeFilter(type){
+  filterType=type;
+  document.getElementById('fAll').className='filter-pill'+(type==='all'?' active':'');
+  document.getElementById('fExp').className='filter-pill'+(type==='expenses'?' active':'');
+  document.getElementById('fSha').className='filter-pill'+(type==='shaadi'?' shaadi-active active':'');
+  applyFilters();
+}
+function applyFilters(){
+  filterFrom=document.getElementById('filterFrom').value;
+  filterTo=document.getElementById('filterTo').value;
+  renderFilteredHistory();
+}
+function clearFilters(){
+  filterFrom='';filterTo='';filterType='all';
+  document.getElementById('filterFrom').value='';
+  document.getElementById('filterTo').value='';
+  document.getElementById('fAll').className='filter-pill active';
+  document.getElementById('fExp').className='filter-pill';
+  document.getElementById('fSha').className='filter-pill';
+  renderFilteredHistory();
+}
+
+function getFilteredRows(){
+  return allRows.filter(function(row){
+    if(filterType==='expenses'&&(row.tag||'Regular').toLowerCase()==='shaadi')return false;
+    if(filterType==='shaadi'&&(row.tag||'Regular').toLowerCase()!=='shaadi')return false;
+    if(filterFrom||filterTo){
+      var rd=toDateInput(row.date);
+      if(filterFrom&&rd<filterFrom)return false;
+      if(filterTo&&rd>filterTo)return false;
+    }
+    return true;
+  });
+}
+
+async function loadHistory(reset){
+  const cfg=loadConfig();
+  if(!cfg.scriptUrl){showToast('Set up Script URL in settings first');return;}
+  if(historyLoading)return;
+  if(reset){historyOffset=0;allRows=[];}
+  historyLoading=true;
+  const list=document.getElementById('historyList');
+  const refresh=document.getElementById('refreshBtn');
+  refresh.classList.add('spinning');
+  if(reset&&!allRows.length){list.innerHTML=Array(3).fill(0).map(()=>'<div class="skeleton"><div class="skel-line w60"></div><div class="skel-line w40"></div></div>').join('');}
+  try{
+    const[expRes,shaRes]=await Promise.all([
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Expenses&n=10&offset='+historyOffset),
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Shaadi&n=10&offset='+historyOffset)
+    ]);
+    var newRows=[];
+    if(expRes.ok){const d=await expRes.json();if(d.success)(d.rows||[]).forEach(r=>{r._sheet='Expenses';newRows.push(r);});}
+    if(shaRes.ok){const d=await shaRes.json();if(d.success)(d.rows||[]).forEach(r=>{r._sheet='Shaadi';newRows.push(r);});}
+    // Sort by date desc (newest first)
+    newRows.sort(function(a,b){return toDateInput(b.date).localeCompare(toDateInput(a.date));});
+    allRows=reset?newRows:allRows.concat(newRows);
+    historyOffset+=10;
+    renderFilteredHistory(newRows.length);
+  }catch(err){
+    if(!allRows.length)list.innerHTML='<div class="history-empty"><div class="empty-icon">⚠️</div><div>Could not load — '+err.message+'</div></div>';
+    else showToast('Refresh failed');
+  }finally{historyLoading=false;refresh.classList.remove('spinning');}
+}
+
+function renderFilteredHistory(newCount){
+  const list=document.getElementById('historyList');
+  const rows=getFilteredRows();
+  const sub=document.getElementById('historySubtitle');
+  if(!rows.length){
+    list.innerHTML='<div class="history-empty"><div class="empty-icon">📭</div><div>No entries match your filter</div></div>';
+    sub.textContent='0 entries';
+    return;
+  }
+  sub.textContent=rows.length+' entr'+(rows.length===1?'y':'ies')+(filterType!=='all'||filterFrom||filterTo?' (filtered)':'');
+  var html=rows.map(function(row,i){
+    var isSh=(row.tag||'').toLowerCase()==='shaadi'||(row._sheet==='Shaadi');
+    return '<div class="history-card'+(isSh?' shaadi-card':'')+'" onclick="openEdit('+i+')">'
+      +'<div class="history-card-top">'
+      +'<div class="history-item">'+esc(row.item||'—')+'</div>'
+      +'<div class="history-amount'+(isSh?' shaadi-amount':'')+'">'+( row.amount?'₹'+row.amount:'—')+'</div>'
+      +'</div>'
+      +'<div class="history-card-meta">'
+      +'<span class="meta-chip">📅 '+esc(row.date||'—')+'</span>'
+      +(isSh?'<span class="meta-chip shaadi-chip">💍 Shaadi</span>':'')
+      +(row.loggedBy?'<span class="meta-chip">👤 '+esc(row.loggedBy)+'</span>':'')
+      +'</div>'
+      +'<div class="edit-hint">Tap to edit →</div>'
+      +'</div>';
+  }).join('');
+  // Load more button
+  html+='<button class="load-more-btn" id="loadMoreBtn" onclick="loadHistory(false)">'
+    +'<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>'
+    +'Load 10 more</button>';
+  list.innerHTML=html;
+  // openEdit now uses filtered rows index → map back to allRows
+  list._filteredRows=rows;
+}
+
+// ── Summary page ─────────────────────────────────────────
+let summaryRawData={exp:[],sha:[]};
+
+function setSumFilter(type){
+  sumFilterType=type;
+  document.getElementById('sfAll').className='sum-filter-pill'+(type==='all'?' active':'');
+  document.getElementById('sfExp').className='sum-filter-pill'+(type==='expenses'?' active':'');
+  document.getElementById('sfSha').className='sum-filter-pill'+(type==='shaadi'?' shaadi-active active':'');
+  renderSummaryPage();
+}
+function clearSumFilters(){
+  sumFilterFrom='';sumFilterTo='';
+  document.getElementById('sumFrom').value='';
+  document.getElementById('sumTo').value='';
+  renderSummaryPage();
+}
+
+async function loadSummaryPage(){
+  const cfg=loadConfig();
+  if(!cfg.scriptUrl){showToast('Set up Script URL first');return;}
+  // Use already-fetched allRows if available, else fetch summary data separately
+  try{
+    const[expRes,shaRes]=await Promise.all([
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Expenses&n=200'),
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Shaadi&n=200')
+    ]);
+    if(expRes.ok){const d=await expRes.json();if(d.success)summaryRawData.exp=d.rows||[];}
+    if(shaRes.ok){const d=await shaRes.json();if(d.success)summaryRawData.sha=d.rows||[];}
+  }catch(e){/* use what we have */}
+  renderSummaryPage();
+}
+
+function renderSummaryPage(){
+  sumFilterFrom=document.getElementById('sumFrom').value;
+  sumFilterTo=document.getElementById('sumTo').value;
+  var expRows=summaryRawData.exp;
+  var shaRows=summaryRawData.sha;
+
+  function filterRows(rows){
+    return rows.filter(function(r){
+      if(sumFilterFrom||sumFilterTo){var rd=toDateInput(r.date);if(sumFilterFrom&&rd<sumFilterFrom)return false;if(sumFilterTo&&rd>sumFilterTo)return false;}
+      return true;
+    });
+  }
+  var fExp=filterRows(expRows);
+  var fSha=filterRows(shaRows);
+  var useExp=sumFilterType!=='shaadi';
+  var useSha=sumFilterType!=='expenses';
+  var totalAmt=0;
+  if(useExp)fExp.forEach(r=>{totalAmt+=parseFloat(r.amount)||0;});
+  if(useSha)fSha.forEach(r=>{totalAmt+=parseFloat(r.amount)||0;});
+
+  document.getElementById('sumTotalAmt').textContent='₹'+Math.round(totalAmt).toLocaleString('en-IN');
+  var subParts=[];
+  if(useExp)subParts.push('Expenses: ₹'+Math.round(fExp.reduce((s,r)=>s+(parseFloat(r.amount)||0),0)).toLocaleString('en-IN'));
+  if(useSha)subParts.push('Shaadi: ₹'+Math.round(fSha.reduce((s,r)=>s+(parseFloat(r.amount)||0),0)).toLocaleString('en-IN'));
+  document.getElementById('sumTotalSub').textContent=subParts.join(' · ');
+
+  // 3-month bar chart
+  var now=new Date(Date.now()+IST_OFFSET);
+  var months=[];
+  for(var mi=2;mi>=0;mi--){var d=new Date(now);d.setUTCMonth(now.getUTCMonth()-mi);months.push({year:d.getUTCFullYear(),month:d.getUTCMonth(),label:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]});}
+  function sumForMonth(rows,y,m){return rows.reduce(function(s,r){var rd=toDateInput(r.date);var dd=new Date(rd+'T00:00:00');if(dd.getUTCFullYear()===y&&dd.getUTCMonth()===m)s+=parseFloat(r.amount)||0;return s;},0);}
+  var bars=months.map(function(mn){
+    var eAmt=useExp?sumForMonth(fExp,mn.year,mn.month):0;
+    var sAmt=useSha?sumForMonth(fSha,mn.year,mn.month):0;
+    return{label:mn.label,exp:eAmt,sha:sAmt,total:eAmt+sAmt};
+  });
+  var maxVal=Math.max(1,...bars.map(b=>b.total));
+  var isShaOnly=sumFilterType==='shaadi';
+  var chartHtml=bars.map(function(b){
+    var h=Math.round((b.total/maxVal)*90);
+    var barClass=isShaOnly?'bar sha-bar':'bar exp-bar';
+    return '<div class="bar-wrap">'
+      +'<div class="bar-amt-label">₹'+Math.round(b.total/1000)+'k</div>'
+      +'<div class="'+barClass+'" style="height:'+h+'px"></div>'
+      +'<div class="bar-month-label">'+b.label+'</div>'
+      +'</div>';
+  }).join('');
+  document.getElementById('sumBarChart').innerHTML=chartHtml;
+
+  // Monthly breakdown (all available months)
+  var monthMap={};
+  function addToMap(rows,key){rows.forEach(function(r){var rd=toDateInput(r.date);var d=new Date(rd+'T00:00:00');var mk=d.getUTCFullYear()+'-'+(d.getUTCMonth()+1).toString().padStart(2,'0');if(!monthMap[mk])monthMap[mk]={exp:0,sha:0,label:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]+' '+d.getUTCFullYear()};monthMap[mk][key]+=parseFloat(r.amount)||0;});}
+  if(useExp)addToMap(fExp,'exp');
+  if(useSha)addToMap(fSha,'sha');
+  var sortedMonths=Object.keys(monthMap).sort().reverse();
+  var gridHtml=sortedMonths.map(function(mk){
+    var m=monthMap[mk];
+    var total=(useExp?m.exp:0)+(useSha?m.sha:0);
+    return '<div class="sum-month-row">'
+      +'<div class="sum-month-label">'+m.label+'</div>'
+      +'<div class="sum-month-amt'+(isShaOnly?' shaadi-c':'')+'">₹'+Math.round(total).toLocaleString('en-IN')+'</div>'
+      +'</div>';
+  }).join('');
+  document.getElementById('sumMonthsGrid').innerHTML=gridHtml||'<div style="color:var(--muted2);font-size:12px;font-family:\'JetBrains Mono\',monospace;text-align:center;padding:16px;">No data yet</div>';
+}
+
+let currentSheetTab='Expenses'; // kept for backward compat with any cached references
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 let editingRow=null,editOriginalTag=null;
 function selectEditTag(tag){document.querySelectorAll('#editTagToggle .mini-tag-btn').forEach(b=>b.classList.remove('active'));document.querySelector('#editTagToggle [data-tag="'+tag+'"]').classList.add('active');const warn=document.getElementById('moveWarning');if(editOriginalTag&&tag!==editOriginalTag)warn.classList.add('show');else warn.classList.remove('show');}
 function getEditTag(){var a=document.querySelector('#editTagToggle .mini-tag-btn.active');return a?a.dataset.tag:'Regular';}
-function openEdit(index){const row=historyData[index];if(!row)return;editingRow=row;editOriginalTag=row.tag||'Regular';document.getElementById('editSubtitle').textContent='Row '+row.rowNum+' in "'+row.sheetName+'" sheet';document.getElementById('editRowInfo').innerHTML='<strong>Original:</strong> "'+esc(row.rawText||row.item||'')+'"';document.getElementById('moveWarning').classList.remove('show');document.getElementById('editDate').value=toDateInput(row.date||'');document.getElementById('editDate').max=TODAY_STR;document.getElementById('editItem').value=row.item||'';document.getElementById('editAmount').value=row.amount||'';document.getElementById('editShop').value=row.shop||'';document.getElementById('editComment').value=row.comment||'';document.getElementById('editCategory').value=row.category||'';document.querySelectorAll('#editTagToggle .mini-tag-btn').forEach(b=>b.classList.remove('active'));const tagBtn=document.querySelector('#editTagToggle [data-tag="'+(row.tag||'Regular')+'"]');if(tagBtn)tagBtn.classList.add('active');document.getElementById('saveEditBtn').disabled=false;document.getElementById('editOverlay').classList.add('show');}
+function openEdit(index){
+  // Use filtered rows if available
+  var list=document.getElementById('historyList');
+  var rows=list._filteredRows||allRows;
+  var row=rows[index];
+  if(!row)return;
+  editingRow=row;editOriginalTag=row.tag||'Regular';
+  document.getElementById('editSubtitle').textContent='Row '+row.rowNum+' in "'+(row.sheetName||row._sheet||'Expenses')+'" sheet';
+  document.getElementById('editRowInfo').innerHTML='<strong>Original:</strong> "'+esc(row.rawText||row.item||'')+'"';
+  document.getElementById('moveWarning').classList.remove('show');
+  document.getElementById('editDate').value=toDateInput(row.date||'');
+  document.getElementById('editDate').max=TODAY_STR;
+  document.getElementById('editItem').value=row.item||'';
+  document.getElementById('editAmount').value=row.amount||'';
+  document.getElementById('editShop').value=row.shop||'';
+  document.getElementById('editComment').value=row.comment||'';
+  document.getElementById('editCategory').value=row.category||'';
+  document.querySelectorAll('#editTagToggle .mini-tag-btn').forEach(b=>b.classList.remove('active'));
+  const tagBtn=document.querySelector('#editTagToggle [data-tag="'+(row.tag||'Regular')+'"]');
+  if(tagBtn)tagBtn.classList.add('active');
+  document.getElementById('saveEditBtn').disabled=false;
+  document.getElementById('editOverlay').classList.add('show');
+}
 function closeEdit(){document.getElementById('editOverlay').classList.remove('show');editingRow=null;editOriginalTag=null;}
 function maybeCloseEdit(e){if(e.target===document.getElementById('editOverlay'))closeEdit();}
-async function saveEdit(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Script URL not set');return;}if(!editingRow)return;const dateVal=document.getElementById('editDate').value;const dateErr=validateDate(dateVal);if(dateErr){showToast('❌ '+dateErr);return;}const newTag=getEditTag();const tagChanged=newTag!==(editOriginalTag||'Regular');const btn=document.getElementById('saveEditBtn');btn.classList.add('loading');btn.disabled=true;try{if(tagChanged){const mp={action:'moveRow',rowNum:editingRow.rowNum,fromSheet:editingRow.sheetName,toSheet:newTag==='Shaadi'?'Shaadi':'Expenses',date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(mp)});historyData.splice(historyData.indexOf(editingRow),1);localStorage.removeItem(HISTORY_CACHE_KEY+'_'+editingRow.sheetName);localStorage.removeItem(HISTORY_CACHE_KEY+'_'+(newTag==='Shaadi'?'Shaadi':'Expenses'));renderHistory();closeEdit();showToast('Moved to '+mp.toSheet+' sheet ✓');}else{const upd={action:'updateRow',rowNum:editingRow.rowNum,sheetName:editingRow.sheetName,date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(upd)});Object.assign(editingRow,upd);localStorage.removeItem(HISTORY_CACHE_KEY+'_'+editingRow.sheetName);renderHistory();closeEdit();showToast('Entry updated ✓');}}catch(err){showToast('Failed — try again');}finally{btn.classList.remove('loading');btn.disabled=false;}}
+async function saveEdit(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Script URL not set');return;}if(!editingRow)return;const dateVal=document.getElementById('editDate').value;const dateErr=validateDate(dateVal);if(dateErr){showToast('❌ '+dateErr);return;}const newTag=getEditTag();const tagChanged=newTag!==(editOriginalTag||'Regular');const btn=document.getElementById('saveEditBtn');btn.classList.add('loading');btn.disabled=true;try{const sheetName=editingRow.sheetName||editingRow._sheet||'Expenses';if(tagChanged){const mp={action:'moveRow',rowNum:editingRow.rowNum,fromSheet:sheetName,toSheet:newTag==='Shaadi'?'Shaadi':'Expenses',date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(mp)});allRows.splice(allRows.indexOf(editingRow),1);renderFilteredHistory();closeEdit();showToast('Moved to '+(newTag==='Shaadi'?'Shaadi':'Expenses')+' sheet ✓');}else{const upd={action:'updateRow',rowNum:editingRow.rowNum,sheetName:sheetName,date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(upd)});Object.assign(editingRow,upd);renderFilteredHistory();closeEdit();showToast('Entry updated ✓');}}catch(err){showToast('Failed — try again');}finally{btn.classList.remove('loading');btn.disabled=false;}}
 
-// Silent background history refresh — updates both sheets in parallel, no spinners
+// Silent background refresh — merges both sheets into allRows
 async function silentRefreshHistory(){
-  const cfg=loadConfig();
-  if(!cfg.scriptUrl)return;
+  const cfg=loadConfig();if(!cfg.scriptUrl)return;
   try{
-    // Fetch both sheets + summary in parallel
-    const[expRes,shaRes,sumRes]=await Promise.all([
-      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Expenses&n=10'),
-      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Shaadi&n=10'),
-      fetch(cfg.scriptUrl+'?action=getSummary')
+    const[expRes,shaRes]=await Promise.all([
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Expenses&n=10&offset=0'),
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Shaadi&n=10&offset=0')
     ]);
-    if(expRes.ok){const d=await expRes.json();if(d.success){var sd=null;if(sumRes&&sumRes.ok){const s=await sumRes.json();if(s.success)sd=s;}localStorage.setItem(HISTORY_CACHE_KEY+'_Expenses',JSON.stringify({rows:d.rows||[],summary:sd,ts:Date.now()}));if(currentSheetTab==='Expenses'){historyData=d.rows||[];renderHistory();if(sd)renderSummaryCard(sd);}}}
-    if(shaRes.ok){const d=await shaRes.json();if(d.success){localStorage.setItem(HISTORY_CACHE_KEY+'_Shaadi',JSON.stringify({rows:d.rows||[],summary:null,ts:Date.now()}));if(currentSheetTab==='Shaadi'){historyData=d.rows||[];renderHistory();}}}
+    var newRows=[];
+    if(expRes.ok){const d=await expRes.json();if(d.success)(d.rows||[]).forEach(r=>{r._sheet='Expenses';newRows.push(r);});}
+    if(shaRes.ok){const d=await shaRes.json();if(d.success)(d.rows||[]).forEach(r=>{r._sheet='Shaadi';newRows.push(r);});}
+    newRows.sort(function(a,b){return toDateInput(b.date).localeCompare(toDateInput(a.date));});
+    // Prepend any truly new rows (not already in allRows by rowNum+sheet)
+    var existing=new Set(allRows.map(r=>(r.sheetName||r._sheet)+'-'+r.rowNum));
+    var trulyNew=newRows.filter(r=>!existing.has((r.sheetName||r._sheet)+'-'+r.rowNum));
+    if(trulyNew.length){allRows=newRows.concat(allRows.filter(r=>!newRows.find(n=>(n.sheetName||n._sheet)+'-'+n.rowNum===(r.sheetName||r._sheet)+'-'+r.rowNum)));allRows.sort(function(a,b){return toDateInput(b.date).localeCompare(toDateInput(a.date));});renderFilteredHistory();}
   }catch(e){/* silent */}
 }
 
