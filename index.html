@@ -1089,6 +1089,27 @@ async function loadSummaryPage(){
   renderSummaryPage();
 }
 
+// Tap a month in Summary → jump to Recent with that month's date range pre-filtered
+function drillIntoMonth(monthKey) {
+  // monthKey is "YYYY-M" e.g. "2026-5"
+  const [y, m] = monthKey.split('-').map(Number);
+  const from = y + '-' + String(m).padStart(2, '0') + '-01';
+  // Last day of month
+  const lastDay = new Date(y, m, 0).getDate();
+  const to = y + '-' + String(m).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0');
+  // Apply type filter from summary to recent
+  if (sumFilterType !== 'all') setTypeFilter(sumFilterType);
+  else setTypeFilter('all');
+  // Set date range
+  document.getElementById('filterFrom').value = from;
+  document.getElementById('filterTo').value = to;
+  filterFrom = from;
+  filterTo = to;
+  // Switch to Recent tab and render
+  switchTab('history');
+  renderFilteredHistory();
+}
+
 function renderSummaryPage(){
   sumFilterFrom=document.getElementById('sumFrom').value;
   sumFilterTo=document.getElementById('sumTo').value;
@@ -1147,9 +1168,12 @@ function renderSummaryPage(){
   var gridHtml=sortedMonths.map(function(mk){
     var m=monthMap[mk];
     var total=(useExp?m.exp:0)+(useSha?m.sha:0);
-    return '<div class="sum-month-row">'
+    return '<div class="sum-month-row" onclick="drillIntoMonth(\''+mk+'\')" style="cursor:pointer;">'
       +'<div class="sum-month-label">'+m.label+'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;">'
       +'<div class="sum-month-amt'+(isShaOnly?' shaadi-c':'')+'">₹'+Math.round(total).toLocaleString('en-IN')+'</div>'
+      +'<div style="font-size:11px;color:var(--muted2);">→</div>'
+      +'</div>'
       +'</div>';
   }).join('');
   document.getElementById('sumMonthsGrid').innerHTML=gridHtml||'<div style="color:var(--muted2);font-size:12px;font-family:\'JetBrains Mono\',monospace;text-align:center;padding:16px;">No data yet</div>';
