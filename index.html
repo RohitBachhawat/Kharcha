@@ -606,8 +606,8 @@ function localParse(text) {
       break;
     }
     // Amount prefixed with ₹ or rs
-    if (/^[₹rs]\d+/i.test(tok)) {
-      amountRaw = tok.replace(/^[₹rs]+/i, '');
+    if (/^(?:₹|rs)\d+/i.test(tok)) {
+      amountRaw = tok.replace(/^(?:₹|rs)+/i, '');
       amountIdx = i;
       break;
     }
