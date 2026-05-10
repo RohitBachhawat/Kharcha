@@ -218,7 +218,7 @@
     <div class="hint-card" id="hintCard">Type naturally — <span>"chai 20"</span> or <span>"bijli 1200"</span> or paste a bank SMS — Hindi auto-translated!</div>
     <div class="input-area">
       <div class="input-label">What did you spend on?</div>
-      <textarea id="expenseInput" placeholder="e.g. chai 20 tapri or sabzi 120 kal" maxlength="500" autofocus></textarea>
+      <textarea id="expenseInput" placeholder="e.g. chai 20 tapri or sabzi 120 kal" autofocus></textarea>
       <div class="char-count" id="charCount">500</div>
       <button class="attach-btn" id="attachBtn" onclick="triggerFileInput()" title="Upload bill or photo" type="button">
         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
@@ -372,7 +372,7 @@ function getTag(){return selectedTag||'';}
 function isShaadi(){return selectedTag==='Shaadi';}
 function updateSheetBadge(){const badge=document.getElementById('sheetBadge');const text=document.getElementById('sheetBadgeText');if(isShaadi()){badge.classList.add('shaadi-mode');text.textContent='Will save to → Shaadi sheet 💍';}else{badge.classList.remove('shaadi-mode');text.textContent='Will save to → Expenses sheet';}}
 
-function onType(){const val=document.getElementById('expenseInput').value;document.getElementById('charCount').textContent=500-val.length;const has=val.trim().length>0;document.getElementById('submitBtn').disabled=!has;if(has)document.getElementById('hintCard').classList.add('hidden');else document.getElementById('hintCard').classList.remove('hidden');}
+function onType(){const val=document.getElementById('expenseInput').value;const ta=document.getElementById('expenseInput');const cc=document.getElementById('charCount');if(ta.dataset.imageParsed==='1'){cc.style.display='none';}else{cc.style.display='';cc.textContent=500-Math.min(val.length,500)+' left';}const has=val.trim().length>0;document.getElementById('submitBtn').disabled=!has;if(has)document.getElementById('hintCard').classList.add('hidden');else document.getElementById('hintCard').classList.remove('hidden');}
 (function(){const ta=document.getElementById('expenseInput');['input','keyup','keydown','paste','cut','change'].forEach(ev=>ta.addEventListener(ev,()=>setTimeout(onType,0)));})();
 
 class KharchaError extends Error{constructor(t,m,h){super(m);this.title=t;this.hint=h;}}
@@ -828,8 +828,12 @@ async function confirmAndSave(){
       var shopVal=(getVal('rv-shop-'+i)||'').trim();
       var commentVal=(getVal('rv-comment-'+i)||'').trim();
       var amtRaw=getVal('rv-amount-'+i);
+      // Mandatory field validation
+      if(!itemVal){showToast('❌ Item name is required for entry '+(count>1?i+1:''));btn.classList.remove('loading');btn.disabled=false;return;}
+      var amtCalc=calcAmount(amtRaw);
+      if(!amtCalc||parseFloat(amtCalc)<=0){showToast('❌ Valid amount is required for entry '+(count>1?i+1:''));btn.classList.remove('loading');btn.disabled=false;return;}
       if(catVal&&(parsedItems[i]?parsedItems[i].category:null)!==catVal)saveCatOverride(itemVal,shopVal,catVal);
-      rows.push({date:fromDateInput(dateVal),item:itemVal,amount:calcAmount(amtRaw),shop:shopVal,comment:commentVal,category:catVal,tag:tagVal,loggedBy:loggedBy,rawText:rawText,sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses'});
+      rows.push({date:fromDateInput(dateVal),item:itemVal,amount:amtCalc,shop:shopVal,comment:commentVal,category:catVal,tag:tagVal,loggedBy:loggedBy,rawText:rawText,sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses'});
     }
     var totalWait=rows.length*400+800;
     rows.forEach(function(row,idx){setTimeout(function(){fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)});},idx*400);});
@@ -847,7 +851,7 @@ let currentSheetTab='Expenses',historyData=[];
 function switchSheetTab(name){currentSheetTab=name;document.getElementById('sheetTabExpenses').classList.toggle('active',name==='Expenses');document.getElementById('sheetTabShaadi').classList.toggle('active',name==='Shaadi');loadHistory();}
 async function loadHistory(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Set up Script URL in settings first');return;}const list=document.getElementById('historyList');const refresh=document.getElementById('refreshBtn');refresh.classList.add('spinning');document.getElementById('summaryCard').style.display='none';const cacheKey=HISTORY_CACHE_KEY+'_'+currentSheetTab;try{const cached=JSON.parse(localStorage.getItem(cacheKey));if(cached&&cached.rows){historyData=cached.rows;renderHistory();}if(cached&&cached.summary&&currentSheetTab==='Expenses')renderSummaryCard(cached.summary);}catch(e){}if(!historyData.length){list.innerHTML=Array(4).fill(0).map(()=>'<div class="skeleton"><div class="skel-line w60"></div><div class="skel-line w40"></div><div class="skel-line w80"></div></div>').join('');}try{const[recentRes,summaryRes]=await Promise.all([fetch(cfg.scriptUrl+'?action=getRecent&sheet='+encodeURIComponent(currentSheetTab)+'&n=10'),currentSheetTab==='Expenses'?fetch(cfg.scriptUrl+'?action=getSummary'):Promise.resolve(null)]);if(!recentRes.ok)throw new Error('HTTP '+recentRes.status);const rd=await recentRes.json();if(!rd.success)throw new Error(rd.error||'Script error');historyData=rd.rows||[];renderHistory();var sd=null;if(summaryRes&&summaryRes.ok){const s=await summaryRes.json();if(s.success){renderSummaryCard(s);sd=s;}}localStorage.setItem(cacheKey,JSON.stringify({rows:historyData,summary:sd,ts:Date.now()}));}catch(err){if(!historyData.length){list.innerHTML='<div class="history-empty"><div class="empty-icon">⚠️</div><div>Could not load</div><div style="font-size:11px;margin-top:4px;color:var(--muted)">'+err.message+'</div></div>';}else showToast('Refresh failed — showing cached data');}finally{refresh.classList.remove('spinning');}}
 function renderSummaryCard(d){const card=document.getElementById('summaryCard');card.style.display='block';const tm=d.thisMonth||0,lm=d.lastMonth||0,tw=d.thisWeek||0;document.getElementById('thisMonthAmt').textContent='₹'+tm.toLocaleString('en-IN');document.getElementById('thisWeekAmt').textContent='₹'+tw.toLocaleString('en-IN');document.getElementById('lastMonthAmt').textContent='₹'+lm.toLocaleString('en-IN');const delta=document.getElementById('summaryDelta');if(lm>0){const pct=Math.round(((tm-lm)/lm)*100);const less=pct<0;delta.textContent=(less?'▼ ':'▲ ')+Math.abs(pct)+'% '+(less?'less':'more');delta.className='summary-delta '+(less?'green':'red');}else{delta.textContent='First month!';delta.className='summary-delta green';}}
-function renderHistory(){const list=document.getElementById('historyList');if(!historyData.length){list.innerHTML='<div class="history-empty"><div class="empty-icon">📭</div><div>No entries yet in '+currentSheetTab+'</div></div>';return;}const isSh=currentSheetTab==='Shaadi';list.innerHTML=historyData.map((row,i)=>{var upd='';if(row.lastUpdated&&row.lastUpdated!==row.timestamp){upd='<div style="font-size:10px;color:var(--muted);font-family:\'JetBrains Mono\',monospace;margin-top:4px;">✏️ '+esc(row.lastUpdated)+'</div>';}return '<div class="history-card" onclick="openEdit('+i+')">'+'<div class="history-card-top"><div class="history-item">'+esc(row.item||'—')+'</div><div class="history-amount'+(isSh?' shaadi-amount':'')+'">'+( row.amount?'₹'+row.amount:'—')+'</div></div>'+'<div class="history-card-meta">'+'<span class="meta-chip">📅 '+esc(row.date||'—')+'</span>'+(row.shop?'<span class="meta-chip">🏪 '+esc(row.shop)+'</span>':'')+(row.category?'<span class="meta-chip cat-chip">'+esc(row.category)+'</span>':'')+(row.tag?'<span class="meta-chip tag-chip">🏷 '+esc(row.tag)+'</span>':'')+(row.loggedBy?'<span class="meta-chip">👤 '+esc(row.loggedBy)+'</span>':'')+'</div>'+(row.comment?'<div style="font-size:12px;color:var(--muted2);margin-top:6px;font-family:\'JetBrains Mono\',monospace">💬 '+esc(row.comment)+'</div>':'')+upd+'<div class="edit-hint">Tap to edit →</div></div>';}).join('');}
+function renderHistory(){const list=document.getElementById('historyList');if(!historyData.length){list.innerHTML='<div class="history-empty"><div class="empty-icon">📭</div><div>No entries yet in '+currentSheetTab+'</div></div>';return;}const isSh=currentSheetTab==='Shaadi';list.innerHTML=historyData.map((row,i)=>{return '<div class="history-card" onclick="openEdit('+i+')">'+'<div class="history-card-top"><div class="history-item">'+esc(row.item||'—')+'</div><div class="history-amount'+(isSh?' shaadi-amount':'')+'">'+( row.amount?'₹'+row.amount:'—')+'</div></div>'+'<div class="history-card-meta">'+'<span class="meta-chip">📅 '+esc(row.date||'—')+'</span>'+(row.loggedBy?'<span class="meta-chip">👤 '+esc(row.loggedBy)+'</span>':'')+'</div>'+'<div class="edit-hint">Tap to edit →</div></div>';}).join('');}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 let editingRow=null,editOriginalTag=null;
@@ -858,26 +862,20 @@ function closeEdit(){document.getElementById('editOverlay').classList.remove('sh
 function maybeCloseEdit(e){if(e.target===document.getElementById('editOverlay'))closeEdit();}
 async function saveEdit(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Script URL not set');return;}if(!editingRow)return;const dateVal=document.getElementById('editDate').value;const dateErr=validateDate(dateVal);if(dateErr){showToast('❌ '+dateErr);return;}const newTag=getEditTag();const tagChanged=newTag!==(editOriginalTag||'Regular');const btn=document.getElementById('saveEditBtn');btn.classList.add('loading');btn.disabled=true;try{if(tagChanged){const mp={action:'moveRow',rowNum:editingRow.rowNum,fromSheet:editingRow.sheetName,toSheet:newTag==='Shaadi'?'Shaadi':'Expenses',date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(mp)});historyData.splice(historyData.indexOf(editingRow),1);localStorage.removeItem(HISTORY_CACHE_KEY+'_'+editingRow.sheetName);localStorage.removeItem(HISTORY_CACHE_KEY+'_'+(newTag==='Shaadi'?'Shaadi':'Expenses'));renderHistory();closeEdit();showToast('Moved to '+mp.toSheet+' sheet ✓');}else{const upd={action:'updateRow',rowNum:editingRow.rowNum,sheetName:editingRow.sheetName,date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(upd)});Object.assign(editingRow,upd);localStorage.removeItem(HISTORY_CACHE_KEY+'_'+editingRow.sheetName);renderHistory();closeEdit();showToast('Entry updated ✓');}}catch(err){showToast('Failed — try again');}finally{btn.classList.remove('loading');btn.disabled=false;}}
 
-// Silent background history refresh — no spinners, no UI disruption
+// Silent background history refresh — updates both sheets in parallel, no spinners
 async function silentRefreshHistory(){
   const cfg=loadConfig();
   if(!cfg.scriptUrl)return;
   try{
-    const sheetToRefresh=currentSheetTab;
-    const[recentRes,summaryRes]=await Promise.all([
-      fetch(cfg.scriptUrl+'?action=getRecent&sheet='+encodeURIComponent(sheetToRefresh)+'&n=10'),
-      sheetToRefresh==='Expenses'?fetch(cfg.scriptUrl+'?action=getSummary'):Promise.resolve(null)
+    // Fetch both sheets + summary in parallel
+    const[expRes,shaRes,sumRes]=await Promise.all([
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Expenses&n=10'),
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Shaadi&n=10'),
+      fetch(cfg.scriptUrl+'?action=getSummary')
     ]);
-    if(!recentRes.ok)return;
-    const rd=await recentRes.json();
-    if(!rd.success)return;
-    historyData=rd.rows||[];
-    var sd=null;
-    if(summaryRes&&summaryRes.ok){const s=await summaryRes.json();if(s.success){sd=s;renderSummaryCard(s);}}
-    localStorage.setItem(HISTORY_CACHE_KEY+'_'+sheetToRefresh,JSON.stringify({rows:historyData,summary:sd,ts:Date.now()}));
-    // Only re-render the list if user is on history tab
-    if(document.getElementById('pageHistory').classList.contains('active'))renderHistory();
-  }catch(e){/* silent — don't bother user */}
+    if(expRes.ok){const d=await expRes.json();if(d.success){var sd=null;if(sumRes&&sumRes.ok){const s=await sumRes.json();if(s.success)sd=s;}localStorage.setItem(HISTORY_CACHE_KEY+'_Expenses',JSON.stringify({rows:d.rows||[],summary:sd,ts:Date.now()}));if(currentSheetTab==='Expenses'){historyData=d.rows||[];renderHistory();if(sd)renderSummaryCard(sd);}}}
+    if(shaRes.ok){const d=await shaRes.json();if(d.success){localStorage.setItem(HISTORY_CACHE_KEY+'_Shaadi',JSON.stringify({rows:d.rows||[],summary:null,ts:Date.now()}));if(currentSheetTab==='Shaadi'){historyData=d.rows||[];renderHistory();}}}
+  }catch(e){/* silent */}
 }
 
 // Recreate file input each time so the same file can be picked again
