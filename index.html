@@ -451,8 +451,6 @@ function toDateInput(str){
 function fromDateInput(val){if(!val)return '';const[y,m,d]=val.split('-');const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return d+' '+M[parseInt(m)-1]+' '+y;}
 function validateDate(val){if(!val)return 'Please select a date';if(val>TODAY_STR)return 'Future dates not allowed';return null;}
 
-function switchTab(tab){document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));const t=tab.charAt(0).toUpperCase()+tab.slice(1);document.getElementById('tab'+t).classList.add('active');document.getElementById('page'+t).classList.add('active');if(tab==='history')loadHistory();}
-
 let selectedTag=null;
 function toggleTag(el){const was=selectedTag===el.dataset.tag;document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=was?null:el.dataset.tag;if(!was)el.classList.add('active');updateSheetBadge();}
 function getTag(){return selectedTag||'';}
@@ -959,7 +957,14 @@ function switchTab(tab){
   const t=tab.charAt(0).toUpperCase()+tab.slice(1);
   document.getElementById('tab'+t).classList.add('active');
   document.getElementById('page'+t).classList.add('active');
-  if(tab==='history')loadHistory(true);
+  if(tab==='history'){
+    if(allRows.length>0){
+      // Data already loaded — just re-render with current filters, no reset
+      renderFilteredHistory();
+    } else {
+      loadHistory(true);
+    }
+  }
   if(tab==='summary')loadSummaryPage();
 }
 
@@ -1007,7 +1012,7 @@ async function loadHistory(reset){
   const cfg=loadConfig();
   if(!cfg.scriptUrl){showToast('Set up Script URL in settings first');return;}
   if(historyLoading)return;
-  if(reset){historyOffset=0;allRows=[];}
+  if(reset){historyOffset=0;allRows=[];displayLimit=20;}
   historyLoading=true;
   const list=document.getElementById('historyList');
   const refresh=document.getElementById('refreshBtn');
@@ -1015,8 +1020,8 @@ async function loadHistory(reset){
   if(reset&&!allRows.length){list.innerHTML=Array(3).fill(0).map(()=>'<div class="skeleton"><div class="skel-line w60"></div><div class="skel-line w40"></div></div>').join('');}
   try{
     const[expRes,shaRes]=await Promise.all([
-      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Expenses&n=10&offset='+historyOffset),
-      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Shaadi&n=10&offset='+historyOffset)
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Expenses&n=200&offset='+historyOffset),
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Shaadi&n=200&offset='+historyOffset)
     ]);
     var newRows=[];
     if(expRes.ok){const d=await expRes.json();if(d.success)(d.rows||[]).forEach(r=>{r._sheet='Expenses';newRows.push(r);});}
@@ -1032,7 +1037,9 @@ async function loadHistory(reset){
   }finally{historyLoading=false;refresh.classList.remove('spinning');}
 }
 
-function renderFilteredHistory(newCount){
+let displayLimit = 20; // how many rows to show at once in Recent
+
+function renderFilteredHistory(){
   const list=document.getElementById('historyList');
   const rows=getFilteredRows();
   const sub=document.getElementById('historySubtitle');
@@ -1041,8 +1048,9 @@ function renderFilteredHistory(newCount){
     sub.textContent='0 entries';
     return;
   }
+  const visible=rows.slice(0,displayLimit);
   sub.textContent=rows.length+' entr'+(rows.length===1?'y':'ies')+(filterType!=='all'||filterFrom||filterTo?' (filtered)':'');
-  var html=rows.map(function(row,i){
+  var html=visible.map(function(row,i){
     var isSh=(row.tag||'').toLowerCase()==='shaadi'||(row._sheet==='Shaadi');
     return '<div class="history-card'+(isSh?' shaadi-card':'')+'" onclick="openEdit('+i+')">'
       +'<div class="history-card-top">'
@@ -1057,13 +1065,28 @@ function renderFilteredHistory(newCount){
       +'<div class="edit-hint">Tap to edit →</div>'
       +'</div>';
   }).join('');
-  // Load more button
-  html+='<button class="load-more-btn" id="loadMoreBtn" onclick="loadHistory(false)">'
-    +'<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>'
-    +'Load 10 more</button>';
+  // Show load more if there are more rows to display OR more to fetch from server
+  const hasMoreDisplay = rows.length > displayLimit;
+  const hasMoreServer  = allRows.length >= historyOffset; // might be more on server
+  if(hasMoreDisplay || hasMoreServer){
+    html+='<button class="load-more-btn" id="loadMoreBtn" onclick="loadMore()">'
+      +'<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>'
+      +'Load more</button>';
+  }
   list.innerHTML=html;
-  // openEdit now uses filtered rows index → map back to allRows
-  list._filteredRows=rows;
+  list._filteredRows=visible; // openEdit uses this
+}
+
+function loadMore(){
+  const rows=getFilteredRows();
+  if(displayLimit < rows.length){
+    // More rows already in memory — just show more
+    displayLimit+=20;
+    renderFilteredHistory();
+  } else {
+    // Need to fetch more from server
+    loadHistory(false);
+  }
 }
 
 // ── Summary page ─────────────────────────────────────────
@@ -1100,23 +1123,21 @@ async function loadSummaryPage(){
 
 // Tap a month in Summary → jump to Recent with that month's date range pre-filtered
 function drillIntoMonth(monthKey) {
-  // monthKey is "YYYY-M" e.g. "2026-5"
   const [y, m] = monthKey.split('-').map(Number);
   const from = y + '-' + String(m).padStart(2, '0') + '-01';
-  // Last day of month
   const lastDay = new Date(y, m, 0).getDate();
   const to = y + '-' + String(m).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0');
-  // Apply type filter from summary to recent
+  // Set filter variables and input values BEFORE switching tab
+  filterFrom = from;
+  filterTo   = to;
+  document.getElementById('filterFrom').value = from;
+  document.getElementById('filterTo').value   = to;
+  // Carry type filter from summary across
   if (sumFilterType !== 'all') setTypeFilter(sumFilterType);
   else setTypeFilter('all');
-  // Set date range
-  document.getElementById('filterFrom').value = from;
-  document.getElementById('filterTo').value = to;
-  filterFrom = from;
-  filterTo = to;
-  // Switch to Recent tab and render
+  // Switch tab — loadHistory will fetch data then call renderFilteredHistory
+  // which will apply the already-set filterFrom/filterTo
   switchTab('history');
-  renderFilteredHistory();
 }
 
 function renderSummaryPage(){
@@ -1230,8 +1251,8 @@ async function silentRefreshHistory(){
   const cfg=loadConfig();if(!cfg.scriptUrl)return;
   try{
     const[expRes,shaRes]=await Promise.all([
-      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Expenses&n=10&offset=0'),
-      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Shaadi&n=10&offset=0')
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Expenses&n=200&offset=0'),
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet=Shaadi&n=200&offset=0')
     ]);
     var newRows=[];
     if(expRes.ok){const d=await expRes.json();if(d.success)(d.rows||[]).forEach(r=>{r._sheet='Expenses';newRows.push(r);});}
