@@ -435,7 +435,19 @@ function loadCatLearn(){try{return JSON.parse(localStorage.getItem(CAT_LEARN_KEY
 function saveCatOverride(item,shop,cat){const l=loadCatLearn();const kws=[];if(item)item.toLowerCase().split(/\s+/).forEach(w=>{if(w.length>2)kws.push(w);});if(shop)shop.toLowerCase().split(/\s+/).forEach(w=>{if(w.length>2)kws.push(w);});kws.forEach(kw=>{l[kw]=cat;});localStorage.setItem(CAT_LEARN_KEY,JSON.stringify(l));}
 function guessCategory(item,shop){const l=loadCatLearn();const kws=[];if(item)item.toLowerCase().split(/\s+/).forEach(w=>{if(w.length>2)kws.push(w);});if(shop)shop.toLowerCase().split(/\s+/).forEach(w=>{if(w.length>2)kws.push(w);});for(const kw of kws){if(l[kw])return l[kw];}return null;}
 
-function toDateInput(str){if(!str)return TODAY_STR;if(/^\d{4}-\d{2}-\d{2}$/.test(str))return str;const M={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};const m=str.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);if(m)return m[3]+'-'+(M[m[2]]||'01')+'-'+m[1].padStart(2,'0');const d=new Date(str);if(!isNaN(d))return d.toISOString().split('T')[0];return TODAY_STR;}
+function toDateInput(str){
+  if(!str)return TODAY_STR;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(str))return str;
+  const M={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+  // Handles "30 Apr 2026" and "Sat, 30 Apr 2026" (Code.gs formatDate includes day name)
+  const m=str.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
+  if(m)return m[3]+'-'+(M[m[2]]||'01')+'-'+m[1].padStart(2,'0');
+  // Last resort — use LOCAL date methods, NOT toISOString() which shifts to UTC
+  // In IST: new Date("Apr 30") midnight local = Apr 29 UTC → toISOString gives wrong date
+  const d=new Date(str);
+  if(!isNaN(d))return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return TODAY_STR;
+}
 function fromDateInput(val){if(!val)return '';const[y,m,d]=val.split('-');const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return d+' '+M[parseInt(m)-1]+' '+y;}
 function validateDate(val){if(!val)return 'Please select a date';if(val>TODAY_STR)return 'Future dates not allowed';return null;}
 
@@ -1137,7 +1149,7 @@ function renderSummaryPage(){
   var now=new Date(Date.now()+IST_OFFSET);
   var months=[];
   for(var mi=2;mi>=0;mi--){var d=new Date(now);d.setUTCMonth(now.getUTCMonth()-mi);months.push({year:d.getUTCFullYear(),month:d.getUTCMonth(),label:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]});}
-  function sumForMonth(rows,y,m){return rows.reduce(function(s,r){var rd=toDateInput(r.date);var dd=new Date(rd+'T00:00:00');if(dd.getUTCFullYear()===y&&dd.getUTCMonth()===m)s+=parseFloat(r.amount)||0;return s;},0);}
+  function sumForMonth(rows,y,m){return rows.reduce(function(s,r){var rd=toDateInput(r.date);var dd=new Date(rd+'T00:00:00');if(dd.getFullYear()===y&&dd.getMonth()===m)s+=parseFloat(r.amount)||0;return s;},0);}
   var bars=months.map(function(mn){
     var eAmt=useExp?sumForMonth(fExp,mn.year,mn.month):0;
     var sAmt=useSha?sumForMonth(fSha,mn.year,mn.month):0;
@@ -1158,7 +1170,7 @@ function renderSummaryPage(){
 
   // Monthly breakdown (all available months)
   var monthMap={};
-  function addToMap(rows,key){rows.forEach(function(r){var rd=toDateInput(r.date);var d=new Date(rd+'T00:00:00');var mk=d.getUTCFullYear()+'-'+(d.getUTCMonth()+1).toString().padStart(2,'0');if(!monthMap[mk])monthMap[mk]={exp:0,sha:0,label:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]+' '+d.getUTCFullYear()};monthMap[mk][key]+=parseFloat(r.amount)||0;});}
+  function addToMap(rows,key){rows.forEach(function(r){var rd=toDateInput(r.date);var d=new Date(rd+'T00:00:00');var mk=d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0');if(!monthMap[mk])monthMap[mk]={exp:0,sha:0,label:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]+' '+d.getFullYear()};monthMap[mk][key]+=parseFloat(r.amount)||0;});}
   if(useExp)addToMap(fExp,'exp');
   if(useSha)addToMap(fSha,'sha');
   var sortedMonths=Object.keys(monthMap).sort().reverse();
