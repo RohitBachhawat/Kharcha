@@ -1145,10 +1145,13 @@ function renderSummaryPage(){
   if(useSha)subParts.push('Shaadi: ₹'+Math.round(fSha.reduce((s,r)=>s+(parseFloat(r.amount)||0),0)).toLocaleString('en-IN'));
   document.getElementById('sumTotalSub').textContent=subParts.join(' · ');
 
-  // 3-month bar chart
-  var now=new Date(Date.now()+IST_OFFSET);
+  // 3-month bar chart — use real local now, local date methods throughout
+  var now=new Date();
   var months=[];
-  for(var mi=2;mi>=0;mi--){var d=new Date(now);d.setUTCMonth(now.getUTCMonth()-mi);months.push({year:d.getUTCFullYear(),month:d.getUTCMonth(),label:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]});}
+  for(var mi=2;mi>=0;mi--){
+    var d=new Date(now.getFullYear(),now.getMonth()-mi,1);
+    months.push({year:d.getFullYear(),month:d.getMonth(),label:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]});
+  }
   function sumForMonth(rows,y,m){return rows.reduce(function(s,r){var rd=toDateInput(r.date);var dd=new Date(rd+'T00:00:00');if(dd.getFullYear()===y&&dd.getMonth()===m)s+=parseFloat(r.amount)||0;return s;},0);}
   var bars=months.map(function(mn){
     var eAmt=useExp?sumForMonth(fExp,mn.year,mn.month):0;
