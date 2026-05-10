@@ -89,12 +89,15 @@
     .filter-pill{padding:6px 14px;border-radius:100px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted2);font-size:14px;font-weight:700;cursor:pointer;transition:all 0.15s;-webkit-tap-highlight-color:transparent;white-space:nowrap;}
     .filter-pill.active{border-color:var(--accent);color:var(--accent);background:var(--surface2);}
     .filter-pill.shaadi-active{border-color:var(--shaadi);color:var(--shaadi);background:var(--surface2);}
-    .filter-date-row{display:flex;gap:6px;padding:0 16px 10px;align-items:center;}
-    .filter-date-input{background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;flex:1;transition:border-color 0.2s;}
+    .filter-date-wrap{display:flex;flex-direction:column;gap:8px;padding:0 16px 10px;}
+    .filter-date-row{display:flex;gap:6px;align-items:center;}
+    .filter-date-actions{display:flex;gap:8px;}
+    .filter-date-input{background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:14px;outline:none;flex:1;transition:border-color 0.2s;min-width:0;}
     .filter-date-input:focus{border-color:var(--accent);}
-    .filter-date-sep{font-size:13px;color:var(--muted2);font-family:'JetBrains Mono',monospace;}
-    .filter-clear-btn{padding:8px 14px;border-radius:100px;border:1px solid var(--border);background:transparent;color:var(--muted2);font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;}
-    .filter-apply-btn{padding:8px 14px;border-radius:100px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;white-space:nowrap;}
+    .filter-date-sep{font-size:14px;color:var(--muted2);font-family:'JetBrains Mono',monospace;flex-shrink:0;}
+    .filter-clear-btn{flex:1;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--muted2);font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;text-align:center;}
+    .filter-apply-btn{flex:1;padding:10px 14px;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;text-align:center;transition:opacity 0.2s;}
+    .filter-apply-btn:disabled{opacity:0.35;cursor:not-allowed;}
     /* history list */
     .history-list{flex:1;overflow-y:auto;padding:0 16px 20px;display:flex;flex-direction:column;gap:8px;}
     .history-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:60px 20px;color:var(--muted2);font-size:13px;font-family:'JetBrains Mono',monospace;text-align:center;}
@@ -122,7 +125,6 @@
     .sum-filter-pill{flex:1;padding:9px 10px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface);color:var(--muted2);font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;text-align:center;transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
     .sum-filter-pill.active{background:var(--surface2);border-color:var(--accent);color:var(--accent);}
     .sum-filter-pill.shaadi-active{border-color:var(--shaadi);color:var(--shaadi);background:var(--surface2);}
-    .sum-date-row{display:flex;gap:6px;align-items:center;}
     .sum-block{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:16px;}
     .sum-block-label{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;}
     .sum-block-amount{font-size:34px;font-weight:800;letter-spacing:-1px;}
@@ -277,8 +279,8 @@
   <div class="page history-page" id="pageHistory">
     <div class="history-header">
       <div><div class="history-title">Recent Entries</div><div class="history-subtitle" id="historySubtitle">Last 10 entries</div></div>
-      <button class="refresh-btn" id="refreshBtn" onclick="loadHistory(true)">
-        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Refresh
+      <button class="refresh-btn" id="refreshBtn" onclick="loadHistory(true)" title="Refresh">
+        <svg width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
       </button>
     </div>
     <!-- Type filter -->
@@ -288,12 +290,16 @@
       <button class="filter-pill" id="fSha" onclick="setTypeFilter('shaadi')">💍 Shaadi</button>
     </div>
     <!-- Date range filter -->
-    <div class="filter-date-row">
-      <input class="filter-date-input" type="date" id="filterFrom" placeholder="From"/>
-      <span class="filter-date-sep">→</span>
-      <input class="filter-date-input" type="date" id="filterTo" placeholder="To"/>
-      <button class="filter-apply-btn" onclick="applyFilters()">Apply</button>
-      <button class="filter-clear-btn" onclick="clearFilters()">Clear</button>
+    <div class="filter-date-wrap">
+      <div class="filter-date-row">
+        <input class="filter-date-input" type="date" id="filterFrom" placeholder="From" onchange="checkApplyBtn()"/>
+        <span class="filter-date-sep">→</span>
+        <input class="filter-date-input" type="date" id="filterTo" placeholder="To" onchange="checkApplyBtn()"/>
+      </div>
+      <div class="filter-date-actions">
+        <button class="filter-apply-btn" id="filterApplyBtn" onclick="applyFilters()" disabled>Apply</button>
+        <button class="filter-clear-btn" onclick="clearFilters()">Clear</button>
+      </div>
     </div>
     <div class="history-list" id="historyList"></div>
   </div>
@@ -311,12 +317,16 @@
         <button class="sum-filter-pill" id="sfSha" onclick="setSumFilter('shaadi')">💍 Shaadi</button>
       </div>
       <!-- Date range -->
-      <div class="sum-date-row">
-        <input class="filter-date-input" type="date" id="sumFrom"/>
-        <span class="filter-date-sep">→</span>
-        <input class="filter-date-input" type="date" id="sumTo"/>
-        <button class="filter-apply-btn" onclick="renderSummaryPage()">Apply</button>
-        <button class="filter-clear-btn" onclick="clearSumFilters()">Clear</button>
+      <div class="filter-date-wrap">
+        <div class="filter-date-row">
+          <input class="filter-date-input" type="date" id="sumFrom" onchange="checkSumApplyBtn()"/>
+          <span class="filter-date-sep">→</span>
+          <input class="filter-date-input" type="date" id="sumTo" onchange="checkSumApplyBtn()"/>
+        </div>
+        <div class="filter-date-actions">
+          <button class="filter-apply-btn" id="sumApplyBtn" onclick="renderSummaryPage()" disabled>Apply</button>
+          <button class="filter-clear-btn" onclick="clearSumFilters()">Clear</button>
+        </div>
       </div>
       <!-- Total block -->
       <div class="sum-block">
@@ -950,6 +960,23 @@ async function confirmAndSave(){
 
 function resetAddForm(){const ta=document.getElementById('expenseInput');ta.value='';ta.dataset.imageParsed='';document.getElementById('charCount').textContent='500';document.getElementById('submitBtn').disabled=true;document.getElementById('hintCard').classList.remove('hidden');document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=null;updateSheetBadge();document.getElementById('uploadStatus').style.display='none';document.getElementById('attachBtn').classList.remove('has-file');}
 
+function checkApplyBtn(){
+  const from=document.getElementById('filterFrom').value;
+  const to=document.getElementById('filterTo').value;
+  document.getElementById('filterApplyBtn').disabled=!(from&&to);
+}
+function checkSumApplyBtn(){
+  const from=document.getElementById('sumFrom').value;
+  const to=document.getElementById('sumTo').value;
+  document.getElementById('sumApplyBtn').disabled=!(from&&to);
+}
+
+// ── Cache helpers ─────────────────────────────────────────
+const CACHE_TTL = 24*60*60*1000; // 1 day
+function saveCache(key, data){ try{ localStorage.setItem(key, JSON.stringify({data, ts:Date.now()})); }catch(e){} }
+function loadCache(key){ try{ const c=JSON.parse(localStorage.getItem(key)); if(c&&c.data) return c; }catch(e){} return null; }
+function isCacheValid(c){ return c && (Date.now()-c.ts) < CACHE_TTL; }
+
 // ── Tab switching ─────────────────────────────────────────
 function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
@@ -989,6 +1016,7 @@ function clearFilters(){
   filterFrom='';filterTo='';filterType='all';
   document.getElementById('filterFrom').value='';
   document.getElementById('filterTo').value='';
+  document.getElementById('filterApplyBtn').disabled=true;
   document.getElementById('fAll').className='filter-pill active';
   document.getElementById('fExp').className='filter-pill';
   document.getElementById('fSha').className='filter-pill';
@@ -1017,7 +1045,18 @@ async function loadHistory(reset){
   const list=document.getElementById('historyList');
   const refresh=document.getElementById('refreshBtn');
   refresh.classList.add('spinning');
-  if(reset&&!allRows.length){list.innerHTML=Array(3).fill(0).map(()=>'<div class="skeleton"><div class="skel-line w60"></div><div class="skel-line w40"></div></div>').join('');}
+
+  // ── Show cache instantly (stale-while-revalidate) ──
+  if(reset){
+    const cached=loadCache('kharcha_rows');
+    if(cached&&cached.data&&cached.data.length){
+      allRows=cached.data;
+      renderFilteredHistory();
+    } else {
+      list.innerHTML=Array(3).fill(0).map(()=>'<div class="skeleton"><div class="skel-line w60"></div><div class="skel-line w40"></div></div>').join('');
+    }
+  }
+
   try{
     const[expRes,shaRes]=await Promise.all([
       fetch(cfg.scriptUrl+'?action=getRecent&sheet=Expenses&n=200&offset='+historyOffset),
@@ -1026,14 +1065,14 @@ async function loadHistory(reset){
     var newRows=[];
     if(expRes.ok){const d=await expRes.json();if(d.success)(d.rows||[]).forEach(r=>{r._sheet='Expenses';newRows.push(r);});}
     if(shaRes.ok){const d=await shaRes.json();if(d.success)(d.rows||[]).forEach(r=>{r._sheet='Shaadi';newRows.push(r);});}
-    // Sort by date desc (newest first)
     newRows.sort(function(a,b){return toDateInput(b.date).localeCompare(toDateInput(a.date));});
     allRows=reset?newRows:allRows.concat(newRows);
-    historyOffset+=10;
-    renderFilteredHistory(newRows.length);
+    historyOffset+=200;
+    if(reset)saveCache('kharcha_rows',allRows);
+    renderFilteredHistory();
   }catch(err){
     if(!allRows.length)list.innerHTML='<div class="history-empty"><div class="empty-icon">⚠️</div><div>Could not load — '+err.message+'</div></div>';
-    else showToast('Refresh failed');
+    else showToast('Refresh failed — showing cached data');
   }finally{historyLoading=false;refresh.classList.remove('spinning');}
 }
 
@@ -1103,13 +1142,21 @@ function clearSumFilters(){
   sumFilterFrom='';sumFilterTo='';
   document.getElementById('sumFrom').value='';
   document.getElementById('sumTo').value='';
+  document.getElementById('sumApplyBtn').disabled=true;
   renderSummaryPage();
 }
 
 async function loadSummaryPage(){
   const cfg=loadConfig();
   if(!cfg.scriptUrl){showToast('Set up Script URL first');return;}
-  // Use already-fetched allRows if available, else fetch summary data separately
+
+  // ── Show cache instantly ──
+  const cached=loadCache('kharcha_summary');
+  if(cached&&cached.data){
+    summaryRawData=cached.data;
+    renderSummaryPage();
+  }
+
   try{
     const[expRes,shaRes]=await Promise.all([
       fetch(cfg.scriptUrl+'?action=getRecent&sheet=Expenses&n=200'),
@@ -1117,7 +1164,8 @@ async function loadSummaryPage(){
     ]);
     if(expRes.ok){const d=await expRes.json();if(d.success)summaryRawData.exp=d.rows||[];}
     if(shaRes.ok){const d=await shaRes.json();if(d.success)summaryRawData.sha=d.rows||[];}
-  }catch(e){/* use what we have */}
+    saveCache('kharcha_summary',summaryRawData);
+  }catch(e){/* use cached data */}
   renderSummaryPage();
 }
 
