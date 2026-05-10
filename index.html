@@ -220,7 +220,7 @@
       <div class="input-label">What did you spend on?</div>
       <textarea id="expenseInput" placeholder="e.g. chai 20 tapri or sabzi 120 kal" maxlength="500" autofocus></textarea>
       <div class="char-count" id="charCount">500</div>
-      <button class="attach-btn" id="attachBtn" onclick="document.getElementById('fileInput').click()" title="Upload bill or photo" type="button">
+      <button class="attach-btn" id="attachBtn" onclick="triggerFileInput()" title="Upload bill or photo" type="button">
         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
           <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66L9.41 17.41a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
         </svg>
@@ -230,7 +230,7 @@
       <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
       <span id="uploadStatusText">Reading file...</span>
     </div>
-    <input type="file" id="fileInput" accept="image/*,.pdf" onchange="handleFileUpload(event)" style="display:none;"/>
+    <input type="file" id="fileInput" accept="image/*,.pdf" style="display:none;"/>
     <div class="tags-section">
       <div class="tags-label">Tag this expense</div>
       <div class="tags-grid">
@@ -678,13 +678,23 @@ async function handleFileUpload(event){
       const arr=JSON.parse(raw);
       const items=Array.isArray(arr)?arr:[arr];
       statusEl.classList.remove('active');
-      statusText.textContent='Found '+items.length+' item(s) from '+file.name;
+      statusText.textContent='✓ '+items.length+' item(s) from '+file.name+' — review below, then Submit';
       attachBtn.classList.add('has-file');
-      document.getElementById('expenseInput').value=items.map(function(i){return (i.item||'')+' '+(i.amount||'');}).join(', ');
-      onType();
+      // Store parsed items keyed by line index for use at submit time
       parsedItems=items.map(function(item){var lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});
-      openReview(parsedItems);
-      setTimeout(function(){autoSetUpiCategory(document.getElementById('expenseInput').value);},100);
+      // Write one line per item into textarea so user can review/edit before submitting
+      var lines=items.map(function(item,i){
+        var parts=[];
+        if(item.item)parts.push(item.item);
+        if(item.amount)parts.push('₹'+item.amount);
+        if(item.shop)parts.push('@'+item.shop);
+        if(item.category)parts.push('['+item.category+']');
+        return parts.join(' · ');
+      });
+      document.getElementById('expenseInput').value=lines.join('\n');
+      // Mark textarea as image-sourced so Submit uses parsedItems directly
+      document.getElementById('expenseInput').dataset.imageParsed='1';
+      onType();
       return;
     }
   }catch(err){
@@ -709,12 +719,29 @@ async function submitExpense(){
   if(!text)return;
 
   const btn=document.getElementById('submitBtn');
+  const ta=document.getElementById('expenseInput');
+
+  // ── Image-sourced path: use stored parsedItems, apply textarea edits ──
+  if(ta.dataset.imageParsed==='1'&&parsedItems&&parsedItems.length>0){
+    // Re-apply any edits the user made in the textarea back onto parsedItems
+    const lines=text.split('\n').map(s=>s.trim()).filter(Boolean);
+    lines.forEach(function(line,i){
+      if(!parsedItems[i])return;
+      // Extract amount if user changed it — look for ₹number pattern
+      var amtMatch=line.match(/₹([\d\.\+\-\*\/]+)/);
+      if(amtMatch)parsedItems[i].amount=amtMatch[1];
+      // Extract item — everything before first ·
+      var parts=line.split('·').map(s=>s.trim());
+      if(parts[0])parsedItems[i].item=parts[0];
+    });
+    openReview(parsedItems);
+    return;
+  }
 
   // ── Fast path: try local parser first ──
   if(!needsGemini(text)){
     const local=localParse(text);
     if(local&&local.length>0){
-      // Instant — no spinner, no network
       parsedItems=local;
       openReview(parsedItems);
       return;
@@ -808,11 +835,13 @@ async function confirmAndSave(){
     rows.forEach(function(row,idx){setTimeout(function(){fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)});},idx*400);});
     showToast(rows.length>1?('✅ '+rows.length+' entries saving...'):'✅ Saved!',totalWait);
     setTimeout(function(){closeReview();resetAddForm();},totalWait);
+    // Silently refresh history in background after all saves have fired
+    setTimeout(function(){silentRefreshHistory();},totalWait+1500);
   }catch(err){showToast('Save failed — try again');}
   finally{btn.classList.remove('loading');btn.disabled=false;}
 }
 
-function resetAddForm(){document.getElementById('expenseInput').value='';document.getElementById('charCount').textContent='500';document.getElementById('submitBtn').disabled=true;document.getElementById('hintCard').classList.remove('hidden');document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=null;updateSheetBadge();document.getElementById('uploadStatus').style.display='none';document.getElementById('attachBtn').classList.remove('has-file');}
+function resetAddForm(){const ta=document.getElementById('expenseInput');ta.value='';ta.dataset.imageParsed='';document.getElementById('charCount').textContent='500';document.getElementById('submitBtn').disabled=true;document.getElementById('hintCard').classList.remove('hidden');document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=null;updateSheetBadge();document.getElementById('uploadStatus').style.display='none';document.getElementById('attachBtn').classList.remove('has-file');}
 
 let currentSheetTab='Expenses',historyData=[];
 function switchSheetTab(name){currentSheetTab=name;document.getElementById('sheetTabExpenses').classList.toggle('active',name==='Expenses');document.getElementById('sheetTabShaadi').classList.toggle('active',name==='Shaadi');loadHistory();}
@@ -828,6 +857,39 @@ function openEdit(index){const row=historyData[index];if(!row)return;editingRow=
 function closeEdit(){document.getElementById('editOverlay').classList.remove('show');editingRow=null;editOriginalTag=null;}
 function maybeCloseEdit(e){if(e.target===document.getElementById('editOverlay'))closeEdit();}
 async function saveEdit(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Script URL not set');return;}if(!editingRow)return;const dateVal=document.getElementById('editDate').value;const dateErr=validateDate(dateVal);if(dateErr){showToast('❌ '+dateErr);return;}const newTag=getEditTag();const tagChanged=newTag!==(editOriginalTag||'Regular');const btn=document.getElementById('saveEditBtn');btn.classList.add('loading');btn.disabled=true;try{if(tagChanged){const mp={action:'moveRow',rowNum:editingRow.rowNum,fromSheet:editingRow.sheetName,toSheet:newTag==='Shaadi'?'Shaadi':'Expenses',date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(mp)});historyData.splice(historyData.indexOf(editingRow),1);localStorage.removeItem(HISTORY_CACHE_KEY+'_'+editingRow.sheetName);localStorage.removeItem(HISTORY_CACHE_KEY+'_'+(newTag==='Shaadi'?'Shaadi':'Expenses'));renderHistory();closeEdit();showToast('Moved to '+mp.toSheet+' sheet ✓');}else{const upd={action:'updateRow',rowNum:editingRow.rowNum,sheetName:editingRow.sheetName,date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(upd)});Object.assign(editingRow,upd);localStorage.removeItem(HISTORY_CACHE_KEY+'_'+editingRow.sheetName);renderHistory();closeEdit();showToast('Entry updated ✓');}}catch(err){showToast('Failed — try again');}finally{btn.classList.remove('loading');btn.disabled=false;}}
+
+// Silent background history refresh — no spinners, no UI disruption
+async function silentRefreshHistory(){
+  const cfg=loadConfig();
+  if(!cfg.scriptUrl)return;
+  try{
+    const sheetToRefresh=currentSheetTab;
+    const[recentRes,summaryRes]=await Promise.all([
+      fetch(cfg.scriptUrl+'?action=getRecent&sheet='+encodeURIComponent(sheetToRefresh)+'&n=10'),
+      sheetToRefresh==='Expenses'?fetch(cfg.scriptUrl+'?action=getSummary'):Promise.resolve(null)
+    ]);
+    if(!recentRes.ok)return;
+    const rd=await recentRes.json();
+    if(!rd.success)return;
+    historyData=rd.rows||[];
+    var sd=null;
+    if(summaryRes&&summaryRes.ok){const s=await summaryRes.json();if(s.success){sd=s;renderSummaryCard(s);}}
+    localStorage.setItem(HISTORY_CACHE_KEY+'_'+sheetToRefresh,JSON.stringify({rows:historyData,summary:sd,ts:Date.now()}));
+    // Only re-render the list if user is on history tab
+    if(document.getElementById('pageHistory').classList.contains('active'))renderHistory();
+  }catch(e){/* silent — don't bother user */}
+}
+
+// Recreate file input each time so the same file can be picked again
+function triggerFileInput(){
+  var old=document.getElementById('fileInput');
+  if(old)old.remove();
+  var inp=document.createElement('input');
+  inp.type='file';inp.id='fileInput';inp.accept='image/*,.pdf';inp.style.display='none';
+  inp.addEventListener('change',handleFileUpload);
+  document.body.appendChild(inp);
+  inp.click();
+}
 
 let toastTimer=null;
 function showToast(msg,duration=2500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');if(toastTimer)clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),duration);}
