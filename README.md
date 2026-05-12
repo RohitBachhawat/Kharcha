@@ -86,7 +86,7 @@ kharcha/
 ### Step 2 — Deploy Apps Script
 
 1. Go to [script.google.com](https://script.google.com) and create a new project
-2. Delete the default code and paste the contents of `Code.gs`
+2. Delete the default code and paste the contents of `backend.gs`
 3. Replace `SHEET_ID` on line 4 with your Spreadsheet ID from Step 1
 4. Click **Deploy → New Deployment**
 5. Set type to **Web App**
