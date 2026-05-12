@@ -435,7 +435,24 @@ const ONLINE_KEYWORDS=/\b(upi|gpay|phonepe|paytm|card|debit|credit|online|neft|i
 const IST_OFFSET=5.5*60*60*1000;
 const TODAY_STR=new Date(Date.now()+IST_OFFSET).toISOString().split('T')[0];
 
-function loadConfig(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{};}catch{return{};}}
+// Replaced at deploy time by Vercel build command (see vercel.json).
+// If not replaced (local dev / manual hosting), app falls back to
+// whatever the user saves via the ⚙️ settings screen.
+const ENV_SCRIPT_URL='__SCRIPT_URL__';
+const ENV_GEMINI_KEY='__GEMINI_KEY__';
+
+function loadConfig(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(STORAGE_KEY))||{};
+    const envUrl=ENV_SCRIPT_URL&&!ENV_SCRIPT_URL.startsWith('__')?ENV_SCRIPT_URL:'';
+    const envKey=ENV_GEMINI_KEY&&!ENV_GEMINI_KEY.startsWith('__')?ENV_GEMINI_KEY:'';
+    return {
+      scriptUrl: envUrl||saved.scriptUrl||'',
+      apiKey:    envKey||saved.apiKey||'',
+      userName:  saved.userName||'',
+    };
+  }catch{return{};}
+}
 function saveConfig(){const cfg={scriptUrl:document.getElementById('scriptUrl').value.trim(),userName:document.getElementById('userName').value.trim(),apiKey:document.getElementById('apiKey').value.trim()};localStorage.setItem(STORAGE_KEY,JSON.stringify(cfg));closeConfig();showToast('Settings saved ✓');}
 function openConfig(){const cfg=loadConfig();document.getElementById('scriptUrl').value=cfg.scriptUrl||'';document.getElementById('userName').value=cfg.userName||'';document.getElementById('apiKey').value=cfg.apiKey||'';document.getElementById('configOverlay').classList.add('show');history.pushState({modal:'config'},'');}
 function closeConfig(){document.getElementById('configOverlay').classList.remove('show');}
