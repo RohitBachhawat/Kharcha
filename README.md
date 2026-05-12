@@ -2,8 +2,6 @@
 
 A privacy-first, AI-powered expense tracker built for Indian families. Log expenses in plain English or Hinglish, paste bank SMS, upload bills — Kharcha parses everything and saves it to your Google Sheet automatically.
 
-**Live Demo:** [kharcha.vercel.app](https://kharcha.vercel.app)
-
 ---
 
 ## Features
