@@ -56,7 +56,7 @@ Google Sheets (Expenses or Shaadi tab)
 ```
 kharcha/
 ├── index.html        # Entire frontend — single file app
-├── Code.gs           # Google Apps Script backend
+├── backend.gs           # Google Apps Script backend
 ├── vercel.json       # Vercel build config (injects env vars)
 ├── .env.example      # Reference for required environment variables
 └── README.md
