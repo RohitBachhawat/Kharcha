@@ -163,14 +163,6 @@ This is currently a solo project. Bug reports and suggestions are welcome via [G
 
 ---
 
-## License
-
-This project does not currently have a license. All rights reserved until one is chosen. If you'd like to use or adapt this project, please open an issue to discuss.
-
-> **Tip on choosing a license:** MIT lets anyone use, modify and distribute freely with attribution. If you're unsure, MIT is the most common choice for open source projects. You can add it by creating a `LICENSE` file with the MIT text and your name.
-
----
-
 ## Acknowledgements
 
 - [Google Gemini](https://aistudio.google.com) for the AI parsing backbone
