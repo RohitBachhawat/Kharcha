@@ -805,7 +805,7 @@ async function handleFileUpload(event){
       var lines=items.map(function(item,i){
         var parts=[];
         if(item.item)parts.push(item.item);
-        if(item.amount)parts.push('₹'+item.amount);
+        if(item.amount)parts.push('₹'+fmtAmt(item.amount));
         if(item.shop)parts.push('@'+item.shop);
         if(item.category)parts.push('['+item.category+']');
         return parts.join(' · ');
@@ -894,7 +894,7 @@ function renderReviewChips(items,mode){const container=document.getElementById('
 
 function buildChip(item,idx,total,chipTag){
   var label=total?('Item '+(idx+1)+' of '+total):'Review';
-  var amtDisplay=item.amount?('Rs.'+(calcAmount(String(item.amount))||item.amount)):'--';
+  var amtDisplay=item.amount?('Rs.'+fmtAmt(calcAmount(String(item.amount))||item.amount)):'--';
   var dateVal=toDateInput(item.date);
   var activeCat=item._localCat||item.category||'';
   var tag=chipTag||'Regular';
@@ -1111,7 +1111,7 @@ function renderFilteredHistory(){
     return '<div class="history-card'+(isSh?' shaadi-card':'')+'" onclick="openEdit('+i+')">'
       +'<div class="history-card-top">'
       +'<div class="history-item">'+esc(row.item||'—')+'</div>'
-      +'<div class="history-amount'+(isSh?' shaadi-amount':'')+'">'+( row.amount?'₹'+row.amount:'—')+'</div>'
+      +'<div class="history-amount'+(isSh?' shaadi-amount':'')+'">'+( row.amount?'₹'+fmtAmt(row.amount):'—')+'</div>'
       +'</div>'
       +'<div class="history-card-meta">'
       +'<span class="meta-chip">📅 '+esc(row.date||'—')+'</span>'
@@ -1279,6 +1279,8 @@ function renderSummaryPage(){
 
 let currentSheetTab='Expenses'; // kept for backward compat with any cached references
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// Indian-style comma grouping, e.g. 100000 -> 1,00,000 ; 1020 -> 1,020
+function fmtAmt(n){if(n===null||n===undefined||n==='')return '';const num=parseFloat(n);if(isNaN(num))return String(n);return num.toLocaleString('en-IN',{maximumFractionDigits:2});}
 
 let editingRow=null,editOriginalTag=null;
 function selectEditTag(tag){document.querySelectorAll('#editTagToggle .mini-tag-btn').forEach(b=>b.classList.remove('active'));document.querySelector('#editTagToggle [data-tag="'+tag+'"]').classList.add('active');const warn=document.getElementById('moveWarning');if(editOriginalTag&&tag!==editOriginalTag)warn.classList.add('show');else warn.classList.remove('show');}
