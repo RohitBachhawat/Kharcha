@@ -57,6 +57,7 @@ kharcha/
 ├── backend.gs           # Google Apps Script backend
 ├── vercel.json       # Vercel build config (injects env vars)
 ├── .env.example      # Reference for required environment variables
+├── tests/            # Offline logic tests (mocked Apps Script + DOM, no network needed)
 └── README.md
 ```
 
@@ -141,6 +142,21 @@ No build step, no `npm install`, no dependencies.
 | `GEMINI_KEY` | Yes | Gemini API key for AI parsing |
 
 See `.env.example` for reference.
+
+---
+
+## Testing
+
+The `tests/` folder has offline logic tests — no live Google Sheets, Drive, or Gemini calls,
+no dependencies, no build step:
+
+```bash
+node tests/test_backend.js    # backend.gs against a mocked Apps Script runtime
+node tests/test_frontend.js   # index.html's confirmAndSave() against a mocked DOM + fetch
+```
+
+See `tests/README.md` for exactly what's covered and what still needs a manual smoke test
+after deploying (real Drive uploads, Gemini parsing accuracy, UI/gestures).
 
 ---
 

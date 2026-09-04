@@ -7,8 +7,9 @@
 const SHEET_ID       = '1_oRggcTg8JBWik-q15-m7BfIH30kz4cTsIcipdjhYuo'; // ← replace this
 const SHEET_EXPENSES = 'Expenses';
 const SHEET_SHAADI   = 'Shaadi';
+const BILLS_FOLDER   = 'Kharcha Bills'; // Drive folder where confirmed bill photos are saved
 
-// Columns: Date, Item, Amount, Shop, Comment, Tag, Category, Logged By, Raw Text, Timestamp, Last Updated
+// Columns: Date, Item, Amount, Shop, Comment, Tag, Category, Logged By, Raw Text, Timestamp, Last Updated, Payment Mode, Additional Info
 
 // ══════════════════════════════════════════════════════════
 //  POST — add / update / move
@@ -56,6 +57,10 @@ function doPost(e) {
       sheet.getRange(rowNum, 9).setValue(data.rawText  || '');
       // Col 10 = Timestamp (keep original, don't touch)
       sheet.getRange(rowNum, 11).setValue(now.toLocaleString('en-IN'));
+      if (data.payMode !== undefined) sheet.getRange(rowNum, 12).setValue(data.payMode);
+      // Col 13 = Additional Info (bill photo link) — only touch if explicitly passed,
+      // so edits that don't mention it never wipe out an existing photo link.
+      if (data.additionalInfo !== undefined) sheet.getRange(rowNum, 13).setValue(data.additionalInfo);
       return ok({ action: 'updated', row: rowNum });
     }
 
@@ -65,10 +70,12 @@ function doPost(e) {
       const fromSheet = ss.getSheetByName(data.fromSheet);
       if (!fromSheet) throw new Error('Source sheet not found: ' + data.fromSheet);
 
-      // Read original timestamp before deleting
+      // Read original timestamp/payment mode/additional info before deleting
       const rowNum = parseInt(data.rowNum);
       if (isNaN(rowNum) || rowNum < 2) throw new Error('Invalid row: ' + data.rowNum);
-      const originalTs = fromSheet.getRange(rowNum, 10).getValue();
+      const originalTs             = fromSheet.getRange(rowNum, 10).getValue();
+      const originalPayMode        = fromSheet.getRange(rowNum, 12).getValue();
+      const originalAdditionalInfo = fromSheet.getRange(rowNum, 13).getValue();
 
       // Delete from source sheet
       fromSheet.deleteRow(rowNum);
@@ -95,7 +102,9 @@ function doPost(e) {
         data.loggedBy || '',
         data.rawText  || '',
         originalTs || now.toLocaleString('en-IN'), // preserve original timestamp
-        now.toLocaleString('en-IN')                // last updated = now
+        now.toLocaleString('en-IN'),                // last updated = now
+        data.payMode !== undefined ? data.payMode : (originalPayMode || 'Cash'),
+        data.additionalInfo !== undefined ? data.additionalInfo : (originalAdditionalInfo || '')
       ]);
 
       return ok({ action: 'moved', from: data.fromSheet, to: data.toSheet });
@@ -105,6 +114,14 @@ function doPost(e) {
     if (data.action === 'geminiVision') {
       const result = callGeminiVision(data.apiKey, data.mimeType || 'image/jpeg', data.base64Data);
       return ok({ result: result });
+    }
+
+    // ── Save a confirmed bill photo to Drive ──────────────
+    // Called only after the user reviews the parsed items and taps Confirm & Save —
+    // never on first upload. Returns the Drive URL to store in "Additional Info".
+    if (data.action === 'saveImage') {
+      const url = saveImageToDrive(data.base64Data, data.mimeType || 'image/jpeg', data.fileName);
+      return ok({ url: url });
     }
 
     // ── Add new row ──────────────────────────────────────
@@ -246,24 +263,26 @@ function getRecentRows(sheetName, n, offset) {
   const startRow = Math.max(2, endRow - n + 1);
   const numRows  = endRow - startRow + 1;
   if(numRows <= 0) return [];
-  const values   = sheet.getRange(startRow, 1, numRows, 11).getValues();
+  const values   = sheet.getRange(startRow, 1, numRows, 13).getValues();
   const rows = [];
   for (let i = values.length - 1; i >= 0; i--) {
     const v = values[i];
     rows.push({
-      rowNum:      startRow + i,
+      rowNum:         startRow + i,
       sheetName,
-      date:        formatDate(v[0]),
-      item:        String(v[1]  || ''),
-      amount:      v[2] !== '' ? v[2] : null,
-      shop:        String(v[3]  || ''),
-      comment:     String(v[4]  || ''),
-      tag:         String(v[5]  || ''),
-      category:    String(v[6]  || ''),
-      loggedBy:    String(v[7]  || ''),
-      rawText:     String(v[8]  || ''),
-      timestamp:   String(v[9]  || ''),
-      lastUpdated: String(v[10] || ''),
+      date:           formatDate(v[0]),
+      item:           String(v[1]  || ''),
+      amount:         v[2] !== '' ? v[2] : null,
+      shop:           String(v[3]  || ''),
+      comment:        String(v[4]  || ''),
+      tag:            String(v[5]  || ''),
+      category:       String(v[6]  || ''),
+      loggedBy:       String(v[7]  || ''),
+      rawText:        String(v[8]  || ''),
+      timestamp:      String(v[9]  || ''),
+      lastUpdated:    String(v[10] || ''),
+      payMode:        String(v[11] || ''),
+      additionalInfo: String(v[12] || ''),
     });
   }
   return rows;
@@ -305,7 +324,8 @@ function writeToSheet(data, sheetName) {
       data.rawText  || '',
       ts,
       ts,
-      data.payMode  || 'Cash'
+      data.payMode  || 'Cash',
+      data.additionalInfo || ''
     ]);
     return sheet.getLastRow();
   } finally {
@@ -315,14 +335,14 @@ function writeToSheet(data, sheetName) {
 
 function setupHeaders(sheet, sheetName) {
   if (!sheet) throw new Error('setupHeaders: sheet is null for ' + sheetName);
-  const headers = ['Date','Item','Amount (₹)','Shop','Comment','Tag','Category','Logged By','Raw Text','Timestamp','Last Updated','Payment Mode'];
+  const headers = ['Date','Item','Amount (₹)','Shop','Comment','Tag','Category','Logged By','Raw Text','Timestamp','Last Updated','Payment Mode','Additional Info'];
   sheet.appendRow(headers);
   const r = sheet.getRange(1, 1, 1, headers.length);
   if (sheetName === SHEET_SHAADI) { r.setBackground('#880E4F'); r.setFontColor('#FFD6EC'); }
   else { r.setBackground('#1B2A1B'); r.setFontColor('#7CFC00'); }
   r.setFontWeight('bold');
   sheet.setFrozenRows(1);
-  [100,220,100,150,220,100,110,100,240,160,160,110].forEach((w,i) => sheet.setColumnWidth(i+1, w));
+  [100,220,100,150,220,100,110,100,240,160,160,110,220].forEach((w,i) => sheet.setColumnWidth(i+1, w));
 }
 
 // ══════════════════════════════════════════════════════════
@@ -378,6 +398,29 @@ function callGeminiVision(apiKey, mimeType, base64Data) {
   if (code !== 200) throw new Error('Gemini Vision error ' + code + ': ' + body.substring(0, 300));
   const json = JSON.parse(body);
   return json.candidates[0].content.parts[0].text;
+}
+
+// ══════════════════════════════════════════════════════════
+//  DRIVE — save confirmed bill photo
+// ══════════════════════════════════════════════════════════
+// Only ever called once the user has reviewed the parsed items and
+// tapped "Confirm & Save" — the image is never touched before that.
+function saveImageToDrive(base64Data, mimeType, fileName) {
+  if (!base64Data) throw new Error('saveImageToDrive: no image data received');
+  const folder = getOrCreateBillsFolder();
+  const bytes  = Utilities.base64Decode(base64Data);
+  const blob   = Utilities.newBlob(bytes, mimeType, fileName || ('bill_' + new Date().getTime() + '.jpg'));
+  const file   = folder.createFile(blob);
+  // "Anyone with the link" so family members can open it even without Drive access
+  // to the owner's account — same trust model as the rest of this no-auth app.
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return file.getUrl();
+}
+
+function getOrCreateBillsFolder() {
+  const folders = DriveApp.getFoldersByName(BILLS_FOLDER);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(BILLS_FOLDER);
 }
 
 function ok(data)  { return ContentService.createTextOutput(JSON.stringify({ success: true,  ...data })).setMimeType(ContentService.MimeType.JSON); }
