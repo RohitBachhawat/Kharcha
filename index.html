@@ -975,21 +975,18 @@ async function confirmAndSave(){
       rows.push({date:fromDateInput(dateVal),item:itemVal,amount:amtCalc,shop:shopVal,comment:commentVal,category:catVal,payMode:payVal,tag:tagVal,loggedBy:loggedBy,rawText:rawText,sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses'});
     }
 
-    // Only now — after the user has reviewed and confirmed — save the bill photo to Drive.
-    // All rows from this one photo share the same Additional Info link.
+    // Only now — after the user has reviewed and confirmed — save the bill photo.
+    // Sent as ONE fire-and-forget request together with all its rows (same no-cors
+    // pattern as every other write in this app) so we never depend on reading a
+    // POST response back — that doesn't work reliably cross-origin with Apps Script,
+    // which is exactly why the row-saves below never try to read theirs either.
     if(isImageSourced){
-      try{
-        var imgRes=await fetch(cfg.scriptUrl,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'saveImage',base64Data:pendingImageBase64,mimeType:pendingImageMimeType,fileName:pendingImageFileName})});
-        var imgData=await imgRes.json();
-        if(imgData&&imgData.success&&imgData.url){
-          rows.forEach(function(r){r.additionalInfo=imgData.url;});
-        }else{
-          showToast('Saved, but photo link failed to save',3000);
-        }
-      }catch(imgErr){
-        // Non-fatal — the expense entries still save even if the photo upload fails.
-        showToast('Saved, but photo link failed to save',3000);
-      }
+      fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'addWithPhoto',rows:rows,base64Data:pendingImageBase64,mimeType:pendingImageMimeType,fileName:pendingImageFileName})});
+      var totalWait=900;
+      showToast(rows.length>1?('✅ '+rows.length+' entries saving...'):'✅ Saved!',totalWait);
+      setTimeout(function(){closeReview();resetAddForm();},totalWait);
+      setTimeout(function(){silentRefreshHistory();},totalWait+1500);
+      return;
     }
 
     var totalWait=rows.length*400+800;

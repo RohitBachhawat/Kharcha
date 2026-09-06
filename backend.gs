@@ -116,9 +116,34 @@ function doPost(e) {
       return ok({ result: result });
     }
 
-    // ── Save a confirmed bill photo to Drive ──────────────
-    // Called only after the user reviews the parsed items and taps Confirm & Save —
-    // never on first upload. Returns the Drive URL to store in "Additional Info".
+    // ── Save a confirmed bill photo + its row(s) in ONE fire-and-forget call ──
+    // Only ever sent after the user reviews the parsed items and taps Confirm & Save.
+    // Deliberately does everything server-side in a single request — this app's other
+    // writes all use no-cors fire-and-forget because Apps Script POST *responses*
+    // generally can't be read back cross-origin (even though the request itself runs
+    // fine). A separate "upload photo, read its URL, then save the row" round trip
+    // would silently lose the URL for exactly that reason. Doing it all here avoids
+    // ever needing to read a response.
+    if (data.action === 'addWithPhoto') {
+      let photoUrl = '';
+      try {
+        photoUrl = saveImageToDrive(data.base64Data, data.mimeType || 'image/jpeg', data.fileName);
+      } catch (imgErr) {
+        // Non-fatal — still save the expense rows even if the Drive upload fails.
+        Logger.log('addWithPhoto: image save failed, saving rows without a link: ' + imgErr.message);
+      }
+      const rowNums = (data.rows || []).map(function(rowData) {
+        rowData.additionalInfo = photoUrl;
+        const isShaadiRow  = (rowData.sheetName === 'Shaadi') || (rowData.tag && rowData.tag.toLowerCase() === 'shaadi');
+        const rowSheetName = isShaadiRow ? SHEET_SHAADI : SHEET_EXPENSES;
+        return writeToSheet(rowData, rowSheetName);
+      });
+      return ok({ action: 'addedWithPhoto', url: photoUrl, rows: rowNums });
+    }
+
+    // ── Save a bill photo to Drive on its own (kept for standalone/manual use;
+    //    the main app flow above no longer relies on this since it requires
+    //    reading the response back, which doesn't work reliably cross-origin) ──
     if (data.action === 'saveImage') {
       const url = saveImageToDrive(data.base64Data, data.mimeType || 'image/jpeg', data.fileName);
       return ok({ url: url });
@@ -425,6 +450,29 @@ function getOrCreateBillsFolder() {
 
 function ok(data)  { return ContentService.createTextOutput(JSON.stringify({ success: true,  ...data })).setMimeType(ContentService.MimeType.JSON); }
 function fail(msg) { return ContentService.createTextOutput(JSON.stringify({ success: false, error: msg })).setMimeType(ContentService.MimeType.JSON); }
+
+// ══════════════════════════════════════════════════════════
+//  ONE-TIME MIGRATION — run manually, once, from the Apps Script editor
+// ══════════════════════════════════════════════════════════
+// setupHeaders() only runs when a sheet is newly created, so any sheet
+// that already existed before "Additional Info" was added never got the
+// new header label written in — even though appended rows already carry
+// the 13th value. This backfills the header (and Payment Mode, in case
+// an even older sheet predates that too) without touching any data rows.
+// Safe to run multiple times — it's a no-op if headers are already correct.
+function migrateAddAdditionalInfoColumn() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  [SHEET_EXPENSES, SHEET_SHAADI].forEach(name => {
+    const sheet = ss.getSheetByName(name);
+    if (!sheet) { Logger.log('Sheet not found (nothing to migrate): ' + name); return; }
+    const header12 = sheet.getRange(1, 12).getValue();
+    const header13 = sheet.getRange(1, 13).getValue();
+    if (!header12) sheet.getRange(1, 12).setValue('Payment Mode');
+    if (!header13) sheet.getRange(1, 13).setValue('Additional Info');
+    sheet.setColumnWidth(13, 220);
+    Logger.log((header13 ? 'Already had' : 'Added') + ' Additional Info header on: ' + name);
+  });
+}
 
 // ══════════════════════════════════════════════════════════
 //  MANUAL TESTS — run from Apps Script editor

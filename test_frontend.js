@@ -7,6 +7,12 @@ const path = require('path');
 const vm = require('vm');
 const assert = require('assert');
 
+// The app fires several fetch() calls without awaiting or .catch()-ing them
+// (fire-and-forget writes) — that's fine in a browser (an unhandled rejection
+// just logs a console warning, it doesn't crash the tab), but Node terminates
+// the process on an unhandled rejection by default. Match browser behavior here.
+process.on('unhandledRejection', () => {});
+
 const INDEX_HTML_PATH = path.join(__dirname, '..', 'index.html');
 
 // Pulls the single inline <script>...</script> block out of index.html so
@@ -188,7 +194,7 @@ section('2. confirmAndSave() — text-only entry (no image)');
 }
 
 // ══════════════════════════════════════════════════════════
-section('3. confirmAndSave() — image-sourced single item, saveImage succeeds');
+section('3. confirmAndSave() — image-sourced single item sends ONE addWithPhoto request');
 {
   const elements = {};
   setInput(elements, 'expenseInput', '');
@@ -204,13 +210,7 @@ section('3. confirmAndSave() — image-sourced single item, saveImage succeeds')
 
   const { sandbox, fetchCalls } = buildSandbox({
     elements,
-    fetchImpl: async (url, opts) => {
-      const body = opts && opts.body ? JSON.parse(opts.body) : null;
-      if (body && body.action === 'saveImage') {
-        return { json: async () => ({ success: true, url: 'https://drive.google.com/file/d/abc123/view' }) };
-      }
-      return { json: async () => ({ success: true }) };
-    },
+    fetchImpl: async () => ({ json: async () => ({ success: true }) }), // no-cors: response is never read
   });
   sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', userName: 'RB' }));
   const expectedBase64 = Buffer.from('fake-image-bytes').toString('base64');
@@ -222,26 +222,30 @@ section('3. confirmAndSave() — image-sourced single item, saveImage succeeds')
     pendingImageFileName: ('bill.jpg'),
   });
 
-  await test('saveImage IS called exactly once for an image-sourced entry', async () => {
+  await test('Exactly one addWithPhoto call is made (silentRefreshHistory\'s later getRecent calls are separate and expected)', async () => {
     await sandbox.confirmAndSave();
-    const saveImageCalls = fetchCalls.filter(c => c.body && c.body.action === 'saveImage');
-    assert.strictEqual(saveImageCalls.length, 1);
-    assert.strictEqual(saveImageCalls[0].body.base64Data, expectedBase64);
-    assert.strictEqual(saveImageCalls[0].body.mimeType, 'image/jpeg');
+    const addWithPhotoCalls = fetchCalls.filter(c => c.body && c.body.action === 'addWithPhoto');
+    assert.strictEqual(addWithPhotoCalls.length, 1);
   });
-  await test('The saveImage request uses text/plain content-type (avoids CORS preflight)', () => {
-    const call = fetchCalls.find(c => c.body && c.body.action === 'saveImage');
-    assert.strictEqual(call.opts.headers['Content-Type'], 'text/plain;charset=utf-8');
+  await test('The request is sent with mode:no-cors — it never depends on reading a response back', () => {
+    const call = fetchCalls.find(c => c.body && c.body.action === 'addWithPhoto');
+    assert.strictEqual(call.opts.mode, 'no-cors');
   });
-  await test('The resulting row is saved WITH the returned Drive URL as additionalInfo', () => {
-    const rowCall = fetchCalls.find(c => c.body && c.body.item === 'Groceries');
-    assert.ok(rowCall);
-    assert.strictEqual(rowCall.body.additionalInfo, 'https://drive.google.com/file/d/abc123/view');
+  await test('The image bytes and the row data travel together in the same request', () => {
+    const body = fetchCalls.find(c => c.body && c.body.action === 'addWithPhoto').body;
+    assert.strictEqual(body.base64Data, expectedBase64);
+    assert.strictEqual(body.mimeType, 'image/jpeg');
+    assert.strictEqual(body.rows.length, 1);
+    assert.strictEqual(body.rows[0].item, 'Groceries');
+    assert.strictEqual(body.rows[0].amount, '500');
+    // additionalInfo is NOT set client-side anymore — the backend fills it in
+    // server-side, in the same request, once the Drive upload succeeds.
+    assert.strictEqual(body.rows[0].additionalInfo, undefined);
   });
 }
 
 // ══════════════════════════════════════════════════════════
-section('4. confirmAndSave() — multi-item bill: all rows share ONE photo link, ONE upload');
+section('4. confirmAndSave() — multi-item bill: still ONE request, ONE upload, for all items');
 {
   const elements = {};
   setInput(elements, 'expenseInput', '');
@@ -259,13 +263,7 @@ section('4. confirmAndSave() — multi-item bill: all rows share ONE photo link,
 
   const { sandbox, fetchCalls } = buildSandbox({
     elements,
-    fetchImpl: async (url, opts) => {
-      const body = opts && opts.body ? JSON.parse(opts.body) : null;
-      if (body && body.action === 'saveImage') {
-        return { json: async () => ({ success: true, url: 'https://drive.google.com/file/d/multi789/view' }) };
-      }
-      return { json: async () => ({ success: true }) };
-    },
+    fetchImpl: async () => ({ json: async () => ({ success: true }) }),
   });
   sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', userName: 'RB' }));
   sandbox.__setState({
@@ -276,20 +274,20 @@ section('4. confirmAndSave() — multi-item bill: all rows share ONE photo link,
     pendingImageFileName: ('grocery_bill.jpg'),
   });
 
-  await test('Exactly ONE saveImage call for a 3-item bill (no duplicate uploads)', async () => {
+  await test('A 3-item bill still results in exactly ONE addWithPhoto call (one upload, not three)', async () => {
     await sandbox.confirmAndSave();
-    const saveImageCalls = fetchCalls.filter(c => c.body && c.body.action === 'saveImage');
-    assert.strictEqual(saveImageCalls.length, 1);
+    const addWithPhotoCalls = fetchCalls.filter(c => c.body && c.body.action === 'addWithPhoto');
+    assert.strictEqual(addWithPhotoCalls.length, 1);
   });
-  await test('All 3 item rows carry the SAME Additional Info URL', () => {
-    const rowCalls = fetchCalls.filter(c => c.body && ['Milk', 'Bread', 'Eggs'].includes(c.body.item));
-    assert.strictEqual(rowCalls.length, 3);
-    rowCalls.forEach(c => assert.strictEqual(c.body.additionalInfo, 'https://drive.google.com/file/d/multi789/view'));
+  await test('All 3 items are bundled into that single request\'s rows array', () => {
+    const rows = fetchCalls.find(c => c.body && c.body.action === 'addWithPhoto').body.rows;
+    assert.strictEqual(rows.length, 3);
+    assert.deepStrictEqual(rows.map(r => r.item), ['Milk', 'Bread', 'Eggs']);
   });
 }
 
 // ══════════════════════════════════════════════════════════
-section('5. confirmAndSave() — saveImage FAILS: entries still save (non-fatal)');
+section('5. confirmAndSave() — image-sourced entries never try to read the response');
 {
   const elements = {};
   setInput(elements, 'expenseInput', '');
@@ -303,13 +301,12 @@ section('5. confirmAndSave() — saveImage FAILS: entries still save (non-fatal)
   setInput(elements, 'rv-amount-0', '75');
   setInput(elements, 'rv-pay-0', 'Cash');
 
+  // Simulate the real-world CORS behavior this bug was about: the request fires fine,
+  // but reading its response throws. Since confirmAndSave now fires no-cors and never
+  // awaits/reads a response for this path, this should have zero effect on the save.
   const { sandbox, fetchCalls } = buildSandbox({
     elements,
-    fetchImpl: async (url, opts) => {
-      const body = opts && opts.body ? JSON.parse(opts.body) : null;
-      if (body && body.action === 'saveImage') throw new Error('Network error');
-      return { json: async () => ({ success: true }) };
-    },
+    fetchImpl: async () => { throw new Error('simulated: response not readable cross-origin'); },
   });
   sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', userName: 'RB' }));
   sandbox.__setState({
@@ -320,13 +317,12 @@ section('5. confirmAndSave() — saveImage FAILS: entries still save (non-fatal)
     pendingImageFileName: ('x.jpg'),
   });
 
-  await test('confirmAndSave does NOT throw even when the image upload fails', async () => {
+  await test('confirmAndSave does NOT throw even if the fetch promise itself rejects', async () => {
     await assert.doesNotReject(sandbox.confirmAndSave());
   });
-  await test('The expense row is still saved despite the failed image upload', () => {
-    const rowCall = fetchCalls.find(c => c.body && c.body.item === 'Snacks');
-    assert.ok(rowCall, 'row should have been saved anyway');
-    assert.strictEqual(rowCall.body.additionalInfo, undefined); // no link attached since upload failed
+  await test('The addWithPhoto request was still sent (fire-and-forget — a rejected promise is fine)', () => {
+    const addWithPhotoCalls = fetchCalls.filter(c => c.body && c.body.action === 'addWithPhoto');
+    assert.strictEqual(addWithPhotoCalls.length, 1);
   });
 }
 

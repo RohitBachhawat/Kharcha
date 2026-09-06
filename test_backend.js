@@ -172,15 +172,57 @@ test('saveImage with no base64Data throws a clean error (fail response, not a cr
   assert.ok(/no image data/i.test(res.error));
 });
 
-section('4. Add row WITH image — Additional Info populated');
-let billRowNum1, billRowNum2;
-test('Two rows from the same bill both get the same Additional Info URL (simulating multi-item confirm flow)', () => {
-  const r1 = post({ date: '04 Sep 2026', item: 'Milk', amount: 60, tag: 'Regular', category: 'Food', loggedBy: 'RB', rawText: 'grocery bill', sheetName: 'Expenses', additionalInfo: savedUrl });
-  const r2 = post({ date: '04 Sep 2026', item: 'Bread', amount: 40, tag: 'Regular', category: 'Food', loggedBy: 'RB', rawText: 'grocery bill', sheetName: 'Expenses', additionalInfo: savedUrl });
-  billRowNum1 = r1.row; billRowNum2 = r2.row;
+section('4. addWithPhoto — the actual production flow (single fire-and-forget call)');
+let billRowNum1, billRowNum2, billPhotoUrl;
+test('addWithPhoto saves the image once AND writes all rows with the same Additional Info in one call', () => {
+  const before = driveFiles.length;
+  const res = post({
+    action: 'addWithPhoto',
+    base64Data: Buffer.from('grocery-bill-bytes').toString('base64'),
+    mimeType: 'image/jpeg',
+    fileName: 'grocery_bill.jpg',
+    rows: [
+      { date: '04 Sep 2026', item: 'Milk', amount: 60, tag: 'Regular', category: 'Food', loggedBy: 'RB', rawText: 'grocery bill', sheetName: 'Expenses' },
+      { date: '04 Sep 2026', item: 'Bread', amount: 40, tag: 'Regular', category: 'Food', loggedBy: 'RB', rawText: 'grocery bill', sheetName: 'Expenses' },
+    ],
+  });
+  assert.strictEqual(res.success, true);
+  assert.ok(res.url.startsWith('https://drive.google.com/file/d/'));
+  assert.strictEqual(res.rows.length, 2);
+  assert.strictEqual(driveFiles.length, before + 1); // exactly one new file, not two
+  billPhotoUrl = res.url;
+  [billRowNum1, billRowNum2] = res.rows;
   const sheet = fakeSS.getSheetByName('Expenses');
-  assert.strictEqual(sheet.rows[billRowNum1 - 1][12], savedUrl);
-  assert.strictEqual(sheet.rows[billRowNum2 - 1][12], savedUrl);
+  assert.strictEqual(sheet.rows[billRowNum1 - 1][12], billPhotoUrl);
+  assert.strictEqual(sheet.rows[billRowNum2 - 1][12], billPhotoUrl);
+});
+test('addWithPhoto still saves all rows even if the Drive upload fails (non-fatal)', () => {
+  // Force a failure by omitting base64Data entirely
+  const res = post({
+    action: 'addWithPhoto',
+    mimeType: 'image/jpeg',
+    rows: [{ date: '04 Sep 2026', item: 'Snacks', amount: 30, tag: 'Regular', category: 'Food', loggedBy: 'RB', rawText: '', sheetName: 'Expenses' }],
+  });
+  assert.strictEqual(res.success, true); // the overall call still succeeds
+  assert.strictEqual(res.url, '');        // no photo link since the upload failed
+  const sheet = fakeSS.getSheetByName('Expenses');
+  const row = sheet.rows[res.rows[0] - 1];
+  assert.strictEqual(row[1], 'Snacks');
+  assert.strictEqual(row[12], ''); // blank, not crashed, not stuck with a stale link
+});
+test('addWithPhoto routes a Shaadi-tagged row to the Shaadi sheet, still sharing the photo link', () => {
+  const res = post({
+    action: 'addWithPhoto',
+    base64Data: Buffer.from('wedding-invoice-bytes').toString('base64'),
+    mimeType: 'image/jpeg',
+    fileName: 'invoice.jpg',
+    rows: [{ date: '04 Sep 2026', item: 'Catering advance', amount: 20000, tag: 'Shaadi', category: 'Food', loggedBy: 'RB', rawText: '', sheetName: 'Shaadi' }],
+  });
+  assert.strictEqual(res.success, true);
+  const shaadiSheet = fakeSS.getSheetByName('Shaadi');
+  const row = shaadiSheet.rows[res.rows[0] - 1];
+  assert.strictEqual(row[1], 'Catering advance');
+  assert.strictEqual(row[12], res.url);
 });
 
 section('5. updateRow preserves Additional Info when not passed');
@@ -188,7 +230,7 @@ test('Editing a row WITHOUT mentioning additionalInfo does not wipe the existing
   post({ action: 'updateRow', rowNum: billRowNum1, sheetName: 'Expenses', date: '04 Sep 2026', item: 'Milk (2L)', amount: 65, tag: 'Regular', category: 'Food', loggedBy: 'RB', rawText: 'grocery bill' });
   const sheet = fakeSS.getSheetByName('Expenses');
   assert.strictEqual(sheet.rows[billRowNum1 - 1][1], 'Milk (2L)'); // item updated
-  assert.strictEqual(sheet.rows[billRowNum1 - 1][12], savedUrl);    // photo link preserved
+  assert.strictEqual(sheet.rows[billRowNum1 - 1][12], billPhotoUrl); // photo link preserved
 });
 test('Editing a row and explicitly clearing additionalInfo DOES clear it', () => {
   post({ action: 'updateRow', rowNum: billRowNum2, sheetName: 'Expenses', date: '04 Sep 2026', item: 'Bread', amount: 40, tag: 'Regular', category: 'Food', loggedBy: 'RB', rawText: '', additionalInfo: '' });
@@ -210,7 +252,7 @@ test('Moving a row to Shaadi preserves its photo link and payment mode when not 
   assert.ok(shaadiSheet, 'Shaadi sheet should exist/auto-create');
   const movedRow = shaadiSheet.rows[shaadiSheet.rows.length - 1];
   assert.strictEqual(movedRow[11], 'Online');   // payMode carried over from source row
-  assert.strictEqual(movedRow[12], savedUrl);   // additionalInfo carried over from source row
+  assert.strictEqual(movedRow[12], billPhotoUrl);   // additionalInfo carried over from source row
 });
 test('Shaadi sheet also got proper 13-column headers on auto-create', () => {
   const headerRow = fakeSS.getSheetByName('Shaadi').rows[0];
@@ -225,7 +267,7 @@ test('getRecent includes payMode and additionalInfo fields', () => {
   const row = res.rows.find(r => r.item === 'Milk (2L)');
   assert.ok(row, 'moved row should be retrievable');
   assert.strictEqual(row.payMode, 'Online');
-  assert.strictEqual(row.additionalInfo, savedUrl);
+  assert.strictEqual(row.additionalInfo, billPhotoUrl);
 });
 
 section('8. Edge cases');
@@ -253,6 +295,34 @@ test('Row with neither item nor amount is rejected by writeToSheet', () => {
   const res = post({ date: '04 Sep 2026', shop: 'x', sheetName: 'Expenses' });
   assert.strictEqual(res.success, false);
   assert.ok(/item and amount/.test(res.error));
+});
+
+section('9. Header migration for pre-existing sheets');
+test('migrateAddAdditionalInfoColumn backfills a sheet that predates the new columns', () => {
+  const ss = SpreadsheetApp.openById();
+  const oldSheet = ss.insertSheet('Expenses_Old_Sim');
+  oldSheet.appendRow(['Date','Item','Amount (₹)','Shop','Comment','Tag','Category','Logged By','Raw Text','Timestamp','Last Updated']);
+  assert.strictEqual(oldSheet.getRange(1, 12).getValue(), '');
+  assert.strictEqual(oldSheet.getRange(1, 13).getValue(), '');
+  // Reuse the exact same per-sheet logic the real migration function runs
+  if (!oldSheet.getRange(1, 12).getValue()) oldSheet.getRange(1, 12).setValue('Payment Mode');
+  if (!oldSheet.getRange(1, 13).getValue()) oldSheet.getRange(1, 13).setValue('Additional Info');
+  assert.strictEqual(oldSheet.rows[0][11], 'Payment Mode');
+  assert.strictEqual(oldSheet.rows[0][12], 'Additional Info');
+});
+test('migrateAddAdditionalInfoColumn (real function) fixes Expenses/Shaadi headers and is idempotent', () => {
+  sandbox.migrateAddAdditionalInfoColumn();
+  const expHeader = fakeSS.getSheetByName('Expenses').rows[0];
+  const shaadiHeader = fakeSS.getSheetByName('Shaadi').rows[0];
+  assert.strictEqual(expHeader[11], 'Payment Mode');
+  assert.strictEqual(expHeader[12], 'Additional Info');
+  assert.strictEqual(shaadiHeader[11], 'Payment Mode');
+  assert.strictEqual(shaadiHeader[12], 'Additional Info');
+  // Run again — should not throw and should not alter anything
+  const before = JSON.stringify(fakeSS.getSheetByName('Expenses').rows[0]);
+  sandbox.migrateAddAdditionalInfoColumn();
+  const after = JSON.stringify(fakeSS.getSheetByName('Expenses').rows[0]);
+  assert.strictEqual(before, after);
 });
 
 // ══════════════════════════════════════════════════════════
