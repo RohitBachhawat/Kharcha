@@ -287,41 +287,98 @@ section('4. confirmAndSave() — multi-item bill: still ONE request, ONE upload,
 }
 
 // ══════════════════════════════════════════════════════════
-section('5. confirmAndSave() — image-sourced entries never try to read the response');
+section('5. confirmAndSave() — addWithPhoto is now AWAITED (mobile-reliability fix)');
 {
-  const elements = {};
-  setInput(elements, 'expenseInput', '');
-  elements['expenseInput'].dataset.imageParsed = '1';
-  setInput(elements, 'rv-date-0', '2026-09-04');
-  setInput(elements, 'rv-cat-0', 'Food');
-  setInput(elements, 'rv-tag-0', 'Regular');
-  setInput(elements, 'rv-item-0', 'Snacks');
-  setInput(elements, 'rv-shop-0', 'Shop');
-  setInput(elements, 'rv-comment-0', '');
-  setInput(elements, 'rv-amount-0', '75');
-  setInput(elements, 'rv-pay-0', 'Cash');
+  // This section exists because of a real bug: on mobile, a large photo payload sent
+  // fire-and-forget could get silently dropped if the tab backgrounded before the
+  // slow upload finished. The fix is to await the request before declaring success.
+  function makeElements() {
+    const elements = {};
+    setInput(elements, 'expenseInput', '');
+    elements['expenseInput'].dataset.imageParsed = '1';
+    setInput(elements, 'rv-date-0', '2026-09-04');
+    setInput(elements, 'rv-cat-0', 'Food');
+    setInput(elements, 'rv-tag-0', 'Regular');
+    setInput(elements, 'rv-item-0', 'Snacks');
+    setInput(elements, 'rv-shop-0', 'Shop');
+    setInput(elements, 'rv-comment-0', '');
+    setInput(elements, 'rv-amount-0', '75');
+    setInput(elements, 'rv-pay-0', 'Cash');
+    return elements;
+  }
+  function setImageState(sandbox) {
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', userName: 'RB' }));
+    sandbox.__setState({
+      parsedItems: ([{ category: 'Food' }]),
+      multiMode: ('separate'),
+      pendingImageBase64: (Buffer.from('bytes').toString('base64')),
+      pendingImageMimeType: ('image/jpeg'),
+      pendingImageFileName: ('x.jpg'),
+    });
+  }
 
-  // Simulate the real-world CORS behavior this bug was about: the request fires fine,
-  // but reading its response throws. Since confirmAndSave now fires no-cors and never
-  // awaits/reads a response for this path, this should have zero effect on the save.
-  const { sandbox, fetchCalls } = buildSandbox({
-    elements,
-    fetchImpl: async () => { throw new Error('simulated: response not readable cross-origin'); },
+  // ---- Success case: confirmAndSave genuinely waits for the request to resolve ----
+  let resolveFetch;
+  const pendingFetch = new Promise(res => { resolveFetch = res; });
+  let resolvedBeforeFormReset = null;
+  const elementsOk = makeElements();
+  const { sandbox: sandboxOk, fetchCalls: callsOk } = buildSandbox({
+    elements: elementsOk,
+    fetchImpl: async () => pendingFetch, // stays pending until we manually resolve it below
   });
-  sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', userName: 'RB' }));
-  sandbox.__setState({
-    parsedItems: ([{ category: 'Food' }]),
-    multiMode: ('separate'),
-    pendingImageBase64: (Buffer.from('bytes').toString('base64')),
-    pendingImageMimeType: ('image/jpeg'),
-    pendingImageFileName: ('x.jpg'),
+  setImageState(sandboxOk);
+  // Override resetAddForm to record whether the fetch had already resolved by the time it runs
+  const originalReset = sandboxOk.resetAddForm;
+  sandboxOk.resetAddForm = function () { resolvedBeforeFormReset = true; return originalReset(); };
+
+  await test('confirmAndSave does not reset the form until the addWithPhoto fetch actually resolves', async () => {
+    const savePromise = sandboxOk.confirmAndSave();
+    // At this point the fetch is still pending — form should NOT have reset yet
+    assert.strictEqual(resolvedBeforeFormReset, null);
+    resolveFetch({}); // now let the network "response" arrive
+    await savePromise;
+    assert.strictEqual(resolvedBeforeFormReset, true);
+    assert.strictEqual(callsOk.filter(c => c.body && c.body.action === 'addWithPhoto').length, 1);
   });
 
-  await test('confirmAndSave does NOT throw even if the fetch promise itself rejects', async () => {
-    await assert.doesNotReject(sandbox.confirmAndSave());
+  // ---- Progress indicator: a spinner+message must be visible WHILE the request is pending ----
+  let resolveFetch2;
+  const pendingFetch2 = new Promise(res => { resolveFetch2 = res; });
+  const elementsProgress = makeElements();
+  const { sandbox: sandboxProgress } = buildSandbox({
+    elements: elementsProgress,
+    fetchImpl: async () => pendingFetch2,
   });
-  await test('The addWithPhoto request was still sent (fire-and-forget — a rejected promise is fine)', () => {
-    const addWithPhotoCalls = fetchCalls.filter(c => c.body && c.body.action === 'addWithPhoto');
+  setImageState(sandboxProgress);
+
+  await test('A spinner + "Saving..." message shows on the toast WHILE the upload is still in flight', async () => {
+    const savePromise = sandboxProgress.confirmAndSave();
+    // Still pending — check the toast NOW, before resolving anything
+    const toastHtml = elementsProgress['toast'].innerHTML;
+    assert.match(toastHtml, /toast-spinner/);
+    assert.match(toastHtml, /Saving/);
+    resolveFetch2({});
+    await savePromise;
+    // After completion, the spinner is gone and the toast shows the real result
+    assert.doesNotMatch(elementsProgress['toast'].innerHTML, /toast-spinner/);
+  });
+
+  // ---- Failure case: a genuinely rejected fetch now surfaces as a real failure, not a false "Saved!" ----
+  const elementsFail = makeElements();
+  const { sandbox: sandboxFail, fetchCalls: callsFail } = buildSandbox({
+    elements: elementsFail,
+    fetchImpl: async () => { throw new Error('simulated: mobile dropped the connection mid-upload'); },
+  });
+  setImageState(sandboxFail);
+
+  await test('confirmAndSave does NOT throw when the network request genuinely fails', async () => {
+    await assert.doesNotReject(sandboxFail.confirmAndSave());
+  });
+  await test('A real send failure shows a failure toast rather than a false "Saved!"', () => {
+    assert.match(elementsFail['toast'].textContent, /failed/i);
+  });
+  await test('The request was attempted (so this is a real send failure, not a silent no-op)', () => {
+    const addWithPhotoCalls = callsFail.filter(c => c.body && c.body.action === 'addWithPhoto');
     assert.strictEqual(addWithPhotoCalls.length, 1);
   });
 }
