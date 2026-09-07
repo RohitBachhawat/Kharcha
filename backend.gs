@@ -4,7 +4,7 @@
 //  Execute as: Me | Who has access: Anyone
 // ══════════════════════════════════════════════════════════
 
-const SHEET_ID       = '1_oRggcTg8JBWik-q15-m7BfIH30kz4cTsIcipdjhYuo'; // ← replace this
+const SHEET_ID       = '1lKgkFTlcs8ZHXDzPAtfm3yW8SKSTMqZras7kygqmBwk'; // ← replace this
 const SHEET_EXPENSES = 'Expenses';
 const SHEET_SHAADI   = 'Shaadi';
 const BILLS_FOLDER   = 'Kharcha Bills'; // Drive folder where confirmed bill photos are saved
