@@ -364,6 +364,7 @@
         <button class="multi-btn" id="btnMerge" onclick="setMultiMode('merge')">Merge into One</button>
       </div>
     </div>
+    <div id="totalMismatchWarning" style="display:none;background:rgba(255,159,10,0.12);border:1px solid rgba(255,159,10,0.4);color:#ff9f0a;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;line-height:1.4;"></div>
     <div class="review-items" id="reviewItems"></div>
     <div class="review-actions">
       <button class="btn-cancel-review" onclick="closeReview()">Cancel</button>
@@ -789,7 +790,7 @@ async function handleFileUpload(event){
     pendingImageMimeType=file.type||'image/jpeg';
     pendingImageFileName=file.name||('bill_'+Date.now()+'.jpg');
     statusText.textContent='Reading bill...';
-    const prompt='Extract ALL expense items from this bill/receipt/passbook image. Return ONLY a valid JSON array, no markdown. Format: [{"date":"DD Mon YYYY or today","item":"English description","amount":number_or_null,"shop":"merchant or null","comment":"note or null","category":"Food|Transport|Shopping|Utilities|Health|Entertainment|Other|null"}]. Multiple items = multiple objects. ONLY JSON array.';
+    const prompt='Extract ALL expense items from this bill/receipt/passbook image. Return ONLY valid JSON, no markdown. Format: {"items":[{"date":"DD Mon YYYY or today","item":"English description","amount":number_or_null,"shop":"merchant or null","comment":"note or null","category":"Food|Transport|Shopping|Utilities|Health|Entertainment|Other|null"}],"receiptTotal":number_or_null}. Multiple items = multiple objects in "items". "receiptTotal" is the final grand total printed/written on the bill itself (e.g. next to "Total"/"Grand Total", or the last underlined number) — set it to null if you cannot find one, and prefer the FINAL total if the paper shows a correction or a crossed-out total replaced by a new one. ONLY the JSON object, nothing else.';
     const MAX_RETRIES=3;
     for(var attempt=1;attempt<=MAX_RETRIES;attempt++){
       let res;
@@ -799,8 +800,13 @@ async function handleFileUpload(event){
       if(!res.ok){const eb=await res.json().catch(()=>({}));throw new Error('Vision error '+res.status+': '+(eb&&eb.error?eb.error.message:'Unknown'));}
       const data=await res.json();
       const raw=(data.candidates[0].content.parts[0].text||'').replace(/```json|```/g,'').trim();
-      const arr=JSON.parse(raw);
-      const items=Array.isArray(arr)?arr:[arr];
+      const parsed=JSON.parse(raw);
+      // Backward/defensive compatible: accept {items,receiptTotal}, a bare array, or a single object.
+      let items,receiptTotal=null;
+      if(parsed&&Array.isArray(parsed.items)){items=parsed.items;receiptTotal=typeof parsed.receiptTotal==='number'?parsed.receiptTotal:null;}
+      else if(Array.isArray(parsed)){items=parsed;}
+      else{items=[parsed];}
+      pendingReceiptTotal=receiptTotal;
       statusEl.classList.remove('active');
       statusText.textContent='✓ '+items.length+' item(s) from '+file.name+' — review below, then Submit';
       attachBtn.classList.add('has-file');
@@ -825,7 +831,7 @@ async function handleFileUpload(event){
     statusEl.classList.remove('active');
     statusText.textContent='Failed: '+err.message;
     showToast('Upload failed: '+err.message,4000);
-    pendingImageBase64=null;pendingImageMimeType=null;pendingImageFileName=null;
+    pendingImageBase64=null;pendingImageMimeType=null;pendingImageFileName=null;pendingReceiptTotal=null;
   }
   event.target.value='';
 }
@@ -836,6 +842,9 @@ let parsedItems=[],multiMode='separate';
 // Holds the compressed bill photo from upload through Gemini parsing.
 // Never sent to the backend until the user taps Confirm & Save.
 let pendingImageBase64=null,pendingImageMimeType=null,pendingImageFileName=null;
+// The receipt's own printed/handwritten grand total, if Gemini could read one —
+// used to warn the user when the sum of parsed line items doesn't match it.
+let pendingReceiptTotal=null;
 
 /* ═══════════════════════════════════════════════════════
    OPTIMISED submitExpense — local-first, Gemini fallback
@@ -895,7 +904,21 @@ async function submitExpense(){
 }
 
 var reviewChipTags={};
-function openReview(items){multiMode='separate';const isMulti=items.length>1;document.getElementById('multiChoice').style.display=isMulti?'block':'none';document.getElementById('btnSeparate').classList.add('active');document.getElementById('btnMerge').classList.remove('active');items.forEach((_,i)=>{reviewChipTags[i]=getTag()||'Regular';});renderReviewChips(items,isMulti?'separate':'single');document.getElementById('reviewOverlay').classList.add('show');history.pushState({modal:'review'},'');}
+function openReview(items){multiMode='separate';const isMulti=items.length>1;document.getElementById('multiChoice').style.display=isMulti?'block':'none';document.getElementById('btnSeparate').classList.add('active');document.getElementById('btnMerge').classList.remove('active');items.forEach((_,i)=>{reviewChipTags[i]=getTag()||'Regular';});renderReviewChips(items,isMulti?'separate':'single');checkTotalMismatch(items);document.getElementById('reviewOverlay').classList.add('show');history.pushState({modal:'review'},'');}
+// Warns when the parsed line items don't add up to the receipt's own printed/written
+// total — the most common sign of a misread or missed item on a messy bill photo.
+// Only relevant for image-sourced entries where Gemini found a total to compare against.
+function checkTotalMismatch(items){
+  const banner=document.getElementById('totalMismatchWarning');
+  const isImageSourced=document.getElementById('expenseInput').dataset.imageParsed==='1';
+  if(!isImageSourced||pendingReceiptTotal==null){banner.style.display='none';return;}
+  const itemsSum=items.reduce((s,i)=>s+(parseFloat(calcAmount(String(i.amount||'')))||0),0);
+  const diff=Math.round((itemsSum-pendingReceiptTotal)*100)/100;
+  if(Math.abs(diff)<=1){banner.style.display='none';return;} // rounding-level, not worth flagging
+  const diffText=diff>0?('₹'+fmtAmt(Math.abs(diff))+' more than'):('₹'+fmtAmt(Math.abs(diff))+' less than');
+  banner.innerHTML='⚠️ Items add up to ₹'+fmtAmt(itemsSum)+' — that\'s '+diffText+' the ₹'+fmtAmt(pendingReceiptTotal)+' total on the receipt. Worth double-checking an item or amount below before saving.';
+  banner.style.display='block';
+}
 function closeReview(){document.getElementById('reviewOverlay').classList.remove('show');}
 function maybeCloseReview(e){if(e.target===document.getElementById('reviewOverlay'))closeReview();}
 function setMultiMode(mode){multiMode=mode;document.getElementById('btnSeparate').classList.toggle('active',mode==='separate');document.getElementById('btnMerge').classList.toggle('active',mode==='merge');renderReviewChips(parsedItems,mode);}
@@ -1011,7 +1034,7 @@ async function confirmAndSave(){
   finally{btn.classList.remove('loading');btn.disabled=false;}
 }
 
-function resetAddForm(){const ta=document.getElementById('expenseInput');ta.value='';ta.dataset.imageParsed='';document.getElementById('charCount').textContent='500';document.getElementById('submitBtn').disabled=true;document.getElementById('hintCard').classList.remove('hidden');document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=null;updateSheetBadge();document.getElementById('uploadStatus').style.display='none';document.getElementById('attachBtn').classList.remove('has-file');pendingImageBase64=null;pendingImageMimeType=null;pendingImageFileName=null;}
+function resetAddForm(){const ta=document.getElementById('expenseInput');ta.value='';ta.dataset.imageParsed='';document.getElementById('charCount').textContent='500';document.getElementById('submitBtn').disabled=true;document.getElementById('hintCard').classList.remove('hidden');document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=null;updateSheetBadge();document.getElementById('uploadStatus').style.display='none';document.getElementById('attachBtn').classList.remove('has-file');pendingImageBase64=null;pendingImageMimeType=null;pendingImageFileName=null;pendingReceiptTotal=null;}
 
 function checkApplyBtn(){
   const from=document.getElementById('filterFrom').value;

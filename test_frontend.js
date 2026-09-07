@@ -385,7 +385,68 @@ section('5. confirmAndSave() — addWithPhoto is now AWAITED (mobile-reliability
 }
 
 // ══════════════════════════════════════════════════════════
-section('6. confirmAndSave() — validation still blocks bad input');
+section('6. checkTotalMismatch() — receipt-total warning banner');
+{
+  function setup(imageParsed, receiptTotal) {
+    const elements = {};
+    setInput(elements, 'expenseInput', '');
+    elements['expenseInput'].dataset.imageParsed = imageParsed ? '1' : '';
+    const { sandbox } = buildSandbox({ elements, fetchImpl: async () => ({ json: async () => ({}) }) });
+    sandbox.__setState({ pendingReceiptTotal: (receiptTotal) });
+    return { sandbox, elements };
+  }
+
+  await test('No banner when the entry is not image-sourced, even with a mismatch', () => {
+    const { sandbox, elements } = setup(false, 4193);
+    sandbox.checkTotalMismatch([{ amount: 100 }]);
+    assert.strictEqual(elements['totalMismatchWarning'].style.display, 'none');
+  });
+  await test('No banner when no receipt total was found (pendingReceiptTotal is null)', () => {
+    const { sandbox, elements } = setup(true, null);
+    sandbox.checkTotalMismatch([{ amount: 100 }]);
+    assert.strictEqual(elements['totalMismatchWarning'].style.display, 'none');
+  });
+  await test('No banner when items sum matches the receipt total exactly', () => {
+    const { sandbox, elements } = setup(true, 300);
+    sandbox.checkTotalMismatch([{ amount: 100 }, { amount: 200 }]);
+    assert.strictEqual(elements['totalMismatchWarning'].style.display, 'none');
+  });
+  await test('No banner for a trivial ₹1 rounding-level difference', () => {
+    const { sandbox, elements } = setup(true, 301);
+    sandbox.checkTotalMismatch([{ amount: 100 }, { amount: 200 }]);
+    assert.strictEqual(elements['totalMismatchWarning'].style.display, 'none');
+  });
+  await test('Banner SHOWS for a real mismatch, with both amounts in the message', () => {
+    const { sandbox, elements } = setup(true, 4193);
+    // The exact Sandip Hardware scenario that motivated this feature
+    sandbox.checkTotalMismatch([
+      { amount: 840 }, { amount: 1800 }, { amount: 168 }, { amount: 225 }, { amount: 40 },
+      { amount: 270 }, { amount: 240 }, { amount: 350 }, { amount: 220 },
+    ]);
+    assert.strictEqual(elements['totalMismatchWarning'].style.display, 'block');
+    assert.match(elements['totalMismatchWarning'].innerHTML, /4,153/);
+    assert.match(elements['totalMismatchWarning'].innerHTML, /4,193/);
+  });
+  await test('Banner correctly says items sum to MORE than the receipt total when that\'s the case', () => {
+    const { sandbox, elements } = setup(true, 100);
+    sandbox.checkTotalMismatch([{ amount: 500 }]);
+    assert.match(elements['totalMismatchWarning'].innerHTML, /more than/);
+  });
+  await test('Banner correctly says items sum to LESS than the receipt total when that\'s the case', () => {
+    const { sandbox, elements } = setup(true, 500);
+    sandbox.checkTotalMismatch([{ amount: 100 }]);
+    assert.match(elements['totalMismatchWarning'].innerHTML, /less than/);
+  });
+  await test('Handles amount expressions (e.g. "200-20") the same way calcAmount does elsewhere', () => {
+    const { sandbox, elements } = setup(true, 100);
+    sandbox.checkTotalMismatch([{ amount: '200-20' }]); // evaluates to 180, still off from 100
+    assert.strictEqual(elements['totalMismatchWarning'].style.display, 'block');
+    assert.match(elements['totalMismatchWarning'].innerHTML, /180/);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('7. confirmAndSave() — validation still blocks bad input');
 {
   const elements = {};
   setInput(elements, 'expenseInput', 'x');
