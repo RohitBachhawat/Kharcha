@@ -214,8 +214,9 @@
     .config-input{width:100%;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;transition:border-color 0.2s;}
     .config-input:focus{border-color:var(--accent);}
     .save-config-btn{width:100%;margin-top:4px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:12px;padding:15px;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;cursor:pointer;}
-    .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 20px;border-radius:100px;font-size:13px;font-weight:600;opacity:0;transition:all 0.3s;white-space:nowrap;z-index:300;}
+    .toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:9px 20px;border-radius:100px;font-size:13px;font-weight:600;opacity:0;transition:all 0.3s;white-space:nowrap;z-index:300;display:inline-flex;align-items:center;gap:8px;}
     .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+    .toast-spinner{width:13px;height:13px;border:2px solid var(--border);border-top-color:var(--text);border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0;}
     @keyframes fadeUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
     .add-page>*{animation:fadeUp 0.4s ease both;}
     .add-page>*:nth-child(1){animation-delay:0.04s;}.add-page>*:nth-child(2){animation-delay:0.08s;}
@@ -976,16 +977,27 @@ async function confirmAndSave(){
     }
 
     // Only now — after the user has reviewed and confirmed — save the bill photo.
-    // Sent as ONE fire-and-forget request together with all its rows (same no-cors
-    // pattern as every other write in this app) so we never depend on reading a
-    // POST response back — that doesn't work reliably cross-origin with Apps Script,
-    // which is exactly why the row-saves below never try to read theirs either.
+    // Sent as ONE request together with all its rows (still no-cors, since we never
+    // depend on reading the response body back — that doesn't work reliably
+    // cross-origin with Apps Script). But unlike a tiny text row, a photo payload is
+    // large enough to take real time on a mobile connection — and mobile browsers
+    // are much more aggressive than desktop about suspending or dropping in-flight
+    // requests the moment a tab backgrounds or the screen locks. So this AWAITS the
+    // fetch promise (which still resolves once the browser actually gets an HTTP
+    // response, even though the opaque no-cors body can't be read) instead of firing
+    // it and immediately telling the user it's done on a guessed timer — that gap
+    // was exactly wide enough for mobile to lose the request silently.
     if(isImageSourced){
-      fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'addWithPhoto',rows:rows,base64Data:pendingImageBase64,mimeType:pendingImageMimeType,fileName:pendingImageFileName})});
-      var totalWait=900;
-      showToast(rows.length>1?('✅ '+rows.length+' entries saving...'):'✅ Saved!',totalWait);
-      setTimeout(function(){closeReview();resetAddForm();},totalWait);
-      setTimeout(function(){silentRefreshHistory();},totalWait+1500);
+      showProgressToast(rows.length>1?('Saving '+rows.length+' entries + photo...'):'Saving entry + photo...');
+      try{
+        await fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'addWithPhoto',rows:rows,base64Data:pendingImageBase64,mimeType:pendingImageMimeType,fileName:pendingImageFileName})});
+      }catch(sendErr){
+        showToast('❌ Save failed — check your connection and try again');
+        return;
+      }
+      showToast(rows.length>1?('✅ '+rows.length+' entries saved'):'✅ Saved!',2000);
+      closeReview();resetAddForm();
+      setTimeout(function(){silentRefreshHistory();},1200);
       return;
     }
 
@@ -1368,7 +1380,11 @@ function triggerFileInput(){
 }
 
 let toastTimer=null;
-function showToast(msg,duration=2500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');if(toastTimer)clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),duration);}
+function showToast(msg,duration=2500){const t=document.getElementById('toast');t.innerHTML='';t.textContent=msg;t.classList.add('show');if(toastTimer)clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),duration);}
+// Shows a spinner + message that stays up until explicitly replaced — used while an
+// operation (like a photo upload) is genuinely in progress, so the person isn't left
+// staring at a silent screen. Call showToast() afterward to replace it with the result.
+function showProgressToast(msg){const t=document.getElementById('toast');if(toastTimer)clearTimeout(toastTimer);t.innerHTML='<div class="toast-spinner"></div><span>'+msg+'</span>';t.classList.add('show');}
 function showErrorToast(msg){showToast('❌ '+msg,5000);}
 
 // ── Swipe down to close any bottom sheet ──────────────────
