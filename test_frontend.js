@@ -227,9 +227,10 @@ section('3. confirmAndSave() — image-sourced single item sends ONE addWithPhot
     const addWithPhotoCalls = fetchCalls.filter(c => c.body && c.body.action === 'addWithPhoto');
     assert.strictEqual(addWithPhotoCalls.length, 1);
   });
-  await test('The request is sent with mode:no-cors — it never depends on reading a response back', () => {
+  await test('The request is sent with mode:no-cors AND a CORS-safelisted Content-Type (regression test: application/json under no-cors was silently dropped/mangled on mobile Safari)', () => {
     const call = fetchCalls.find(c => c.body && c.body.action === 'addWithPhoto');
     assert.strictEqual(call.opts.mode, 'no-cors');
+    assert.strictEqual(call.opts.headers['Content-Type'], 'text/plain;charset=utf-8');
   });
   await test('The image bytes and the row data travel together in the same request', () => {
     const body = fetchCalls.find(c => c.body && c.body.action === 'addWithPhoto').body;

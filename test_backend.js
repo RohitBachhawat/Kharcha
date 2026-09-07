@@ -224,6 +224,16 @@ test('addWithPhoto routes a Shaadi-tagged row to the Shaadi sheet, still sharing
   assert.strictEqual(row[1], 'Catering advance');
   assert.strictEqual(row[12], res.url);
 });
+test('addWithPhoto with missing/empty rows fails LOUDLY with a specific message (regression test for the silent-no-op bug)', () => {
+  // Previously this silently returned success with an empty rows array — looked like
+  // "Completed" with nothing saved and no clue why. Now it must fail with a clear reason.
+  const res1 = post({ action: 'addWithPhoto', base64Data: 'abc', mimeType: 'image/jpeg' }); // rows entirely missing
+  assert.strictEqual(res1.success, false);
+  assert.ok(/no rows in payload/.test(res1.error));
+  const res2 = post({ action: 'addWithPhoto', base64Data: 'abc', mimeType: 'image/jpeg', rows: [] }); // rows explicitly empty
+  assert.strictEqual(res2.success, false);
+  assert.ok(/no rows in payload/.test(res2.error));
+});
 
 section('5. updateRow preserves Additional Info when not passed');
 test('Editing a row WITHOUT mentioning additionalInfo does not wipe the existing photo link', () => {
