@@ -48,6 +48,7 @@ function makeSheet(name) {
     appendRow(arr) { this.rows.push(arr.slice()); },
     deleteRow(r) { this.rows.splice(r - 1, 1); },
     getLastRow() { return this.rows.length; },
+    getLastColumn() { return this.rows.length ? Math.max(...this.rows.map(r => r.length)) : 0; },
     setFrozenRows() {},
     setColumnWidth() {},
   };
@@ -58,7 +59,13 @@ function makeSpreadsheet() {
   return {
     _sheets: sheets,
     getSheetByName(name) { return sheets[name] || null; },
-    insertSheet(name) { const s = makeSheet(name); sheets[name] = s; return s; },
+    insertSheet(name) {
+      const s = makeSheet(name);
+      s.setName = (newName) => { delete sheets[s.name]; s.name = newName; sheets[newName] = s; };
+      sheets[name] = s;
+      return s;
+    },
+    deleteSheet(sheet) { delete sheets[sheet.name]; },
   };
 }
 
@@ -112,8 +119,37 @@ const Logger = { log(...a) { /* console.log('[Logger]', ...a); */ } };
 const SpreadsheetApp = { openById() { return fakeSS; } };
 const UrlFetchApp = { fetch() { throw new Error('UrlFetchApp should not be called in offline tests'); } };
 
+// ---- Mock ScriptApp (time-based triggers) ----
+const installedTriggers = [];
+const ScriptApp = {
+  getProjectTriggers() {
+    return installedTriggers.map(t => ({
+      getHandlerFunction: () => t.handlerFunction,
+      getUniqueId: () => t.id,
+    }));
+  },
+  deleteTrigger(triggerRef) {
+    const idx = installedTriggers.findIndex(t => t.id === triggerRef.getUniqueId());
+    if (idx >= 0) installedTriggers.splice(idx, 1);
+  },
+  newTrigger(handlerFunction) {
+    const spec = { handlerFunction, everyDaysN: null, atHourN: null };
+    const builder = {
+      timeBased: () => builder,
+      everyDays: (n) => { spec.everyDaysN = n; return builder; },
+      atHour: (h) => { spec.atHourN = h; return builder; },
+      create: () => {
+        const id = 'trigger_' + (installedTriggers.length + 1);
+        installedTriggers.push({ id, handlerFunction, everyDaysN: spec.everyDaysN, atHourN: spec.atHourN });
+        return { getUniqueId: () => id };
+      },
+    };
+    return builder;
+  },
+};
+
 const sandbox = {
-  SpreadsheetApp, DriveApp, Utilities, ContentService, LockService, Logger, UrlFetchApp,
+  SpreadsheetApp, DriveApp, Utilities, ContentService, LockService, Logger, UrlFetchApp, ScriptApp,
   Date, JSON, console, Math, String, parseInt, parseFloat, isNaN, Array, Object, Buffer,
 };
 vm.createContext(sandbox);
@@ -129,12 +165,13 @@ function get(params) {
 
 // ══════════════════════════════════════════════════════════
 section('1. Sheet bootstrap / headers');
-test('Expenses sheet has 13 headers including Additional Info', () => {
+test('Expenses sheet has 14 headers including Additional Info and Trace ID', () => {
   post({ date: '04 Sep 2026', item: 'Tea', amount: 20, shop: 'Tapri', tag: 'Regular', category: 'Food', loggedBy: 'RB', rawText: 'chai 20 tapri', sheetName: 'Expenses' });
   const headerRow = fakeSS.getSheetByName('Expenses').rows[0];
-  assert.strictEqual(headerRow.length, 13);
+  assert.strictEqual(headerRow.length, 14);
   assert.strictEqual(headerRow[11], 'Payment Mode');
   assert.strictEqual(headerRow[12], 'Additional Info');
+  assert.strictEqual(headerRow[13], 'Trace ID');
 });
 
 section('2. Add row (no image) — Additional Info stays blank');
@@ -264,10 +301,11 @@ test('Moving a row to Shaadi preserves its photo link and payment mode when not 
   assert.strictEqual(movedRow[11], 'Online');   // payMode carried over from source row
   assert.strictEqual(movedRow[12], billPhotoUrl);   // additionalInfo carried over from source row
 });
-test('Shaadi sheet also got proper 13-column headers on auto-create', () => {
+test('Shaadi sheet also got proper 14-column headers on auto-create', () => {
   const headerRow = fakeSS.getSheetByName('Shaadi').rows[0];
-  assert.strictEqual(headerRow.length, 13);
+  assert.strictEqual(headerRow.length, 14);
   assert.strictEqual(headerRow[12], 'Additional Info');
+  assert.strictEqual(headerRow[13], 'Trace ID');
 });
 
 section('7. getRecentRows returns payMode + additionalInfo to the frontend');
@@ -314,25 +352,213 @@ test('migrateAddAdditionalInfoColumn backfills a sheet that predates the new col
   oldSheet.appendRow(['Date','Item','Amount (₹)','Shop','Comment','Tag','Category','Logged By','Raw Text','Timestamp','Last Updated']);
   assert.strictEqual(oldSheet.getRange(1, 12).getValue(), '');
   assert.strictEqual(oldSheet.getRange(1, 13).getValue(), '');
-  // Reuse the exact same per-sheet logic the real migration function runs
-  if (!oldSheet.getRange(1, 12).getValue()) oldSheet.getRange(1, 12).setValue('Payment Mode');
-  if (!oldSheet.getRange(1, 13).getValue()) oldSheet.getRange(1, 13).setValue('Additional Info');
-  assert.strictEqual(oldSheet.rows[0][11], 'Payment Mode');
-  assert.strictEqual(oldSheet.rows[0][12], 'Additional Info');
+  assert.strictEqual(oldSheet.getRange(1, 14).getValue(), '');
 });
-test('migrateAddAdditionalInfoColumn (real function) fixes Expenses/Shaadi headers and is idempotent', () => {
+test('migrateAddAdditionalInfoColumn (real function) fixes Expenses/Shaadi headers including Trace ID, and is idempotent', () => {
   sandbox.migrateAddAdditionalInfoColumn();
   const expHeader = fakeSS.getSheetByName('Expenses').rows[0];
   const shaadiHeader = fakeSS.getSheetByName('Shaadi').rows[0];
   assert.strictEqual(expHeader[11], 'Payment Mode');
   assert.strictEqual(expHeader[12], 'Additional Info');
+  assert.strictEqual(expHeader[13], 'Trace ID');
   assert.strictEqual(shaadiHeader[11], 'Payment Mode');
   assert.strictEqual(shaadiHeader[12], 'Additional Info');
+  assert.strictEqual(shaadiHeader[13], 'Trace ID');
   // Run again — should not throw and should not alter anything
   const before = JSON.stringify(fakeSS.getSheetByName('Expenses').rows[0]);
   sandbox.migrateAddAdditionalInfoColumn();
   const after = JSON.stringify(fakeSS.getSheetByName('Expenses').rows[0]);
   assert.strictEqual(before, after);
+});
+
+section('10. Trace ID on Expenses/Shaadi — links a saved row back to its AI_Traces entry');
+let tracedRowNum;
+test('writeToSheet stores traceId in column 14', () => {
+  const res = post({ date: '04 Sep 2026', item: 'Chai', amount: 20, tag: 'Regular', category: 'Food', loggedBy: 'RB', rawText: 'chai 20', sheetName: 'Expenses', traceId: 'T-abc123' });
+  tracedRowNum = res.row;
+  const sheet = fakeSS.getSheetByName('Expenses');
+  assert.strictEqual(sheet.rows[tracedRowNum - 1][13], 'T-abc123');
+});
+test('A row with no traceId (a local/non-AI parse) leaves the column blank', () => {
+  const res = post({ date: '04 Sep 2026', item: 'Milk', amount: 60, tag: 'Regular', category: 'Food', loggedBy: 'RB', rawText: 'milk 60', sheetName: 'Expenses' });
+  const sheet = fakeSS.getSheetByName('Expenses');
+  assert.strictEqual(sheet.rows[res.row - 1][13], '');
+});
+test('updateRow WITHOUT mentioning traceId preserves the existing one', () => {
+  post({ action: 'updateRow', rowNum: tracedRowNum, sheetName: 'Expenses', date: '04 Sep 2026', item: 'Chai (large)', amount: 25, tag: 'Regular', category: 'Food', loggedBy: 'RB', rawText: '' });
+  const sheet = fakeSS.getSheetByName('Expenses');
+  assert.strictEqual(sheet.rows[tracedRowNum - 1][1], 'Chai (large)');
+  assert.strictEqual(sheet.rows[tracedRowNum - 1][13], 'T-abc123');
+});
+test('moveRow carries traceId to the destination sheet when not overridden', () => {
+  const res = post({ action: 'moveRow', rowNum: tracedRowNum, fromSheet: 'Expenses', toSheet: 'Shaadi', date: '04 Sep 2026', item: 'Chai (large)', amount: 25, tag: 'Shaadi', category: 'Food', loggedBy: 'RB', rawText: '' });
+  assert.strictEqual(res.success, true);
+  const shaadiSheet = fakeSS.getSheetByName('Shaadi');
+  const movedRow = shaadiSheet.rows[shaadiSheet.rows.length - 1];
+  assert.strictEqual(movedRow[13], 'T-abc123');
+});
+test('getRecentRows returns the traceId field to the frontend', () => {
+  const res = get({ action: 'getRecent', sheet: 'Shaadi', n: '5' });
+  const row = res.rows.find(r => r.item === 'Chai (large)');
+  assert.ok(row);
+  assert.strictEqual(row.traceId, 'T-abc123');
+});
+
+section('11. logAITrace — unified AI observability log (text / SMS / photo)');
+test('logAITrace creates the AI_Traces sheet with the full v2 schema on first use', () => {
+  const res = post({ action: 'logAITrace', traceId: 'T-photo1', type: 'photo', attempt: 1, model: 'gemini-3.1-flash-lite-preview', promptVersion: 'vision-v2', fileName: 'bill.jpg', rawResponse: '{"items":[]}', itemsCountRaw: 9, itemsCountFiltered: 8, itemsSum: 2353, receiptTotal: 4193, mismatch: true, mismatchAmount: -1840, httpStatus: 200, userAgent: 'Mozilla/5.0 (iPhone)', loggedBy: 'RB' });
+  assert.strictEqual(res.success, true);
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  assert.ok(sheet, 'AI_Traces sheet should be auto-created');
+  assert.strictEqual(JSON.stringify(sheet.rows[0]), JSON.stringify(['Trace ID','Timestamp','Type','Attempt','Model','Prompt Version','Items (raw)','Items (kept)','Items Sum','Receipt Total','Mismatch?','Mismatch Amount','HTTP Status','Error Category','Error Message','Latency (ms)','Outcome','Edited Fields','User Agent','Logged By','File Name','Raw Model Response']));
+});
+test('logAITrace writes a photo-type row with all fields correctly placed', () => {
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[0], 'T-photo1');    // Trace ID
+  assert.strictEqual(row[2], 'photo');        // Type
+  assert.strictEqual(row[3], 1);              // Attempt
+  assert.strictEqual(row[4], 'gemini-3.1-flash-lite-preview'); // Model
+  assert.strictEqual(row[5], 'vision-v2');    // Prompt Version
+  assert.strictEqual(row[6], 9);              // Items raw
+  assert.strictEqual(row[7], 8);              // Items kept
+  assert.strictEqual(row[8], 2353);           // Items sum
+  assert.strictEqual(row[9], 4193);           // Receipt total
+  assert.strictEqual(row[10], 'YES');         // Mismatch?
+  assert.strictEqual(row[11], -1840);         // Mismatch amount
+  assert.strictEqual(row[12], 200);           // HTTP status
+  assert.strictEqual(row[16], '');            // Outcome (not applicable to this row)
+  assert.strictEqual(row[17], '');            // Edited Fields (not applicable)
+  assert.strictEqual(row[18], 'Mozilla/5.0 (iPhone)'); // User agent
+  assert.strictEqual(row[19], 'RB');          // Logged by
+  assert.strictEqual(row[20], 'bill.jpg');    // File name
+  assert.ok(row[21].includes('items'));       // Raw response
+});
+test('logAITrace writes a text-type ERROR row (a retry attempt) with no items/file, just error info', () => {
+  const res = post({ action: 'logAITrace', traceId: 'T-text1', type: 'text', attempt: 1, model: 'gemini-3.1-flash-lite-preview', promptVersion: 'text-v1', httpStatus: 429, errorCategory: 'rate_limit', errorMessage: 'Too many requests', latencyMs: 850, loggedBy: 'RB' });
+  assert.strictEqual(res.success, true);
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[2], 'text');
+  assert.strictEqual(row[6], '');   // no items count for a failed attempt
+  assert.strictEqual(row[12], 429);
+  assert.strictEqual(row[13], 'rate_limit');
+  assert.strictEqual(row[14], 'Too many requests');
+  assert.strictEqual(row[15], 850);
+});
+test('logAITrace writes an sms-type row correctly', () => {
+  const res = post({ action: 'logAITrace', traceId: 'T-sms1', type: 'sms', attempt: 1, model: 'gemini-3.1-flash-lite-preview', promptVersion: 'sms-v1', itemsCountRaw: 1, itemsCountFiltered: 1, itemsSum: 500, loggedBy: 'RB', rawResponse: '[{"item":"UPI Payment"}]' });
+  assert.strictEqual(res.success, true);
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[2], 'sms');
+  assert.strictEqual(row[9], ''); // no receipt total concept for sms
+});
+test('logAITrace truncates a very long raw response so it can never blow up a sheet cell', () => {
+  const hugeResponse = 'x'.repeat(10000);
+  post({ action: 'logAITrace', traceId: 'T-huge', type: 'photo', rawResponse: hugeResponse, fileName: 'huge.jpg' });
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.ok(row[21].length <= 3000);
+});
+test('logAITrace never throws even with a malformed/missing payload (must never break the main flow)', () => {
+  const res = post({ action: 'logAITrace' }); // nothing but the action itself
+  assert.strictEqual(res.success, true);
+});
+test('doPost still returns success:true for logAITrace even if an internal logging error occurs', () => {
+  const res = post({ action: 'logAITrace', rawResponse: null, itemsCountRaw: 'not-a-number' });
+  assert.strictEqual(res.success, true);
+});
+
+section('11b. logAITrace — Outcome / Edited Fields columns (outcome tracking)');
+test('An outcome row for "saved as-is" logs correctly', () => {
+  const res = post({ action: 'logAITrace', traceId: 'T-outcome1', type: 'photo', outcome: 'saved_as_is', editedFields: '' });
+  assert.strictEqual(res.success, true);
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[16], 'saved_as_is');
+  assert.strictEqual(row[17], '');
+});
+test('An outcome row for "saved edited" logs which fields changed', () => {
+  const res = post({ action: 'logAITrace', traceId: 'T-outcome2', type: 'text', outcome: 'saved_edited', editedFields: 'amount,category' });
+  assert.strictEqual(res.success, true);
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[16], 'saved_edited');
+  assert.strictEqual(row[17], 'amount,category');
+});
+test('An outcome row for "abandoned" logs correctly', () => {
+  const res = post({ action: 'logAITrace', traceId: 'T-outcome3', type: 'sms', outcome: 'abandoned' });
+  assert.strictEqual(res.success, true);
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[16], 'abandoned');
+});
+test('A normal attempt/summary row (no outcome) leaves Outcome/Edited Fields blank', () => {
+  post({ action: 'logAITrace', traceId: 'T-normal', type: 'photo', itemsCountRaw: 3 });
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[16], '');
+  assert.strictEqual(row[17], '');
+});
+
+section('12. getOrCreateTraceSheet — schema self-healing');
+test('A schema mismatch with NO real data rows gets replaced outright (no archive clutter)', () => {
+  // Simulate an old-schema AI_Traces sheet with just a header, no data — as if a
+  // previous version's headers were created but never actually logged anything yet.
+  fakeSS.deleteSheet(fakeSS.getSheetByName('AI_Traces')); // clear what earlier tests built up
+  const oldSheet = fakeSS.insertSheet('AI_Traces');
+  oldSheet.appendRow(['Timestamp', 'File Name']); // old v1-style header, no data rows
+  sandbox.logAITrace({ traceId: 'T-fresh', type: 'photo' }); // triggers getOrCreateTraceSheet()
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  assert.strictEqual(sheet.rows[0][0], 'Trace ID'); // replaced with the current schema
+  const archivedNames = Object.keys(fakeSS._sheets).filter(n => n.startsWith('AI_Traces_archive_'));
+  assert.strictEqual(archivedNames.length, 0, 'a header-only mismatch should be replaced outright, not archived');
+});
+test('A schema mismatch WITH real data rows gets archived, never destroyed', () => {
+  fakeSS.deleteSheet(fakeSS.getSheetByName('AI_Traces'));
+  const oldSheet = fakeSS.insertSheet('AI_Traces');
+  oldSheet.appendRow(['Timestamp', 'File Name']);
+  oldSheet.appendRow(['04 Sep 2026', 'old_bill.jpg']); // a real logged row under the old schema
+  sandbox.logAITrace({ traceId: 'T-fresh2', type: 'photo' });
+  const freshSheet = fakeSS.getSheetByName('AI_Traces');
+  assert.strictEqual(freshSheet.rows[0][0], 'Trace ID'); // fresh sheet has the new schema
+  assert.strictEqual(freshSheet.rows.length, 2); // header + the one new row just logged
+  const archivedNames = Object.keys(fakeSS._sheets).filter(n => n.startsWith('AI_Traces_archive_'));
+  assert.strictEqual(archivedNames.length, 1, 'the old data should have been preserved under an archive name');
+  assert.strictEqual(fakeSS._sheets[archivedNames[0]].rows[1][1], 'old_bill.jpg'); // old data intact
+});
+
+section('13. cleanupOldTraces — 365-day retention (TRACE_RETENTION_DAYS)');
+test('Deletes trace rows older than the retention window, keeps recent ones', () => {
+  fakeSS.deleteSheet(fakeSS.getSheetByName('AI_Traces'));
+  const sheet = sandbox.getOrCreateTraceSheet();
+  const oldDate = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toLocaleString('en-IN'); // 400 days ago
+  const recentDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toLocaleString('en-IN'); // 10 days ago
+  sheet.appendRow(['T-old', oldDate, 'photo']);
+  sheet.appendRow(['T-recent', recentDate, 'photo']);
+  sandbox.cleanupOldTraces();
+  const remainingIds = sheet.rows.slice(1).map(r => r[0]);
+  assert.ok(!remainingIds.includes('T-old'), 'row older than 365 days should be deleted');
+  assert.ok(remainingIds.includes('T-recent'), 'row within 365 days should be kept');
+});
+test('Running cleanup on a sheet with only a header does not throw', () => {
+  fakeSS.deleteSheet(fakeSS.getSheetByName('AI_Traces'));
+  sandbox.getOrCreateTraceSheet(); // header only, no data rows
+  assert.doesNotThrow(() => sandbox.cleanupOldTraces());
+});
+
+section('14. installTraceCleanupTrigger — one-time setup for automatic daily cleanup');
+test('Installs a daily trigger targeting cleanupOldTraces', () => {
+  sandbox.installTraceCleanupTrigger();
+  const triggers = sandbox.ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'cleanupOldTraces');
+  assert.strictEqual(triggers.length, 1);
+});
+test('Running it again does NOT create a duplicate trigger (idempotent)', () => {
+  sandbox.installTraceCleanupTrigger();
+  sandbox.installTraceCleanupTrigger();
+  const triggers = sandbox.ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'cleanupOldTraces');
+  assert.strictEqual(triggers.length, 1);
 });
 
 // ══════════════════════════════════════════════════════════

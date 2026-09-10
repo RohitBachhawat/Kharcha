@@ -436,6 +436,17 @@ const PAY_MODES=['Cash','Online'];
 const ONLINE_KEYWORDS=/\b(upi|gpay|phonepe|paytm|card|debit|credit|online|neft|imps|rtgs|net.?banking|razorpay|amazon.?pay|bhim)\b/i;
 const IST_OFFSET=5.5*60*60*1000;
 const TODAY_STR=new Date(Date.now()+IST_OFFSET).toISOString().split('T')[0];
+// Model name used for every Gemini call — defined once so a future model swap is a
+// one-line change, and so every AI_Traces row records exactly which model produced it
+// (Google can silently repoint what a model name serves; this is how you'd notice).
+const GEMINI_MODEL='gemini-3.1-flash-lite-preview';
+// Bump these labels whenever the corresponding prompt's TEXT changes meaningfully.
+// This is what lets an old AI_Traces row be understood in the context of the prompt
+// logic that was actually live when it was captured — without it, "why did this parse
+// badly three weeks ago" is unanswerable once the prompt has since been edited.
+const VISION_PROMPT_VERSION='vision-v2-receipttotal';
+const TEXT_EXPENSE_PROMPT_VERSION='text-v1';
+const TEXT_SMS_PROMPT_VERSION='sms-v1';
 
 // Replaced at deploy time by Vercel build command (see vercel.json).
 // If not replaced (local dev / manual hosting), app falls back to
@@ -733,24 +744,37 @@ function autoSetUpiCategory(text){if(!isBankSms(text))return;document.querySelec
 
 function buildExpensePrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);const d2=new Date(now);d2.setDate(now.getDate()-2);const d3=new Date(now);d3.setDate(now.getDate()-3);const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];return 'You are a family expense parser for an Indian family. Return ONLY a valid JSON array, no markdown.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+', 2daysago='+fmt(d2)+', 3daysago='+fmt(d3)+', Day='+dn+'\n\nRules:\n1. Translate Hindi/Hinglish to English: chai=Tea, sabzi=Vegetables, doodh=Milk, dawai=Medicine, kapde=Clothes, bijli=Electricity, auto=Auto Rickshaw, kal=yesterday, aaj=today\n2. Detect multiple items if multiple expenses in text\n3. Resolve relative dates\n4. AMOUNT EXPRESSIONS: keep arithmetic as string: "clothes-2000-20" => amount="2000-20", "metro-50/2" => amount="50/2". Dashes between item and amount are separators not subtraction unless both sides are numbers.\n5. Category: Food/Transport/Shopping/Utilities/Health/Entertainment/Other or null if unsure\n\nReturn: [{"date":"DD Mon YYYY","item":"English name","amount":"expr_or_number_or_null","shop":"name_or_null","comment":"extra_or_null","category":"cat_or_null"}]\n\nOnly JSON array.';}
 
-async function callGeminiProxy(prompt){
+async function callGeminiProxy(prompt,traceMeta){
   const cfg=loadConfig();
   if(!cfg.scriptUrl)throw new KharchaError('Script URL Missing','No Apps Script URL.','Tap settings.');
   const MAX_RETRIES=3;
   for(var attempt=1;attempt<=MAX_RETRIES;attempt++){
+    const t0=Date.now();
     let res;
     try{const p=new URLSearchParams({action:'geminiProxy',apiKey:cfg.apiKey,prompt});res=await fetch(cfg.scriptUrl+'?'+p.toString());}
-    catch(e){throw new KharchaError('Network Error','Could not reach Apps Script: '+e.message,'Check internet and Script URL.');}
-    if(!res.ok)throw new KharchaError('Proxy Error','Apps Script HTTP '+res.status,'Redeploy as Web App, access=Anyone.');
+    catch(e){
+      if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,errorCategory:'network_error',errorMessage:e.message,latencyMs:Date.now()-t0}));
+      throw new KharchaError('Network Error','Could not reach Apps Script: '+e.message,'Check internet and Script URL.');
+    }
+    if(!res.ok){
+      if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:res.status,errorCategory:'http_error',errorMessage:'Apps Script HTTP '+res.status,latencyMs:Date.now()-t0}));
+      throw new KharchaError('Proxy Error','Apps Script HTTP '+res.status,'Redeploy as Web App, access=Anyone.');
+    }
     let data;
-    try{data=await res.json();}catch(e){throw new KharchaError('Response Error','Could not read response.','Deploy latest Code.gs.');}
+    try{data=await res.json();}catch(e){
+      if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:res.status,errorCategory:'response_read_error',errorMessage:e.message,latencyMs:Date.now()-t0}));
+      throw new KharchaError('Response Error','Could not read response.','Deploy latest Code.gs.');
+    }
     if(!data.success){
       const m=data.error||'Unknown';
       if(m.includes('429')){
+        if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:429,errorCategory:'rate_limit',errorMessage:m,latencyMs:Date.now()-t0}));
         if(attempt<MAX_RETRIES){const wait=attempt*10000;showToast('Rate limit — retrying in '+attempt*10+'s ('+attempt+'/'+MAX_RETRIES+')...',wait);await new Promise(r=>setTimeout(r,wait));continue;}
         throw new KharchaError('Rate Limit','Too many requests. All '+MAX_RETRIES+' retries failed.','Wait a minute and try again.');
       }
-      if(m.includes('400')||m.toLowerCase().includes('api key'))throw new KharchaError('Invalid API Key',m,'Get key at aistudio.google.com.');
+      const cat=(m.includes('400')||m.toLowerCase().includes('api key'))?'invalid_api_key':'gemini_error';
+      if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,errorCategory:cat,errorMessage:m,latencyMs:Date.now()-t0}));
+      if(cat==='invalid_api_key')throw new KharchaError('Invalid API Key',m,'Get key at aistudio.google.com.');
       throw new KharchaError('Gemini Error',m,'Check API key in settings.');
     }
     return data.result||'';
@@ -758,19 +782,34 @@ async function callGeminiProxy(prompt){
 }
 
 async function parseWithGemini(text){
-  var prompt=isBankSms(text)?buildSmsPrompt(text):buildExpensePrompt(text);
-  const raw=await callGeminiProxy(prompt);
+  const cfg=loadConfig();
+  const isSms=isBankSms(text);
+  const type=isSms?'sms':'text';
+  const promptVersion=isSms?TEXT_SMS_PROMPT_VERSION:TEXT_EXPENSE_PROMPT_VERSION;
+  var prompt=isSms?buildSmsPrompt(text):buildExpensePrompt(text);
+  pendingTraceId=generateTraceId();
+  pendingTraceType=type;
+  const traceMeta={traceId:pendingTraceId,type:type,model:GEMINI_MODEL,promptVersion:promptVersion};
+  const raw=await callGeminiProxy(prompt,traceMeta);
   const clean=raw.replace(/```json|```/g,'').trim();
+  let arr;
   try{
     const p=JSON.parse(clean);
-    const arr=Array.isArray(p)?p:[p];
-    return arr.map(item=>{
-      const lc=guessCategory(item.item,item.shop);
-      if(lc)item._localCat=lc;
-      if(isBankSms(text)&&!item.category&&!lc)item.category='UPI/Online';
-      return item;
-    });
-  }catch{throw new KharchaError('Parse Error','Bad JSON: '+clean.substring(0,80),'Try simpler text.');}
+    arr=Array.isArray(p)?p:[p];
+  }catch(e){
+    logAITrace(cfg,Object.assign({},traceMeta,{errorCategory:'json_parse_error',errorMessage:e.message,rawResponse:clean}));
+    throw new KharchaError('Parse Error','Bad JSON: '+clean.substring(0,80),'Try simpler text.');
+  }
+  arr=arr.map(item=>{
+    const lc=guessCategory(item.item,item.shop);
+    if(lc)item._localCat=lc;
+    if(isSms&&!item.category&&!lc)item.category='UPI/Online';
+    return item;
+  });
+  const rawCount=arr.length;
+  const filtered=filterValidAmountItems(arr);
+  logAITrace(cfg,Object.assign({},traceMeta,{itemsCountRaw:rawCount,itemsCountFiltered:filtered.length,itemsSum:sumItemAmounts(filtered),rawResponse:clean}));
+  return filtered;
 }
 
 async function handleFileUpload(event){
@@ -790,25 +829,49 @@ async function handleFileUpload(event){
     pendingImageMimeType=file.type||'image/jpeg';
     pendingImageFileName=file.name||('bill_'+Date.now()+'.jpg');
     statusText.textContent='Reading bill...';
+    pendingTraceId=generateTraceId();
+    pendingTraceType='photo';
     const prompt='Extract ALL expense items from this bill/receipt/passbook image. Return ONLY valid JSON, no markdown. Format: {"items":[{"date":"DD Mon YYYY or today","item":"English description","amount":number_or_null,"shop":"merchant or null","comment":"note or null","category":"Food|Transport|Shopping|Utilities|Health|Entertainment|Other|null"}],"receiptTotal":number_or_null}. Multiple items = multiple objects in "items". "receiptTotal" is the final grand total printed/written on the bill itself (e.g. next to "Total"/"Grand Total", or the last underlined number) — set it to null if you cannot find one, and prefer the FINAL total if the paper shows a correction or a crossed-out total replaced by a new one. ONLY the JSON object, nothing else.';
     const MAX_RETRIES=3;
     for(var attempt=1;attempt<=MAX_RETRIES;attempt++){
+      const t0=Date.now();
       let res;
-      try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key='+cfg.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:base64Data}}]}],generationConfig:{maxOutputTokens:1000}})});}
-      catch(e){throw new Error('Network error: '+e.message);}
-      if(res.status===429){if(attempt<MAX_RETRIES){const w=attempt*10000;showToast('Rate limit, retrying in '+attempt*10+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}throw new Error('Rate limit. Wait a minute and try again.');}
-      if(!res.ok){const eb=await res.json().catch(()=>({}));throw new Error('Vision error '+res.status+': '+(eb&&eb.error?eb.error.message:'Unknown'));}
+      try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent?key='+cfg.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:base64Data}}]}],generationConfig:{maxOutputTokens:1000}})});}
+      catch(e){
+        logAITrace(cfg,{traceId:pendingTraceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,errorCategory:'network_error',errorMessage:e.message,latencyMs:Date.now()-t0,fileName:file.name});
+        throw new Error('Network error: '+e.message);
+      }
+      if(res.status===429){
+        logAITrace(cfg,{traceId:pendingTraceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:429,errorCategory:'rate_limit',errorMessage:'429 rate limited',latencyMs:Date.now()-t0,fileName:file.name});
+        if(attempt<MAX_RETRIES){const w=attempt*10000;showToast('Rate limit, retrying in '+attempt*10+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}
+        throw new Error('Rate limit. Wait a minute and try again.');
+      }
+      if(!res.ok){
+        const eb=await res.json().catch(()=>({}));
+        const em=(eb&&eb.error?eb.error.message:'Unknown');
+        logAITrace(cfg,{traceId:pendingTraceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:'http_error',errorMessage:em,latencyMs:Date.now()-t0,fileName:file.name});
+        throw new Error('Vision error '+res.status+': '+em);
+      }
       const data=await res.json();
       const raw=(data.candidates[0].content.parts[0].text||'').replace(/```json|```/g,'').trim();
-      const parsed=JSON.parse(raw);
+      let parsed;
+      try{parsed=JSON.parse(raw);}
+      catch(e){
+        logAITrace(cfg,{traceId:pendingTraceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:'json_parse_error',errorMessage:e.message,latencyMs:Date.now()-t0,fileName:file.name,rawResponse:raw});
+        throw new Error('Could not read the AI response for this photo. Try again.');
+      }
       // Backward/defensive compatible: accept {items,receiptTotal}, a bare array, or a single object.
       let items,receiptTotal=null;
       if(parsed&&Array.isArray(parsed.items)){items=parsed.items;receiptTotal=typeof parsed.receiptTotal==='number'?parsed.receiptTotal:null;}
       else if(Array.isArray(parsed)){items=parsed;}
       else{items=[parsed];}
       pendingReceiptTotal=receiptTotal;
+      const droppedCount=items.length;
+      items=filterValidAmountItems(items);
+      logAITrace(cfg,{traceId:pendingTraceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,itemsCountRaw:droppedCount,itemsCountFiltered:items.length,itemsSum:sumItemAmounts(items),receiptTotal:receiptTotal,latencyMs:Date.now()-t0,fileName:file.name,rawResponse:raw});
+      if(items.length===0)throw new Error('Could not read any valid amounts from this photo. Try a clearer photo, or enter the expense manually.');
       statusEl.classList.remove('active');
-      statusText.textContent='✓ '+items.length+' item(s) from '+file.name+' — review below, then Submit';
+      statusText.textContent='✓ '+items.length+' item(s) from '+file.name+(items.length<droppedCount?' ('+(droppedCount-items.length)+' unreadable/cancelled item(s) skipped)':'')+' — review below, then Submit';
       attachBtn.classList.add('has-file');
       // Store parsed items keyed by line index for use at submit time
       parsedItems=items.map(function(item){var lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});
@@ -831,7 +894,7 @@ async function handleFileUpload(event){
     statusEl.classList.remove('active');
     statusText.textContent='Failed: '+err.message;
     showToast('Upload failed: '+err.message,4000);
-    pendingImageBase64=null;pendingImageMimeType=null;pendingImageFileName=null;pendingReceiptTotal=null;
+    pendingImageBase64=null;pendingImageMimeType=null;pendingImageFileName=null;pendingReceiptTotal=null;pendingTraceId=null;pendingTraceType=null;
   }
   event.target.value='';
 }
@@ -845,6 +908,20 @@ let pendingImageBase64=null,pendingImageMimeType=null,pendingImageFileName=null;
 // The receipt's own printed/handwritten grand total, if Gemini could read one —
 // used to warn the user when the sum of parsed line items doesn't match it.
 let pendingReceiptTotal=null;
+// Set whenever an entry is going through an AI parse (text/SMS/photo) — carried through
+// to the saved row's "Trace ID" column so it can be looked up in AI_Traces later.
+// Stays null for entries the fast local parser handles without ever calling Gemini.
+let pendingTraceId=null;
+// Which type (text/sms/photo) the current pendingTraceId belongs to — needed so the
+// eventual outcome log (saved_as_is/saved_edited/abandoned) is tagged correctly.
+let pendingTraceType=null;
+// closeReview() is the single choke point for every way to dismiss the review overlay
+// (X button, Cancel button, backdrop click, hardware back) — but it's ALSO called as
+// part of a successful save. This flag lets closeReview() tell those apart, so
+// "abandoned" only gets logged when the user actually walked away without saving.
+let reviewJustSaved=false;
+// Compact, sortable-ish, good enough for a personal app (not a distributed-systems ID).
+function generateTraceId(){return 'T-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);}
 
 /* ═══════════════════════════════════════════════════════
    OPTIMISED submitExpense — local-first, Gemini fallback
@@ -880,6 +957,7 @@ async function submitExpense(){
     const local=localParse(text);
     if(local&&local.length>0){
       parsedItems=local;
+      pendingTraceId=null;pendingTraceType=null; // no AI was involved — leave the Trace ID column blank for this entry
       openReview(parsedItems);
       return;
     }
@@ -891,10 +969,12 @@ async function submitExpense(){
   if(isBankSms(text))showToast('📱 Bank SMS detected — parsing...',2000);
   else showToast('✨ Complex input — asking AI...', 2000);
   try{
-    parsedItems=await parseWithGemini(text);
+    parsedItems=await parseWithGemini(text); // sets pendingTraceId internally
+    if(parsedItems.length===0)throw new KharchaError('No Valid Amounts','Could not read a valid amount from this text.','Try rephrasing, or enter manually.');
     openReview(parsedItems);
     setTimeout(function(){autoSetUpiCategory(text);},100);
   }catch(err){
+    pendingTraceId=null;pendingTraceType=null; // a failed parse produced nothing worth linking a saved row to
     if(err instanceof KharchaError)showErrorToast(err.title+': '+err.message);
     else showErrorToast(err.message||'Something went wrong');
   }finally{
@@ -904,22 +984,94 @@ async function submitExpense(){
 }
 
 var reviewChipTags={};
+// Drops items Gemini couldn't assign a real, positive amount to — e.g. a struck-through
+// or cancelled line on a bill. Without this, such an item still showed up in a merged
+// item's NAME list while silently contributing ₹0 to the summed AMOUNT — which looked
+// exactly like a bug: an item you can see that the total doesn't actually include.
+function filterValidAmountItems(items){return (items||[]).filter(function(it){return parseFloat(calcAmount(String(it&&it.amount!=null?it.amount:'')))>0;});}
 function openReview(items){multiMode='separate';const isMulti=items.length>1;document.getElementById('multiChoice').style.display=isMulti?'block':'none';document.getElementById('btnSeparate').classList.add('active');document.getElementById('btnMerge').classList.remove('active');items.forEach((_,i)=>{reviewChipTags[i]=getTag()||'Regular';});renderReviewChips(items,isMulti?'separate':'single');checkTotalMismatch(items);document.getElementById('reviewOverlay').classList.add('show');history.pushState({modal:'review'},'');}
 // Warns when the parsed line items don't add up to the receipt's own printed/written
 // total — the most common sign of a misread or missed item on a messy bill photo.
 // Only relevant for image-sourced entries where Gemini found a total to compare against.
+// Shared by checkTotalMismatch() and the trace logger, so both always agree on "the total".
+function sumItemAmounts(items){return (items||[]).reduce((s,i)=>s+(parseFloat(calcAmount(String(i.amount||'')))||0),0);}
+// Logs every Gemini Vision bill-parse attempt to the "AI_Traces" sheet tab — raw response,
+// item counts before/after filtering, the receipt's own total, and whether they'd mismatch.
+// Fire-and-forget: logging must NEVER throw, block, or otherwise affect the main upload flow.
+// Fire-and-forget log of one AI event (a retry/error at a single attempt, or a final
+// parse outcome) to the "AI_Traces" sheet tab. NEVER throws — logging must not affect
+// the main upload/parse flow either way.
+//
+// params: {traceId, type:'text'|'sms'|'photo', attempt, model, promptVersion,
+//          itemsCountRaw, itemsCountFiltered, itemsSum, receiptTotal,
+//          httpStatus, errorCategory, errorMessage, latencyMs, fileName, rawResponse}
+//
+// To add a new field later: add it here, add it to the backend's TRACE_HEADERS +
+// logAITrace() in backend.gs (same order), and pass it from whichever call site
+// produces it. Nothing else needs to change.
+function logAITrace(cfg,params){
+  try{
+    const itemsSum=params.itemsSum;
+    const receiptTotal=params.receiptTotal;
+    const mismatchAmount=(itemsSum!=null&&receiptTotal!=null)?Math.round((itemsSum-receiptTotal)*100)/100:null;
+    const mismatch=mismatchAmount!=null&&Math.abs(mismatchAmount)>1;
+    fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({action:'logAITrace'},params,{mismatch:mismatch,mismatchAmount:mismatchAmount,userAgent:navigator.userAgent||'',loggedBy:cfg.userName||''}))});
+  }catch(traceErr){/* logging must never break the main flow */}
+}
+// Compares what Gemini originally proposed for one item against what actually got
+// submitted, and returns the list of fields that differ. Only compares fields Gemini
+// itself predicts (item/amount/shop/comment/category) — NOT tag or payMode, which are
+// app-side choices the model never proposed in the first place, so "the user picked a
+// different sheet" isn't a sign the AI got anything wrong.
+function computeEditedFields(original,final){
+  if(!original)return [];
+  const fields=[];
+  if((original.item||'').trim()!==(final.item||'').trim())fields.push('item');
+  const origAmt=parseFloat(calcAmount(String(original.amount||'')))||0;
+  const finalAmt=parseFloat(final.amount)||0;
+  if(Math.abs(origAmt-finalAmt)>0.01)fields.push('amount');
+  if((original.shop||'').trim()!==(final.shop||'').trim())fields.push('shop');
+  if((original.comment||'').trim()!==(final.comment||'').trim())fields.push('comment');
+  const origCat=(original._localCat||original.category||'').trim();
+  const finalCat=(final.category||'').trim();
+  // Only counts as "edited" if Gemini actually proposed a category and it changed —
+  // Gemini leaving it blank and the user picking one isn't "correcting a mistake".
+  if(origCat&&finalCat&&origCat!==finalCat)fields.push('category');
+  const origDateNorm=toDateInput(original.date||'');
+  const finalDateNorm=toDateInput(final.date||'');
+  if(origDateNorm&&finalDateNorm&&origDateNorm!==finalDateNorm)fields.push('date');
+  return fields;
+}
+// Logs whether an AI-parsed entry was saved exactly as proposed, saved after edits,
+// or abandoned (review opened, never confirmed) — the feedback loop that would have
+// caught the phantom-item bug without needing you to notice a wrong total yourself.
+// Scoped to 'separate' review mode only — a merged multi-item row concatenates several
+// original items into one, where "was it edited" no longer has a clean 1:1 meaning.
+function logOutcomeTrace(cfg,traceId,type,outcome,editedFields){
+  if(!traceId)return; // nothing to link this outcome to — not an AI-parsed entry
+  logAITrace(cfg,{traceId:traceId,type:type||'',outcome:outcome,editedFields:(editedFields||[]).join(',')});
+}
 function checkTotalMismatch(items){
   const banner=document.getElementById('totalMismatchWarning');
   const isImageSourced=document.getElementById('expenseInput').dataset.imageParsed==='1';
   if(!isImageSourced||pendingReceiptTotal==null){banner.style.display='none';return;}
-  const itemsSum=items.reduce((s,i)=>s+(parseFloat(calcAmount(String(i.amount||'')))||0),0);
+  const itemsSum=sumItemAmounts(items);
   const diff=Math.round((itemsSum-pendingReceiptTotal)*100)/100;
   if(Math.abs(diff)<=1){banner.style.display='none';return;} // rounding-level, not worth flagging
   const diffText=diff>0?('₹'+fmtAmt(Math.abs(diff))+' more than'):('₹'+fmtAmt(Math.abs(diff))+' less than');
   banner.innerHTML='⚠️ Items add up to ₹'+fmtAmt(itemsSum)+' — that\'s '+diffText+' the ₹'+fmtAmt(pendingReceiptTotal)+' total on the receipt. Worth double-checking an item or amount below before saving.';
   banner.style.display='block';
 }
-function closeReview(){document.getElementById('reviewOverlay').classList.remove('show');}
+function closeReview(){
+  // If a Gemini-parsed review is closing WITHOUT having just been saved, that's a real
+  // "abandoned" signal — the user saw the AI's proposal and chose not to keep it.
+  // Scoped to 'separate' mode for the same reason as the edited-fields comparison above.
+  if(!reviewJustSaved&&pendingTraceId&&multiMode!=='merge'){
+    logOutcomeTrace(loadConfig(),pendingTraceId,pendingTraceType,'abandoned',[]);
+  }
+  reviewJustSaved=false;
+  document.getElementById('reviewOverlay').classList.remove('show');
+}
 function maybeCloseReview(e){if(e.target===document.getElementById('reviewOverlay'))closeReview();}
 function setMultiMode(mode){multiMode=mode;document.getElementById('btnSeparate').classList.toggle('active',mode==='separate');document.getElementById('btnMerge').classList.toggle('active',mode==='merge');renderReviewChips(parsedItems,mode);}
 function renderReviewChips(items,mode){const container=document.getElementById('reviewItems');const defTag=getTag()||'Regular';if(mode==='merge'||mode==='single'){reviewChipTags[0]=defTag;const mItem=items.map(i=>i.item||'').filter(Boolean).join(', ');const mAmt=items.reduce((s,i)=>s+(parseFloat(calcAmount(String(i.amount||'')))||0),0)||'';const shops=[...new Set(items.map(i=>i.shop).filter(Boolean))];const mShop=shops.length===1?shops[0]:'';const cat=items[0]?items[0]._localCat||items[0].category||'':'';container.innerHTML=buildChip({date:items[0]?items[0].date:'',item:mItem,amount:mAmt,shop:mShop,comment:'',category:cat},0,null,defTag);}else{container.innerHTML=items.map((item,i)=>buildChip(item,i,items.length,reviewChipTags[i]||defTag)).join('');}}
@@ -996,8 +1148,20 @@ async function confirmAndSave(){
       var amtCalc=calcAmount(amtRaw);
       if(!amtCalc||parseFloat(amtCalc)<=0){showToast('❌ Valid amount is required for entry '+(count>1?i+1:''));btn.classList.remove('loading');btn.disabled=false;return;}
       if(catVal&&(parsedItems[i]?parsedItems[i].category:null)!==catVal)saveCatOverride(itemVal,shopVal,catVal);
-      rows.push({date:fromDateInput(dateVal),item:itemVal,amount:amtCalc,shop:shopVal,comment:commentVal,category:catVal,payMode:payVal,tag:tagVal,loggedBy:loggedBy,rawText:rawText,sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses'});
+      rows.push({date:fromDateInput(dateVal),item:itemVal,amount:amtCalc,shop:shopVal,comment:commentVal,category:catVal,payMode:payVal,tag:tagVal,loggedBy:loggedBy,rawText:rawText,sheetName:tagVal==='Shaadi'?'Shaadi':'Expenses',traceId:pendingTraceId||''});
     }
+
+    // Was this AI-parsed entry saved exactly as Gemini proposed, or edited first?
+    // Scoped to 'separate' mode — a merged item concatenates several originals into
+    // one, where "was it edited" no longer has a clean 1:1 meaning to compare against.
+    if(pendingTraceId&&multiMode!=='merge'){
+      var allEditedFields=[];
+      for(var ei=0;ei<rows.length;ei++){
+        computeEditedFields(parsedItems[ei],rows[ei]).forEach(function(f){if(allEditedFields.indexOf(f)===-1)allEditedFields.push(f);});
+      }
+      logOutcomeTrace(cfg,pendingTraceId,pendingTraceType,allEditedFields.length>0?'saved_edited':'saved_as_is',allEditedFields);
+    }
+    reviewJustSaved=true; // tell closeReview() below this is a real save, not a cancel
 
     // Only now — after the user has reviewed and confirmed — save the bill photo.
     // Sent as ONE request together with all its rows (still no-cors, since we never
@@ -1034,7 +1198,7 @@ async function confirmAndSave(){
   finally{btn.classList.remove('loading');btn.disabled=false;}
 }
 
-function resetAddForm(){const ta=document.getElementById('expenseInput');ta.value='';ta.dataset.imageParsed='';document.getElementById('charCount').textContent='500';document.getElementById('submitBtn').disabled=true;document.getElementById('hintCard').classList.remove('hidden');document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=null;updateSheetBadge();document.getElementById('uploadStatus').style.display='none';document.getElementById('attachBtn').classList.remove('has-file');pendingImageBase64=null;pendingImageMimeType=null;pendingImageFileName=null;pendingReceiptTotal=null;}
+function resetAddForm(){const ta=document.getElementById('expenseInput');ta.value='';ta.dataset.imageParsed='';document.getElementById('charCount').textContent='500';document.getElementById('submitBtn').disabled=true;document.getElementById('hintCard').classList.remove('hidden');document.querySelectorAll('.tag-pill').forEach(p=>p.classList.remove('active'));selectedTag=null;updateSheetBadge();document.getElementById('uploadStatus').style.display='none';document.getElementById('attachBtn').classList.remove('has-file');pendingImageBase64=null;pendingImageMimeType=null;pendingImageFileName=null;pendingReceiptTotal=null;pendingTraceId=null;pendingTraceType=null;}
 
 function checkApplyBtn(){
   const from=document.getElementById('filterFrom').value;
@@ -1370,7 +1534,7 @@ function openEdit(index){
 }
 function closeEdit(){document.getElementById('editOverlay').classList.remove('show');editingRow=null;editOriginalTag=null;}
 function maybeCloseEdit(e){if(e.target===document.getElementById('editOverlay'))closeEdit();}
-async function saveEdit(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Script URL not set');return;}if(!editingRow)return;const dateVal=document.getElementById('editDate').value;const dateErr=validateDate(dateVal);if(dateErr){showToast('❌ '+dateErr);return;}const newTag=getEditTag();const tagChanged=newTag!==(editOriginalTag||'Regular');const btn=document.getElementById('saveEditBtn');btn.classList.add('loading');btn.disabled=true;try{const sheetName=editingRow.sheetName||editingRow._sheet||'Expenses';if(tagChanged){const mp={action:'moveRow',rowNum:editingRow.rowNum,fromSheet:sheetName,toSheet:newTag==='Shaadi'?'Shaadi':'Expenses',date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||'',payMode:editingRow.payMode||'Cash',additionalInfo:editingRow.additionalInfo||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(mp)});allRows.splice(allRows.indexOf(editingRow),1);renderFilteredHistory();closeEdit();showToast('Moved to '+(newTag==='Shaadi'?'Shaadi':'Expenses')+' sheet ✓');}else{const upd={action:'updateRow',rowNum:editingRow.rowNum,sheetName:sheetName,date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||'',payMode:editingRow.payMode||'Cash',additionalInfo:editingRow.additionalInfo||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(upd)});Object.assign(editingRow,upd);renderFilteredHistory();closeEdit();showToast('Entry updated ✓');}}catch(err){showToast('Failed — try again');}finally{btn.classList.remove('loading');btn.disabled=false;}}
+async function saveEdit(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Script URL not set');return;}if(!editingRow)return;const dateVal=document.getElementById('editDate').value;const dateErr=validateDate(dateVal);if(dateErr){showToast('❌ '+dateErr);return;}const newTag=getEditTag();const tagChanged=newTag!==(editOriginalTag||'Regular');const btn=document.getElementById('saveEditBtn');btn.classList.add('loading');btn.disabled=true;try{const sheetName=editingRow.sheetName||editingRow._sheet||'Expenses';if(tagChanged){const mp={action:'moveRow',rowNum:editingRow.rowNum,fromSheet:sheetName,toSheet:newTag==='Shaadi'?'Shaadi':'Expenses',date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||'',payMode:editingRow.payMode||'Cash',additionalInfo:editingRow.additionalInfo||'',traceId:editingRow.traceId||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(mp)});allRows.splice(allRows.indexOf(editingRow),1);renderFilteredHistory();closeEdit();showToast('Moved to '+(newTag==='Shaadi'?'Shaadi':'Expenses')+' sheet ✓');}else{const upd={action:'updateRow',rowNum:editingRow.rowNum,sheetName:sheetName,date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||'',payMode:editingRow.payMode||'Cash',additionalInfo:editingRow.additionalInfo||'',traceId:editingRow.traceId||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(upd)});Object.assign(editingRow,upd);renderFilteredHistory();closeEdit();showToast('Entry updated ✓');}}catch(err){showToast('Failed — try again');}finally{btn.classList.remove('loading');btn.disabled=false;}}
 
 // Silent background refresh — merges both sheets into allRows
 async function silentRefreshHistory(){

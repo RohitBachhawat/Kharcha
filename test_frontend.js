@@ -88,7 +88,7 @@ function buildSandbox({ elements = {}, fetchImpl }) {
     setTimeout: (fn) => { fn(); return 0; }, // run "later" work immediately for deterministic tests
     clearTimeout: () => {},
     setInterval: () => 0, clearInterval: () => {},
-    Date, JSON, Math, String, parseInt, parseFloat, isNaN, Array, Object, Function, RegExp,
+    Date, JSON, Math, String, parseInt, parseFloat, isNaN, Array, Object, Function, RegExp, URLSearchParams,
     navigator: { onLine: true, serviceWorker: undefined },
     alert: () => {},
     history: { pushState: () => {}, replaceState: () => {}, back: () => {} },
@@ -190,6 +190,44 @@ section('2. confirmAndSave() — text-only entry (no image)');
     assert.strictEqual(rowCall.body.additionalInfo, undefined);
     assert.strictEqual(rowCall.body.amount, '20');
     assert.strictEqual(rowCall.body.sheetName, 'Expenses');
+  });
+  await test('A local-parse entry (pendingTraceId never set) saves with an empty traceId, not undefined', () => {
+    const rowCall = fetchCalls.find(c => c.body && c.body.item === 'Tea');
+    assert.strictEqual(rowCall.body.traceId, '');
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('2b. confirmAndSave() — stamps a real Trace ID for a Gemini-sourced text entry');
+{
+  const elements = {};
+  setInput(elements, 'expenseInput', 'bought some hardware stuff, complicated bill');
+  elements['expenseInput'].dataset.imageParsed = ''; // text path, not photo — but WAS Gemini-parsed
+  setInput(elements, 'rv-date-0', '2026-09-04');
+  setInput(elements, 'rv-cat-0', 'Shopping');
+  setInput(elements, 'rv-tag-0', 'Regular');
+  setInput(elements, 'rv-item-0', 'Hardware items');
+  setInput(elements, 'rv-shop-0', 'Sandip Hardware');
+  setInput(elements, 'rv-comment-0', '');
+  setInput(elements, 'rv-amount-0', '500');
+  setInput(elements, 'rv-pay-0', 'Cash');
+
+  const { sandbox, fetchCalls } = buildSandbox({
+    elements,
+    fetchImpl: async () => ({ json: async () => ({ success: true }) }),
+  });
+  sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', userName: 'RB' }));
+  sandbox.__setState({
+    parsedItems: ([{ category: 'Shopping' }]),
+    multiMode: ('separate'),
+    pendingTraceId: ('T-real-trace-abc12'), // as if parseWithGemini had just set this
+  });
+
+  await test('The saved row carries the real Trace ID set by a prior Gemini text parse', async () => {
+    await sandbox.confirmAndSave();
+    const rowCall = fetchCalls.find(c => c.body && c.body.item === 'Hardware items');
+    assert.ok(rowCall);
+    assert.strictEqual(rowCall.body.traceId, 'T-real-trace-abc12');
   });
 }
 
@@ -385,6 +423,61 @@ section('5. confirmAndSave() — addWithPhoto is now AWAITED (mobile-reliability
 }
 
 // ══════════════════════════════════════════════════════════
+section('5b. filterValidAmountItems() — drops items with no real amount before they ever reach review');
+{
+  const { sandbox } = buildSandbox({ elements: {}, fetchImpl: async () => ({ json: async () => ({}) }) });
+
+  await test('Keeps items with a valid positive amount', () => {
+    const result = sandbox.filterValidAmountItems([{ item: 'Tea', amount: 20 }, { item: 'Milk', amount: 60 }]);
+    assert.strictEqual(result.length, 2);
+  });
+  await test('Drops an item with amount: null (e.g. a struck-through/cancelled line)', () => {
+    const result = sandbox.filterValidAmountItems([{ item: 'Tea', amount: 20 }, { item: '10 inch Handle', amount: null }]);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].item, 'Tea');
+  });
+  await test('Drops an item with amount: 0', () => {
+    const result = sandbox.filterValidAmountItems([{ item: 'Free sample', amount: 0 }, { item: 'Tea', amount: 20 }]);
+    assert.strictEqual(result.length, 1);
+  });
+  await test('Drops an item with a missing amount field entirely', () => {
+    const result = sandbox.filterValidAmountItems([{ item: 'Tea' }, { item: 'Milk', amount: 60 }]);
+    assert.strictEqual(result.length, 1);
+    assert.strictEqual(result[0].item, 'Milk');
+  });
+  await test('Drops an item with a negative amount', () => {
+    const result = sandbox.filterValidAmountItems([{ item: 'Refund?', amount: -50 }, { item: 'Tea', amount: 20 }]);
+    assert.strictEqual(result.length, 1);
+  });
+  await test('Keeps an item whose amount is an evaluable expression string (e.g. "200-20")', () => {
+    const result = sandbox.filterValidAmountItems([{ item: 'Combo', amount: '200-20' }]);
+    assert.strictEqual(result.length, 1);
+  });
+  await test('Handles null/undefined input gracefully (returns empty array, no crash)', () => {
+    assert.strictEqual(sandbox.filterValidAmountItems(null).length, 0);
+    assert.strictEqual(sandbox.filterValidAmountItems(undefined).length, 0);
+  });
+  await test('The exact Sandip Hardware scenario: the struck-through 10" handle is dropped, everything else stays', () => {
+    const rawGeminiItems = [
+      { item: '4 inch R/A Handle', amount: 840 },
+      { item: '10 inch R/A Handle', amount: null }, // struck through on the receipt
+      { item: '4 inch S/S Handle', amount: 168 },
+      { item: 'S/S Knob', amount: 225 },
+      { item: '2 inch Buffer', amount: 40 },
+      { item: 'Crest R/S', amount: 270 },
+      { item: 'Cupboard lock', amount: 240 },
+      { item: 'Godrej Cupboard', amount: 350 },
+      { item: '6 inch L.T. Bolt', amount: 220 },
+    ];
+    const result = sandbox.filterValidAmountItems(rawGeminiItems);
+    assert.strictEqual(result.length, 8);
+    assert.ok(!result.some(i => i.item === '10 inch R/A Handle'), 'the cancelled item must not appear at all — not in the list, not in any total');
+    const sum = result.reduce((s, i) => s + i.amount, 0);
+    assert.strictEqual(sum, 2353); // matches what was actually paid, within ₹1 rounding
+  });
+}
+
+// ══════════════════════════════════════════════════════════
 section('6. checkTotalMismatch() — receipt-total warning banner');
 {
   function setup(imageParsed, receiptTotal) {
@@ -442,6 +535,314 @@ section('6. checkTotalMismatch() — receipt-total warning banner');
     sandbox.checkTotalMismatch([{ amount: '200-20' }]); // evaluates to 180, still off from 100
     assert.strictEqual(elements['totalMismatchWarning'].style.display, 'block');
     assert.match(elements['totalMismatchWarning'].innerHTML, /180/);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('6b. logAITrace() — fire-and-forget AI observability logging (unified text/sms/photo)');
+{
+  const cfg = { scriptUrl: 'https://script.google.com/fake', userName: 'RB' };
+
+  await test('Sends a logAITrace request with all the diagnostic fields', () => {
+    const elements = {};
+    const { sandbox, fetchCalls } = buildSandbox({ elements, fetchImpl: async () => ({}) });
+    sandbox.logAITrace(cfg, { traceId: 'T-1', type: 'photo', attempt: 1, model: 'gemini-3.1-flash-lite-preview', promptVersion: 'vision-v2', fileName: 'bill.jpg', rawResponse: '{"items":[]}', itemsCountRaw: 9, itemsCountFiltered: 8, itemsSum: 2353, receiptTotal: 4193 });
+    assert.strictEqual(fetchCalls.length, 1);
+    const body = fetchCalls[0].body;
+    assert.strictEqual(body.action, 'logAITrace');
+    assert.strictEqual(body.traceId, 'T-1');
+    assert.strictEqual(body.type, 'photo');
+    assert.strictEqual(body.fileName, 'bill.jpg');
+    assert.strictEqual(body.itemsCountRaw, 9);
+    assert.strictEqual(body.itemsCountFiltered, 8);
+    assert.strictEqual(body.itemsSum, 2353);
+    assert.strictEqual(body.receiptTotal, 4193);
+    assert.strictEqual(body.loggedBy, 'RB');
+  });
+  await test('Correctly computes and flags a real mismatch', () => {
+    const { sandbox, fetchCalls } = buildSandbox({ elements: {}, fetchImpl: async () => ({}) });
+    sandbox.logAITrace(cfg, { traceId: 'T-2', type: 'photo', itemsSum: 2353, receiptTotal: 4193 });
+    const body = fetchCalls[0].body;
+    assert.strictEqual(body.mismatch, true);
+    assert.strictEqual(body.mismatchAmount, 2353 - 4193);
+  });
+  await test('Does not flag a mismatch when items sum matches the receipt total', () => {
+    const { sandbox, fetchCalls } = buildSandbox({ elements: {}, fetchImpl: async () => ({}) });
+    sandbox.logAITrace(cfg, { traceId: 'T-3', type: 'photo', itemsSum: 300, receiptTotal: 300 });
+    assert.strictEqual(fetchCalls[0].body.mismatch, false);
+  });
+  await test('Does not flag a mismatch when no receipt total was found (receiptTotal null, e.g. text/sms)', () => {
+    const { sandbox, fetchCalls } = buildSandbox({ elements: {}, fetchImpl: async () => ({}) });
+    sandbox.logAITrace(cfg, { traceId: 'T-4', type: 'text', itemsSum: 300 });
+    assert.strictEqual(fetchCalls[0].body.mismatch, false);
+    assert.strictEqual(fetchCalls[0].body.mismatchAmount, null);
+  });
+  await test('Uses no-cors + text/plain, same as every other write (consistent with the mobile-reliability fix)', () => {
+    const { sandbox, fetchCalls } = buildSandbox({ elements: {}, fetchImpl: async () => ({}) });
+    sandbox.logAITrace(cfg, { traceId: 'T-5', type: 'text' });
+    assert.strictEqual(fetchCalls[0].opts.mode, 'no-cors');
+    assert.strictEqual(fetchCalls[0].opts.headers['Content-Type'], 'text/plain;charset=utf-8');
+  });
+  await test('Carries error/attempt fields through untouched for a retry/error log', () => {
+    const { sandbox, fetchCalls } = buildSandbox({ elements: {}, fetchImpl: async () => ({}) });
+    sandbox.logAITrace(cfg, { traceId: 'T-6', type: 'text', attempt: 2, httpStatus: 429, errorCategory: 'rate_limit', errorMessage: 'Too many requests', latencyMs: 900 });
+    const body = fetchCalls[0].body;
+    assert.strictEqual(body.attempt, 2);
+    assert.strictEqual(body.httpStatus, 429);
+    assert.strictEqual(body.errorCategory, 'rate_limit');
+    assert.strictEqual(body.errorMessage, 'Too many requests');
+    assert.strictEqual(body.latencyMs, 900);
+  });
+  await test('NEVER throws, even if fetch itself throws synchronously — logging must not break the upload flow', () => {
+    const elements = {};
+    const { sandbox } = buildSandbox({ elements, fetchImpl: () => { throw new Error('boom'); } });
+    assert.doesNotThrow(() => sandbox.logAITrace(cfg, { traceId: 'T-7', type: 'photo' }));
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('6c. parseWithGemini() — Trace ID generation, type detection, filtering, and logging');
+{
+  function setupTextSandbox(replyText) {
+    const elements = {};
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements,
+      fetchImpl: async (url) => {
+        // GET requests to the Apps Script geminiProxy action — respond with a canned Gemini reply
+        return { ok: true, status: 200, json: async () => ({ success: true, result: replyText }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' }));
+    return { sandbox, fetchCalls };
+  }
+
+  await test('A plain expense text gets type="text" and a fresh Trace ID', async () => {
+    const { sandbox, fetchCalls } = setupTextSandbox('[{"item":"Tea","amount":20,"shop":"Tapri","category":"Food"}]');
+    const items = await sandbox.parseWithGemini('chai and samosa at the corner shop');
+    assert.strictEqual(items.length, 1);
+    const traceCall = fetchCalls.find(c => c.body && c.body.action === 'logAITrace');
+    assert.ok(traceCall, 'a final outcome trace should have been logged');
+    assert.strictEqual(traceCall.body.type, 'text');
+    assert.match(traceCall.body.traceId, /^T-/); // generateTraceId()'s format
+  });
+  await test('Bank SMS text gets type="sms" instead of "text"', async () => {
+    const { sandbox, fetchCalls } = setupTextSandbox('[{"item":"UPI Payment","amount":500,"shop":"Merchant"}]');
+    const smsText = 'Rs.500 debited from your account XX1234 via UPI to MERCHANT on 04-09-26';
+    await sandbox.parseWithGemini(smsText);
+    const traceCall = fetchCalls.find(c => c.body && c.body.action === 'logAITrace');
+    assert.strictEqual(traceCall.body.type, 'sms');
+  });
+  await test('Applies filterValidAmountItems the same way the photo path does — drops items with no real amount', async () => {
+    const { sandbox } = setupTextSandbox('[{"item":"Tea","amount":20},{"item":"Cancelled thing","amount":null}]');
+    const items = await sandbox.parseWithGemini('chai 20 and something else');
+    assert.strictEqual(items.length, 1);
+    assert.strictEqual(items[0].item, 'Tea');
+  });
+  await test('A JSON parse failure logs an error trace with the raw response, then throws', async () => {
+    const { sandbox, fetchCalls } = setupTextSandbox('not valid json at all');
+    await assert.rejects(() => sandbox.parseWithGemini('some garbled input'));
+    const traceCall = fetchCalls.find(c => c.body && c.body.action === 'logAITrace' && c.body.errorCategory === 'json_parse_error');
+    assert.ok(traceCall, 'a json_parse_error trace should have been logged');
+    assert.strictEqual(traceCall.body.rawResponse, 'not valid json at all');
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('6d. computeEditedFields() — pure comparison logic');
+{
+  const { sandbox } = buildSandbox({ elements: {}, fetchImpl: async () => ({}) });
+
+  await test('No changes at all returns an empty list', () => {
+    const original = { item: 'Tea', amount: 20, shop: 'Tapri', comment: '', category: 'Food', date: '04 Sep 2026' };
+    const final = { item: 'Tea', amount: '20', shop: 'Tapri', comment: '', category: 'Food', date: '2026-09-04' };
+    assert.strictEqual(sandbox.computeEditedFields(original, final).length, 0);
+  });
+  await test('A changed item name is detected', () => {
+    const result = sandbox.computeEditedFields({ item: 'Tea', amount: 20 }, { item: 'Chai Latte', amount: '20' });
+    assert.ok(result.includes('item'));
+  });
+  await test('A changed amount is detected (numeric tolerance for float rounding)', () => {
+    const result = sandbox.computeEditedFields({ item: 'Tea', amount: 20 }, { item: 'Tea', amount: '25' });
+    assert.ok(result.includes('amount'));
+  });
+  await test('A trivial floating point difference under 0.01 is NOT flagged', () => {
+    const result = sandbox.computeEditedFields({ item: 'Tea', amount: 20.001 }, { item: 'Tea', amount: '20.005' });
+    assert.ok(!result.includes('amount'));
+  });
+  await test('A changed shop is detected', () => {
+    const result = sandbox.computeEditedFields({ item: 'Tea', shop: 'Tapri' }, { item: 'Tea', shop: 'Different Shop' });
+    assert.ok(result.includes('shop'));
+  });
+  await test('A changed comment is detected', () => {
+    const result = sandbox.computeEditedFields({ item: 'Tea', comment: 'morning' }, { item: 'Tea', comment: 'evening' });
+    assert.ok(result.includes('comment'));
+  });
+  await test('A changed category IS flagged when Gemini originally proposed one', () => {
+    const result = sandbox.computeEditedFields({ item: 'Tea', category: 'Food' }, { item: 'Tea', category: 'Other' });
+    assert.ok(result.includes('category'));
+  });
+  await test('Category is NOT flagged when Gemini left it blank and the user just picked one (not a correction)', () => {
+    const result = sandbox.computeEditedFields({ item: 'Tea', category: '' }, { item: 'Tea', category: 'Food' });
+    assert.ok(!result.includes('category'));
+  });
+  await test('A changed date is detected', () => {
+    const result = sandbox.computeEditedFields({ item: 'Tea', date: '04 Sep 2026' }, { item: 'Tea', date: '2026-09-03' });
+    assert.ok(result.includes('date'));
+  });
+  await test('Multiple simultaneous changes are all listed', () => {
+    const result = sandbox.computeEditedFields({ item: 'Tea', amount: 20, shop: 'A' }, { item: 'Chai', amount: '25', shop: 'B' });
+    assert.strictEqual(result.length, 3);
+  });
+  await test('A null/undefined original (e.g. no corresponding parsedItems entry) returns empty, not a crash', () => {
+    assert.strictEqual(sandbox.computeEditedFields(null, { item: 'Tea' }).length, 0);
+    assert.strictEqual(sandbox.computeEditedFields(undefined, { item: 'Tea' }).length, 0);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('6e. logOutcomeTrace() — the wrapper that feeds the Outcome/Edited Fields columns');
+{
+  const cfg = { scriptUrl: 'https://script.google.com/fake', userName: 'RB' };
+
+  await test('Logs outcome + comma-joined edited fields', () => {
+    const { sandbox, fetchCalls } = buildSandbox({ elements: {}, fetchImpl: async () => ({}) });
+    sandbox.logOutcomeTrace(cfg, 'T-1', 'text', 'saved_edited', ['amount', 'category']);
+    assert.strictEqual(fetchCalls.length, 1);
+    assert.strictEqual(fetchCalls[0].body.outcome, 'saved_edited');
+    assert.strictEqual(fetchCalls[0].body.editedFields, 'amount,category');
+    assert.strictEqual(fetchCalls[0].body.traceId, 'T-1');
+  });
+  await test('Does nothing (no fetch at all) when traceId is falsy — nothing to link the outcome to', () => {
+    const { sandbox, fetchCalls } = buildSandbox({ elements: {}, fetchImpl: async () => ({}) });
+    sandbox.logOutcomeTrace(cfg, null, 'text', 'abandoned', []);
+    assert.strictEqual(fetchCalls.length, 0);
+  });
+  await test('An empty edited-fields array logs as an empty string, not "undefined"', () => {
+    const { sandbox, fetchCalls } = buildSandbox({ elements: {}, fetchImpl: async () => ({}) });
+    sandbox.logOutcomeTrace(cfg, 'T-2', 'photo', 'saved_as_is', []);
+    assert.strictEqual(fetchCalls[0].body.editedFields, '');
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('6f. confirmAndSave() — outcome tracking integration');
+{
+  function makeTextElements(itemVal, amountVal) {
+    const elements = {};
+    setInput(elements, 'expenseInput', 'some ai-parsed text');
+    elements['expenseInput'].dataset.imageParsed = '';
+    setInput(elements, 'rv-date-0', '2026-09-04');
+    setInput(elements, 'rv-cat-0', 'Food');
+    setInput(elements, 'rv-tag-0', 'Regular');
+    setInput(elements, 'rv-item-0', itemVal);
+    setInput(elements, 'rv-shop-0', 'Tapri');
+    setInput(elements, 'rv-comment-0', '');
+    setInput(elements, 'rv-amount-0', amountVal);
+    setInput(elements, 'rv-pay-0', 'Cash');
+    return elements;
+  }
+  function setup(elements) {
+    const { sandbox, fetchCalls } = buildSandbox({ elements, fetchImpl: async () => ({ json: async () => ({ success: true }) }) });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', userName: 'RB' }));
+    return { sandbox, fetchCalls };
+  }
+
+  await test('Saving EXACTLY what Gemini proposed logs outcome=saved_as_is with no edited fields', async () => {
+    const { sandbox, fetchCalls } = setup(makeTextElements('Tea', '20'));
+    sandbox.__setState({
+      parsedItems: ([{ item: 'Tea', amount: 20, shop: 'Tapri', comment: '', category: 'Food', date: '04 Sep 2026' }]),
+      multiMode: ('separate'),
+      pendingTraceId: ('T-asis'),
+      pendingTraceType: ('text'),
+    });
+    await sandbox.confirmAndSave();
+    const outcomeCall = fetchCalls.find(c => c.body && c.body.outcome);
+    assert.ok(outcomeCall, 'an outcome trace should have been logged');
+    assert.strictEqual(outcomeCall.body.outcome, 'saved_as_is');
+    assert.strictEqual(outcomeCall.body.editedFields, '');
+  });
+  await test('Editing the amount before saving logs outcome=saved_edited with "amount" listed', async () => {
+    const { sandbox, fetchCalls } = setup(makeTextElements('Tea', '35')); // Gemini said 20, user changed to 35
+    sandbox.__setState({
+      parsedItems: ([{ item: 'Tea', amount: 20, shop: 'Tapri', comment: '', category: 'Food', date: '04 Sep 2026' }]),
+      multiMode: ('separate'),
+      pendingTraceId: ('T-edited'),
+      pendingTraceType: ('text'),
+    });
+    await sandbox.confirmAndSave();
+    const outcomeCall = fetchCalls.find(c => c.body && c.body.outcome);
+    assert.ok(outcomeCall);
+    assert.strictEqual(outcomeCall.body.outcome, 'saved_edited');
+    assert.strictEqual(outcomeCall.body.editedFields, 'amount');
+  });
+  await test('No outcome trace at all for a local-parse entry (pendingTraceId never set)', async () => {
+    const { sandbox, fetchCalls } = setup(makeTextElements('Tea', '20'));
+    sandbox.__setState({ parsedItems: ([{ item: 'Tea', amount: 20 }]), multiMode: ('separate') });
+    await sandbox.confirmAndSave();
+    const outcomeCall = fetchCalls.find(c => c.body && c.body.outcome);
+    assert.strictEqual(outcomeCall, undefined);
+  });
+  await test('No outcome trace in merge mode (1:1 comparison doesn\'t apply to a merged row)', async () => {
+    const elements = makeTextElements('Tea, Milk', '80');
+    const { sandbox, fetchCalls } = setup(elements);
+    sandbox.__setState({
+      parsedItems: ([{ item: 'Tea', amount: 20 }, { item: 'Milk', amount: 60 }]),
+      multiMode: ('merge'),
+      pendingTraceId: ('T-merge'),
+      pendingTraceType: ('text'),
+    });
+    await sandbox.confirmAndSave();
+    const outcomeCall = fetchCalls.find(c => c.body && c.body.outcome);
+    assert.strictEqual(outcomeCall, undefined);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('6g. closeReview() — abandonment tracking');
+{
+  function setup() {
+    const elements = {};
+    const { sandbox, fetchCalls } = buildSandbox({ elements, fetchImpl: async () => ({}) });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', userName: 'RB' }));
+    return { sandbox, fetchCalls, elements };
+  }
+
+  await test('Closing a Gemini-parsed review WITHOUT saving logs outcome=abandoned', () => {
+    const { sandbox, fetchCalls } = setup();
+    sandbox.__setState({ pendingTraceId: ('T-abandon1'), pendingTraceType: ('text'), multiMode: ('separate') });
+    sandbox.closeReview();
+    const outcomeCall = fetchCalls.find(c => c.body && c.body.outcome);
+    assert.ok(outcomeCall, 'an abandoned trace should have been logged');
+    assert.strictEqual(outcomeCall.body.outcome, 'abandoned');
+    assert.strictEqual(outcomeCall.body.traceId, 'T-abandon1');
+  });
+  await test('closeReview() called as part of a SUCCESSFUL save does NOT log abandoned', () => {
+    const { sandbox, fetchCalls } = setup();
+    sandbox.__setState({ pendingTraceId: ('T-notabandoned'), pendingTraceType: ('text'), multiMode: ('separate'), reviewJustSaved: (true) });
+    sandbox.closeReview();
+    const outcomeCall = fetchCalls.find(c => c.body && c.body.outcome === 'abandoned');
+    assert.strictEqual(outcomeCall, undefined);
+  });
+  await test('reviewJustSaved resets after closeReview() runs, so the NEXT close is evaluated fresh', () => {
+    const { sandbox, fetchCalls } = setup();
+    sandbox.__setState({ pendingTraceId: ('T-seq1'), pendingTraceType: ('text'), multiMode: ('separate'), reviewJustSaved: (true) });
+    sandbox.closeReview(); // suppressed — this was a save
+    sandbox.__setState({ pendingTraceId: ('T-seq2') }); // a new review session begins
+    sandbox.closeReview(); // this one should NOT be suppressed
+    const abandonedCalls = fetchCalls.filter(c => c.body && c.body.outcome === 'abandoned');
+    assert.strictEqual(abandonedCalls.length, 1);
+    assert.strictEqual(abandonedCalls[0].body.traceId, 'T-seq2');
+  });
+  await test('No abandonment log for a local-parse review (pendingTraceId never set)', () => {
+    const { sandbox, fetchCalls } = setup();
+    sandbox.closeReview();
+    assert.strictEqual(fetchCalls.length, 0);
+  });
+  await test('No abandonment log in merge mode', () => {
+    const { sandbox, fetchCalls } = setup();
+    sandbox.__setState({ pendingTraceId: ('T-mergeabandon'), pendingTraceType: ('text'), multiMode: ('merge') });
+    sandbox.closeReview();
+    assert.strictEqual(fetchCalls.length, 0);
   });
 }
 
