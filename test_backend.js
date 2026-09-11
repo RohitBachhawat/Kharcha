@@ -82,6 +82,11 @@ const DriveApp = {
     let i = 0;
     return { hasNext: () => i < match.length, next: () => match[i++] };
   },
+  getFileById(id) {
+    const file = driveFiles.find(f => f.id === id);
+    if (!file) throw new Error('File not found: ' + id);
+    return file;
+  },
   createFolder(name) {
     const files = [];
     const folder = {
@@ -92,6 +97,7 @@ const DriveApp = {
           blob, sharing: null,
           setSharing(access, perm) { this.sharing = { access, perm }; },
           getUrl() { return 'https://drive.google.com/file/d/' + this.id + '/view'; },
+          getBlob() { return { getBytes: () => blob.bytes, getContentType: () => blob.mimeType }; },
         };
         files.push(file); driveFiles.push(file);
         return file;
@@ -104,6 +110,7 @@ const DriveApp = {
 
 const Utilities = {
   base64Decode(str) { return Buffer.from(str, 'base64'); },
+  base64Encode(bytes) { return Buffer.isBuffer(bytes) ? bytes.toString('base64') : Buffer.from(String(bytes)).toString('base64'); },
   newBlob(bytes, mimeType, name) { return { bytes, mimeType, name }; },
 };
 
@@ -559,6 +566,89 @@ test('Running it again does NOT create a duplicate trigger (idempotent)', () => 
   sandbox.installTraceCleanupTrigger();
   const triggers = sandbox.ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'cleanupOldTraces');
   assert.strictEqual(triggers.length, 1);
+});
+
+section('15. seedEvalCases + getEvalCases — the eval test set');
+test('seedEvalCases populates the Evals sheet with the starter set', () => {
+  sandbox.seedEvalCases();
+  const sheet = fakeSS.getSheetByName('Evals');
+  assert.ok(sheet, 'Evals sheet should be created');
+  assert.strictEqual(JSON.stringify(sheet.rows[0]), JSON.stringify(['Case ID', 'Type', 'Input', 'Expected Items (JSON)', 'Expected Total', 'Image File ID', 'Notes']));
+  assert.strictEqual(sheet.rows.length, 9); // header + 8 starter cases
+});
+test('seedEvalCases is safe to re-run — clears and rewrites rather than duplicating', () => {
+  sandbox.seedEvalCases();
+  sandbox.seedEvalCases();
+  const sheet = fakeSS.getSheetByName('Evals');
+  assert.strictEqual(sheet.rows.length, 9); // still 9, not 17
+});
+test('getEvalCases returns properly parsed case objects via the real GET action', () => {
+  const res = get({ action: 'getEvalCases' });
+  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.cases.length, 8);
+  const simple = res.cases.find(c => c.caseId === 'EVAL-001');
+  assert.strictEqual(simple.type, 'text');
+  assert.strictEqual(simple.input, 'chai 20');
+  assert.strictEqual(simple.expectedItems.length, 1);
+  assert.strictEqual(simple.expectedItems[0].item, 'Tea');
+  assert.strictEqual(simple.expectedItems[0].amount, 20);
+});
+test('The photo case (EVAL-008) has the full 9-item expected list and a receipt total', () => {
+  const res = get({ action: 'getEvalCases' });
+  const photoCase = res.cases.find(c => c.caseId === 'EVAL-008');
+  assert.strictEqual(photoCase.type, 'photo');
+  assert.strictEqual(photoCase.expectedItems.length, 9);
+  assert.strictEqual(photoCase.expectedTotal, 4193);
+  assert.ok(photoCase.notes.includes('2,354') || photoCase.notes.toLowerCase().includes('actually paid'), 'notes should explain the paid-vs-transcribed ambiguity');
+});
+test('getEvalCases returns an empty array (not an error) when the sheet has no cases yet', () => {
+  const ss = fakeSS.deleteSheet(fakeSS.getSheetByName('Evals'));
+  const res = get({ action: 'getEvalCases' });
+  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.cases.length, 0);
+  sandbox.seedEvalCases(); // restore for subsequent tests
+});
+
+section('16. getEvalImage — serving a fixture photo for photo eval cases');
+test('getEvalImage returns base64 + mimeType for a real Drive file', () => {
+  const folder = sandbox.DriveApp.createFolder('Eval Fixtures Test');
+  const originalBytes = Buffer.from('fake-bill-photo-bytes');
+  const file = folder.createFile({ bytes: originalBytes, mimeType: 'image/jpeg', name: 'bill.jpg' });
+  const res = get({ action: 'getEvalImage', fileId: file.id });
+  assert.strictEqual(res.success, true);
+  assert.strictEqual(res.mimeType, 'image/jpeg');
+  assert.strictEqual(Buffer.from(res.base64Data, 'base64').toString(), 'fake-bill-photo-bytes');
+});
+test('getEvalImage fails cleanly (not a crash) for a nonexistent file ID', () => {
+  const res = get({ action: 'getEvalImage', fileId: 'does-not-exist' });
+  assert.strictEqual(res.success, false);
+});
+test('getEvalImage fails cleanly when fileId is missing entirely', () => {
+  const res = get({ action: 'getEvalImage' });
+  assert.strictEqual(res.success, false);
+});
+
+section('17. logEvalRun — tracking scores over time');
+test('logEvalRun creates the Eval_Results sheet with proper headers and writes a row', () => {
+  const res = post({ action: 'logEvalRun', runId: 'RUN-1', model: 'gemini-3.1-flash-lite-preview', visionPromptVersion: 'vision-v2-receipttotal', textPromptVersion: 'text-v1', smsPromptVersion: 'sms-v1', casesRun: 8, amountScore: 87.5, itemNameScore: 92.0, categoryScore: 75.0, overallScore: 84.8, perCaseDetail: JSON.stringify([{ caseId: 'EVAL-001', pass: true }]) });
+  assert.strictEqual(res.success, true);
+  const sheet = fakeSS.getSheetByName('Eval_Results');
+  assert.ok(sheet);
+  assert.strictEqual(JSON.stringify(sheet.rows[0]), JSON.stringify(['Run ID', 'Timestamp', 'Model', 'Vision Prompt Version', 'Text Prompt Version', 'SMS Prompt Version', 'Cases Run', 'Amount Score (%)', 'Item Name Score (%)', 'Category Score (%)', 'Overall Score (%)', 'Per-Case Detail (JSON)']));
+  const row = sheet.rows[1];
+  assert.strictEqual(row[0], 'RUN-1');
+  assert.strictEqual(row[6], 8);
+  assert.strictEqual(row[7], 87.5);
+  assert.strictEqual(row[10], 84.8);
+});
+test('Multiple runs accumulate as separate rows, giving a trend over time', () => {
+  post({ action: 'logEvalRun', runId: 'RUN-2', overallScore: 90.0, casesRun: 8 });
+  const sheet = fakeSS.getSheetByName('Eval_Results');
+  assert.strictEqual(sheet.rows.length, 3); // header + RUN-1 + RUN-2
+});
+test('logEvalRun never throws even with a malformed/missing payload', () => {
+  const res = post({ action: 'logEvalRun' });
+  assert.strictEqual(res.success, true);
 });
 
 // ══════════════════════════════════════════════════════════

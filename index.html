@@ -781,7 +781,7 @@ async function callGeminiProxy(prompt,traceMeta){
   }
 }
 
-async function parseWithGemini(text){
+async function parseWithGemini(text,skipTrace){
   const cfg=loadConfig();
   const isSms=isBankSms(text);
   const type=isSms?'sms':'text';
@@ -789,7 +789,7 @@ async function parseWithGemini(text){
   var prompt=isSms?buildSmsPrompt(text):buildExpensePrompt(text);
   pendingTraceId=generateTraceId();
   pendingTraceType=type;
-  const traceMeta={traceId:pendingTraceId,type:type,model:GEMINI_MODEL,promptVersion:promptVersion};
+  const traceMeta=skipTrace?null:{traceId:pendingTraceId,type:type,model:GEMINI_MODEL,promptVersion:promptVersion};
   const raw=await callGeminiProxy(prompt,traceMeta);
   const clean=raw.replace(/```json|```/g,'').trim();
   let arr;
@@ -797,7 +797,7 @@ async function parseWithGemini(text){
     const p=JSON.parse(clean);
     arr=Array.isArray(p)?p:[p];
   }catch(e){
-    logAITrace(cfg,Object.assign({},traceMeta,{errorCategory:'json_parse_error',errorMessage:e.message,rawResponse:clean}));
+    if(!skipTrace)logAITrace(cfg,Object.assign({},traceMeta,{errorCategory:'json_parse_error',errorMessage:e.message,rawResponse:clean}));
     throw new KharchaError('Parse Error','Bad JSON: '+clean.substring(0,80),'Try simpler text.');
   }
   arr=arr.map(item=>{
@@ -808,7 +808,7 @@ async function parseWithGemini(text){
   });
   const rawCount=arr.length;
   const filtered=filterValidAmountItems(arr);
-  logAITrace(cfg,Object.assign({},traceMeta,{itemsCountRaw:rawCount,itemsCountFiltered:filtered.length,itemsSum:sumItemAmounts(filtered),rawResponse:clean}));
+  if(!skipTrace)logAITrace(cfg,Object.assign({},traceMeta,{itemsCountRaw:rawCount,itemsCountFiltered:filtered.length,itemsSum:sumItemAmounts(filtered),rawResponse:clean}));
   return filtered;
 }
 
@@ -831,65 +831,27 @@ async function handleFileUpload(event){
     statusText.textContent='Reading bill...';
     pendingTraceId=generateTraceId();
     pendingTraceType='photo';
-    const prompt='Extract ALL expense items from this bill/receipt/passbook image. Return ONLY valid JSON, no markdown. Format: {"items":[{"date":"DD Mon YYYY or today","item":"English description","amount":number_or_null,"shop":"merchant or null","comment":"note or null","category":"Food|Transport|Shopping|Utilities|Health|Entertainment|Other|null"}],"receiptTotal":number_or_null}. Multiple items = multiple objects in "items". "receiptTotal" is the final grand total printed/written on the bill itself (e.g. next to "Total"/"Grand Total", or the last underlined number) — set it to null if you cannot find one, and prefer the FINAL total if the paper shows a correction or a crossed-out total replaced by a new one. ONLY the JSON object, nothing else.';
-    const MAX_RETRIES=3;
-    for(var attempt=1;attempt<=MAX_RETRIES;attempt++){
-      const t0=Date.now();
-      let res;
-      try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent?key='+cfg.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:base64Data}}]}],generationConfig:{maxOutputTokens:1000}})});}
-      catch(e){
-        logAITrace(cfg,{traceId:pendingTraceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,errorCategory:'network_error',errorMessage:e.message,latencyMs:Date.now()-t0,fileName:file.name});
-        throw new Error('Network error: '+e.message);
-      }
-      if(res.status===429){
-        logAITrace(cfg,{traceId:pendingTraceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:429,errorCategory:'rate_limit',errorMessage:'429 rate limited',latencyMs:Date.now()-t0,fileName:file.name});
-        if(attempt<MAX_RETRIES){const w=attempt*10000;showToast('Rate limit, retrying in '+attempt*10+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}
-        throw new Error('Rate limit. Wait a minute and try again.');
-      }
-      if(!res.ok){
-        const eb=await res.json().catch(()=>({}));
-        const em=(eb&&eb.error?eb.error.message:'Unknown');
-        logAITrace(cfg,{traceId:pendingTraceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:'http_error',errorMessage:em,latencyMs:Date.now()-t0,fileName:file.name});
-        throw new Error('Vision error '+res.status+': '+em);
-      }
-      const data=await res.json();
-      const raw=(data.candidates[0].content.parts[0].text||'').replace(/```json|```/g,'').trim();
-      let parsed;
-      try{parsed=JSON.parse(raw);}
-      catch(e){
-        logAITrace(cfg,{traceId:pendingTraceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:'json_parse_error',errorMessage:e.message,latencyMs:Date.now()-t0,fileName:file.name,rawResponse:raw});
-        throw new Error('Could not read the AI response for this photo. Try again.');
-      }
-      // Backward/defensive compatible: accept {items,receiptTotal}, a bare array, or a single object.
-      let items,receiptTotal=null;
-      if(parsed&&Array.isArray(parsed.items)){items=parsed.items;receiptTotal=typeof parsed.receiptTotal==='number'?parsed.receiptTotal:null;}
-      else if(Array.isArray(parsed)){items=parsed;}
-      else{items=[parsed];}
-      pendingReceiptTotal=receiptTotal;
-      const droppedCount=items.length;
-      items=filterValidAmountItems(items);
-      logAITrace(cfg,{traceId:pendingTraceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,itemsCountRaw:droppedCount,itemsCountFiltered:items.length,itemsSum:sumItemAmounts(items),receiptTotal:receiptTotal,latencyMs:Date.now()-t0,fileName:file.name,rawResponse:raw});
-      if(items.length===0)throw new Error('Could not read any valid amounts from this photo. Try a clearer photo, or enter the expense manually.');
-      statusEl.classList.remove('active');
-      statusText.textContent='✓ '+items.length+' item(s) from '+file.name+(items.length<droppedCount?' ('+(droppedCount-items.length)+' unreadable/cancelled item(s) skipped)':'')+' — review below, then Submit';
-      attachBtn.classList.add('has-file');
-      // Store parsed items keyed by line index for use at submit time
-      parsedItems=items.map(function(item){var lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});
-      // Write one line per item into textarea so user can review/edit before submitting
-      var lines=items.map(function(item,i){
-        var parts=[];
-        if(item.item)parts.push(item.item);
-        if(item.amount)parts.push('₹'+fmtAmt(item.amount));
-        if(item.shop)parts.push('@'+item.shop);
-        if(item.category)parts.push('['+item.category+']');
-        return parts.join(' · ');
-      });
-      document.getElementById('expenseInput').value=lines.join('\n');
-      // Mark textarea as image-sourced so Submit uses parsedItems directly
-      document.getElementById('expenseInput').dataset.imageParsed='1';
-      onType();
-      return;
-    }
+    const result=await runVisionParse(cfg,base64Data,file.name,pendingTraceId);
+    pendingReceiptTotal=result.receiptTotal;
+    const items=result.items;
+    statusEl.classList.remove('active');
+    statusText.textContent='✓ '+items.length+' item(s) from '+file.name+(items.length<result.droppedCount?' ('+(result.droppedCount-items.length)+' unreadable/cancelled item(s) skipped)':'')+' — review below, then Submit';
+    attachBtn.classList.add('has-file');
+    // Store parsed items keyed by line index for use at submit time
+    parsedItems=items.map(function(item){var lc=guessCategory(item.item,item.shop);if(lc)item._localCat=lc;return item;});
+    // Write one line per item into textarea so user can review/edit before submitting
+    var lines=items.map(function(item,i){
+      var parts=[];
+      if(item.item)parts.push(item.item);
+      if(item.amount)parts.push('₹'+fmtAmt(item.amount));
+      if(item.shop)parts.push('@'+item.shop);
+      if(item.category)parts.push('['+item.category+']');
+      return parts.join(' · ');
+    });
+    document.getElementById('expenseInput').value=lines.join('\n');
+    // Mark textarea as image-sourced so Submit uses parsedItems directly
+    document.getElementById('expenseInput').dataset.imageParsed='1';
+    onType();
   }catch(err){
     statusEl.classList.remove('active');
     statusText.textContent='Failed: '+err.message;
@@ -897,6 +859,54 @@ async function handleFileUpload(event){
     pendingImageBase64=null;pendingImageMimeType=null;pendingImageFileName=null;pendingReceiptTotal=null;pendingTraceId=null;pendingTraceType=null;
   }
   event.target.value='';
+}
+
+// The actual Gemini Vision call + retry/error handling + item filtering — factored out
+// of handleFileUpload so the eval runner can exercise the EXACT same production code
+// path (including the exact prompt text) instead of a second copy that could drift.
+// Pass traceId=null to suppress trace logging entirely (used by eval runs, so they
+// don't pollute AI_Traces with non-production noise).
+async function runVisionParse(cfg,base64Data,fileName,traceId){
+  const prompt='Extract ALL expense items from this bill/receipt/passbook image. Return ONLY valid JSON, no markdown. Format: {"items":[{"date":"DD Mon YYYY or today","item":"English description","amount":number_or_null,"shop":"merchant or null","comment":"note or null","category":"Food|Transport|Shopping|Utilities|Health|Entertainment|Other|null"}],"receiptTotal":number_or_null}. Multiple items = multiple objects in "items". "receiptTotal" is the final grand total printed/written on the bill itself (e.g. next to "Total"/"Grand Total", or the last underlined number) — set it to null if you cannot find one, and prefer the FINAL total if the paper shows a correction or a crossed-out total replaced by a new one. ONLY the JSON object, nothing else.';
+  const MAX_RETRIES=3;
+  for(var attempt=1;attempt<=MAX_RETRIES;attempt++){
+    const t0=Date.now();
+    let res;
+    try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent?key='+cfg.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:base64Data}}]}],generationConfig:{maxOutputTokens:1000}})});}
+    catch(e){
+      if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,errorCategory:'network_error',errorMessage:e.message,latencyMs:Date.now()-t0,fileName:fileName});
+      throw new Error('Network error: '+e.message);
+    }
+    if(res.status===429){
+      if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:429,errorCategory:'rate_limit',errorMessage:'429 rate limited',latencyMs:Date.now()-t0,fileName:fileName});
+      if(attempt<MAX_RETRIES){const w=attempt*10000;showToast('Rate limit, retrying in '+attempt*10+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}
+      throw new Error('Rate limit. Wait a minute and try again.');
+    }
+    if(!res.ok){
+      const eb=await res.json().catch(()=>({}));
+      const em=(eb&&eb.error?eb.error.message:'Unknown');
+      if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:'http_error',errorMessage:em,latencyMs:Date.now()-t0,fileName:fileName});
+      throw new Error('Vision error '+res.status+': '+em);
+    }
+    const data=await res.json();
+    const raw=(data.candidates[0].content.parts[0].text||'').replace(/```json|```/g,'').trim();
+    let parsed;
+    try{parsed=JSON.parse(raw);}
+    catch(e){
+      if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:'json_parse_error',errorMessage:e.message,latencyMs:Date.now()-t0,fileName:fileName,rawResponse:raw});
+      throw new Error('Could not read the AI response for this photo. Try again.');
+    }
+    // Backward/defensive compatible: accept {items,receiptTotal}, a bare array, or a single object.
+    let items,receiptTotal=null;
+    if(parsed&&Array.isArray(parsed.items)){items=parsed.items;receiptTotal=typeof parsed.receiptTotal==='number'?parsed.receiptTotal:null;}
+    else if(Array.isArray(parsed)){items=parsed;}
+    else{items=[parsed];}
+    const droppedCount=items.length;
+    items=filterValidAmountItems(items);
+    if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,itemsCountRaw:droppedCount,itemsCountFiltered:items.length,itemsSum:sumItemAmounts(items),receiptTotal:receiptTotal,latencyMs:Date.now()-t0,fileName:fileName,rawResponse:raw});
+    if(items.length===0)throw new Error('Could not read any valid amounts from this photo. Try a clearer photo, or enter the expense manually.');
+    return {items:items,receiptTotal:receiptTotal,rawResponse:raw,droppedCount:droppedCount};
+  }
 }
 
 async function compressImage(file){return new Promise((resolve,reject)=>{if(file.type==='application/pdf'){const r=new FileReader();r.onload=e=>resolve(e.target.result);r.onerror=reject;r.readAsDataURL(file);return;}const img=new Image();const url=URL.createObjectURL(file);img.onload=function(){URL.revokeObjectURL(url);const canvas=document.createElement('canvas');const MAX=800;let w=img.width,h=img.height;if(w>h&&w>MAX){h=Math.round(h*MAX/w);w=MAX;}else if(h>w&&h>MAX){w=Math.round(w*MAX/h);h=MAX;}else if(w>MAX&&h>MAX){w=MAX;h=MAX;}canvas.width=w;canvas.height=h;const ctx=canvas.getContext('2d');ctx.drawImage(img,0,0,w,h);resolve(canvas.toDataURL('image/jpeg',0.7));};img.onerror=reject;img.src=url;});}
@@ -1050,6 +1060,104 @@ function computeEditedFields(original,final){
 function logOutcomeTrace(cfg,traceId,type,outcome,editedFields){
   if(!traceId)return; // nothing to link this outcome to — not an AI-parsed entry
   logAITrace(cfg,{traceId:traceId,type:type||'',outcome:outcome,editedFields:(editedFields||[]).join(',')});
+}
+
+// ══════════════════════════════════════════════════════════
+//  EVALS — score current parse quality against a fixed, known-correct test set
+// ══════════════════════════════════════════════════════════
+// Compares what was actually parsed against an eval case's expected items. Greedy
+// best-match by amount closeness (least ambiguous signal available), then checks
+// item-name (loose, case-insensitive substring either direction) and category
+// (informational — many expected items don't specify one) on each matched pair.
+function scoreEvalCase(actualItems,expectedItems){
+  const remaining=(actualItems||[]).slice();
+  let amountHits=0,itemNameHits=0,categoryHits=0,categoryTotal=0;
+  const details=[];
+  (expectedItems||[]).forEach(function(exp){
+    let bestIdx=-1,bestDiff=Infinity;
+    remaining.forEach(function(act,i){
+      const diff=Math.abs((parseFloat(act.amount)||0)-(parseFloat(exp.amount)||0));
+      if(diff<bestDiff){bestDiff=diff;bestIdx=i;}
+    });
+    if(bestIdx===-1){
+      details.push({expectedItem:exp.item,expectedAmount:exp.amount,matchedItem:null,amountMatch:false,itemMatch:false});
+      return;
+    }
+    const act=remaining[bestIdx];
+    const amountMatch=bestDiff<=0.01;
+    if(amountMatch)amountHits++;
+    const expName=(exp.item||'').toLowerCase().trim();
+    const actName=(act.item||'').toLowerCase().trim();
+    const itemMatch=!!(expName&&actName&&(expName.includes(actName)||actName.includes(expName)));
+    if(itemMatch)itemNameHits++;
+    if(exp.category){
+      categoryTotal++;
+      if((act.category||'').toLowerCase()===exp.category.toLowerCase())categoryHits++;
+    }
+    details.push({expectedItem:exp.item,expectedAmount:exp.amount,matchedItem:act.item,matchedAmount:act.amount,amountMatch:amountMatch,itemMatch:itemMatch});
+    remaining.splice(bestIdx,1); // claim this actual item so it can't be double-matched
+  });
+  const n=(expectedItems||[]).length;
+  return {
+    amountScore:n?Math.round((amountHits/n)*1000)/10:100,
+    itemNameScore:n?Math.round((itemNameHits/n)*1000)/10:100,
+    categoryScore:categoryTotal?Math.round((categoryHits/categoryTotal)*1000)/10:null, // null = not applicable
+    extraActualItems:remaining.length, // actual items that matched nothing expected — possible hallucination
+    details:details,
+  };
+}
+
+// Runs every eval case through the EXACT production code paths (parseWithGemini for
+// text/sms, runVisionParse for photo) with tracing suppressed, scores each one, logs
+// the aggregate run, and returns everything for the UI to render.
+async function runEvals(onProgress){
+  const cfg=loadConfig();
+  if(!cfg.scriptUrl)throw new Error('Script URL not set — add it in Settings first.');
+  const casesParams=new URLSearchParams({action:'getEvalCases'});
+  const casesRes=await fetch(cfg.scriptUrl+'?'+casesParams.toString());
+  const casesData=await casesRes.json();
+  if(!casesData.success)throw new Error('Could not load eval cases: '+(casesData.error||'unknown error'));
+  const cases=casesData.cases||[];
+  const results=[];
+  for(let i=0;i<cases.length;i++){
+    const c=cases[i];
+    if(onProgress)onProgress(i+1,cases.length,c.caseId);
+    try{
+      let actualItems,receiptTotal=null;
+      if(c.type==='photo'){
+        if(!c.imageFileId){results.push({caseId:c.caseId,type:c.type,error:'No Image File ID set for this case yet'});continue;}
+        const imgParams=new URLSearchParams({action:'getEvalImage',fileId:c.imageFileId});
+        const imgRes=await fetch(cfg.scriptUrl+'?'+imgParams.toString());
+        const imgData=await imgRes.json();
+        if(!imgData.success)throw new Error(imgData.error||'Could not fetch eval image');
+        const visionResult=await runVisionParse(cfg,imgData.base64Data,c.caseId+'.jpg',null); // traceId=null → no trace log
+        actualItems=visionResult.items;
+        receiptTotal=visionResult.receiptTotal;
+      }else{
+        actualItems=await parseWithGemini(c.input,true); // skipTrace=true
+      }
+      const score=scoreEvalCase(actualItems,c.expectedItems);
+      let totalMatch=null;
+      if(c.expectedTotal!=null)totalMatch=receiptTotal!=null&&Math.abs(receiptTotal-c.expectedTotal)<=1;
+      results.push(Object.assign({caseId:c.caseId,type:c.type,notes:c.notes,receiptTotal:receiptTotal,expectedTotal:c.expectedTotal,totalMatch:totalMatch},score));
+    }catch(err){
+      results.push({caseId:c.caseId,type:c.type,error:err.message});
+    }
+  }
+  const valid=results.filter(r=>!r.error);
+  const avg=function(key){return valid.length?valid.reduce(function(s,r){return s+(r[key]||0);},0)/valid.length:0;};
+  const catValid=valid.filter(r=>r.categoryScore!=null);
+  const summary={
+    casesRun:cases.length,
+    casesErrored:results.length-valid.length,
+    amountScore:Math.round(avg('amountScore')*10)/10,
+    itemNameScore:Math.round(avg('itemNameScore')*10)/10,
+    categoryScore:catValid.length?Math.round((catValid.reduce(function(s,r){return s+r.categoryScore;},0)/catValid.length)*10)/10:null,
+  };
+  summary.overallScore=Math.round(((summary.amountScore+summary.itemNameScore)/2)*10)/10;
+  const runId='RUN-'+Date.now();
+  fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'logEvalRun',runId:runId,model:GEMINI_MODEL,visionPromptVersion:VISION_PROMPT_VERSION,textPromptVersion:TEXT_EXPENSE_PROMPT_VERSION,smsPromptVersion:TEXT_SMS_PROMPT_VERSION,casesRun:summary.casesRun,amountScore:summary.amountScore,itemNameScore:summary.itemNameScore,categoryScore:summary.categoryScore,overallScore:summary.overallScore,perCaseDetail:JSON.stringify(results.map(function(r){return {caseId:r.caseId,error:r.error||null,amountScore:r.amountScore,itemNameScore:r.itemNameScore};}))})});
+  return {runId:runId,summary:summary,results:results};
 }
 function checkTotalMismatch(items){
   const banner=document.getElementById('totalMismatchWarning');
@@ -1651,6 +1759,55 @@ window.addEventListener('popstate', function(e) {
 
 const _cfg=loadConfig();
 if(!_cfg.scriptUrl||!_cfg.apiKey)setTimeout(()=>showToast('Tap ⚙️ to set up your app'),800);
+
+// ── Hidden eval-suite admin view — reachable via ?evals=1 ──
+// Deliberately minimal/unstyled — an internal dev tool, not a feature for family
+// members, so it doesn't warrant the same design investment as the main app.
+if(new URLSearchParams(location.search).get('evals')==='1'){
+  document.body.innerHTML='<div id="evalsRoot" style="max-width:640px;margin:0 auto;padding:24px 16px;font-family:inherit;color:#eee;background:#0d0d0d;min-height:100vh;"></div>';
+  renderEvalsView();
+}
+async function renderEvalsView(){
+  const root=document.getElementById('evalsRoot');
+  root.innerHTML='<h2 style="margin-bottom:16px;">Kharcha Evals</h2>'
+    +'<button id="runEvalsBtn" style="padding:10px 20px;border-radius:8px;background:#ff5a3c;color:#fff;border:none;font-weight:600;cursor:pointer;font-size:14px;">▶ Run Evals</button>'
+    +'<div id="evalsStatus" style="margin-top:12px;color:#999;font-size:13px;"></div>'
+    +'<div id="evalsResults" style="margin-top:20px;"></div>';
+  document.getElementById('runEvalsBtn').onclick=async function(){
+    const btn=this;btn.disabled=true;btn.textContent='Running...';
+    const statusEl=document.getElementById('evalsStatus');
+    const resultsEl=document.getElementById('evalsResults');
+    resultsEl.innerHTML='';
+    try{
+      const out=await runEvals(function(done,total,caseId){statusEl.textContent='Running '+done+'/'+total+': '+caseId;});
+      statusEl.textContent='Done — run ID '+out.runId+' (also saved to Eval_Results sheet).';
+      resultsEl.innerHTML=renderEvalSummaryHtml(out.summary)+renderEvalResultsHtml(out.results);
+    }catch(err){
+      statusEl.textContent='Failed: '+err.message;
+    }finally{
+      btn.disabled=false;btn.textContent='▶ Run Evals';
+    }
+  };
+}
+function renderEvalSummaryHtml(s){
+  return '<div style="background:#181818;border:1px solid #333;border-radius:10px;padding:16px;margin-bottom:16px;">'
+    +'<div style="font-size:28px;font-weight:700;">'+s.overallScore+'% overall</div>'
+    +'<div style="margin-top:8px;color:#999;font-size:13px;">Amount: '+s.amountScore+'% · Item name: '+s.itemNameScore+'%'+(s.categoryScore!=null?' · Category: '+s.categoryScore+'%':' · Category: n/a')+'</div>'
+    +'<div style="margin-top:4px;color:#999;font-size:13px;">'+s.casesRun+' case(s) run'+(s.casesErrored?', '+s.casesErrored+' errored':'')+'</div>'
+    +'</div>';
+}
+function renderEvalResultsHtml(results){
+  return results.map(function(r){
+    if(r.error)return '<div style="padding:10px 0;border-bottom:1px solid #2a2a2a;"><b>'+r.caseId+'</b> <span style="color:#ff6b6b;">ERROR: '+r.error+'</span></div>';
+    var color=r.amountScore>=90?'#4caf50':r.amountScore>=50?'#ff9800':'#ff5252';
+    return '<div style="padding:10px 0;border-bottom:1px solid #2a2a2a;font-size:13px;">'
+      +'<b>'+r.caseId+'</b> ('+r.type+') — <span style="color:'+color+';">amount '+r.amountScore+'%</span>, item name '+r.itemNameScore+'%'
+      +(r.categoryScore!=null?', category '+r.categoryScore+'%':'')
+      +(r.totalMatch!=null?(', total match: '+(r.totalMatch?'✅':'❌')):'')
+      +(r.extraActualItems?(' — ⚠️ '+r.extraActualItems+' extra unmatched item(s)'):'')
+      +'</div>';
+  }).join('');
+}
 </script>
 </body>
 </html>

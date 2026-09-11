@@ -847,6 +847,167 @@ section('6g. closeReview() — abandonment tracking');
 }
 
 // ══════════════════════════════════════════════════════════
+section('6h. scoreEvalCase() — pure scoring logic');
+{
+  const { sandbox } = buildSandbox({ elements: {}, fetchImpl: async () => ({}) });
+
+  await test('A perfect match scores 100 on amount and item name', () => {
+    const result = sandbox.scoreEvalCase([{ item: 'Tea', amount: 20 }], [{ item: 'Tea', amount: 20 }]);
+    assert.strictEqual(result.amountScore, 100);
+    assert.strictEqual(result.itemNameScore, 100);
+    assert.strictEqual(result.extraActualItems, 0);
+  });
+  await test('A wrong amount lowers the amount score but not necessarily the item name score', () => {
+    const result = sandbox.scoreEvalCase([{ item: 'Tea', amount: 999 }], [{ item: 'Tea', amount: 20 }]);
+    assert.strictEqual(result.amountScore, 0);
+    assert.strictEqual(result.itemNameScore, 100); // still matched to the closest-amount item, name still correct
+  });
+  await test('Item name uses a loose substring match, not exact equality', () => {
+    const result = sandbox.scoreEvalCase([{ item: 'Tea (Masala)', amount: 20 }], [{ item: 'Tea', amount: 20 }]);
+    assert.strictEqual(result.itemNameScore, 100);
+  });
+  await test('A completely different item name fails the item-name score', () => {
+    const result = sandbox.scoreEvalCase([{ item: 'Bus Ticket', amount: 20 }], [{ item: 'Tea', amount: 20 }]);
+    assert.strictEqual(result.itemNameScore, 0);
+  });
+  await test('Missing an expected item (actual has fewer items) is scored as a miss for that item', () => {
+    const result = sandbox.scoreEvalCase([{ item: 'Tea', amount: 20 }], [{ item: 'Tea', amount: 20 }, { item: 'Milk', amount: 60 }]);
+    assert.strictEqual(result.amountScore, 50); // 1 of 2 expected items matched
+  });
+  await test('Extra unmatched actual items (possible hallucination) are counted separately', () => {
+    const result = sandbox.scoreEvalCase([{ item: 'Tea', amount: 20 }, { item: 'Phantom Item', amount: 999 }], [{ item: 'Tea', amount: 20 }]);
+    assert.strictEqual(result.amountScore, 100); // the one expected item still matched correctly
+    assert.strictEqual(result.extraActualItems, 1); // but there's a leftover actual item nothing expected
+  });
+  await test('Category score is null (not 0) when no expected item specifies a category — "not applicable", not "failed"', () => {
+    const result = sandbox.scoreEvalCase([{ item: 'Tea', amount: 20 }], [{ item: 'Tea', amount: 20 }]);
+    assert.strictEqual(result.categoryScore, null);
+  });
+  await test('Category score is computed only over expected items that actually specify one', () => {
+    const result = sandbox.scoreEvalCase(
+      [{ item: 'Tea', amount: 20, category: 'Food' }, { item: 'Bus', amount: 30, category: 'Other' }],
+      [{ item: 'Tea', amount: 20, category: 'Food' }, { item: 'Bus', amount: 30 }], // second expected item has no category
+    );
+    assert.strictEqual(result.categoryScore, 100); // only the first pair counted, and it matched
+  });
+  await test('Multiple items are matched correctly via greedy best-amount matching (no double-claiming)', () => {
+    const result = sandbox.scoreEvalCase(
+      [{ item: 'Milk', amount: 60 }, { item: 'Tea', amount: 20 }],
+      [{ item: 'Tea', amount: 20 }, { item: 'Milk', amount: 60 }], // different order
+    );
+    assert.strictEqual(result.amountScore, 100);
+    assert.strictEqual(result.itemNameScore, 100);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('6i. runEvals() — full orchestration against the exact production code paths');
+{
+  function buildEvalCasesResponse(cases) { return { success: true, cases }; }
+
+  await test('Runs text cases through the real parseWithGemini and scores them', async () => {
+    const elements = {};
+    const cases = [
+      { caseId: 'EVAL-001', type: 'text', input: 'chai 20', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: null, imageFileId: '', notes: '' },
+    ];
+    const { sandbox } = buildSandbox({
+      elements,
+      fetchImpl: async (url, opts) => {
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases) };
+        if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
+        return { json: async () => ({ success: true }) }; // logEvalRun (no-cors, response unused)
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' }));
+    const out = await sandbox.runEvals();
+    assert.strictEqual(out.results.length, 1);
+    assert.strictEqual(out.results[0].amountScore, 100);
+    assert.strictEqual(out.summary.overallScore, 100);
+  });
+
+  await test('Runs photo cases through the real runVisionParse and checks total match', async () => {
+    const elements = {};
+    const cases = [
+      { caseId: 'EVAL-008', type: 'photo', input: '', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: 20, imageFileId: 'file123', notes: '' },
+    ];
+    const { sandbox } = buildSandbox({
+      elements,
+      fetchImpl: async (url, opts) => {
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases) };
+        if (typeof url === 'string' && url.includes('action=getEvalImage')) return { json: async () => ({ success: true, base64Data: Buffer.from('fake-bill').toString('base64'), mimeType: 'image/jpeg' }) };
+        if (typeof url === 'string' && url.startsWith('https://generativelanguage.googleapis.com')) {
+          return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"items":[{"item":"Tea","amount":20}],"receiptTotal":20}' }] } }] }) };
+        }
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' }));
+    const out = await sandbox.runEvals();
+    assert.strictEqual(out.results[0].amountScore, 100);
+    assert.strictEqual(out.results[0].totalMatch, true);
+  });
+
+  await test('A photo case with no Image File ID errors gracefully instead of crashing the whole run', async () => {
+    const elements = {};
+    const cases = [
+      { caseId: 'EVAL-008', type: 'photo', input: '', expectedItems: [], expectedTotal: null, imageFileId: '', notes: '' },
+      { caseId: 'EVAL-001', type: 'text', input: 'chai 20', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: null, imageFileId: '', notes: '' },
+    ];
+    const { sandbox } = buildSandbox({
+      elements,
+      fetchImpl: async (url) => {
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases) };
+        if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' }));
+    const out = await sandbox.runEvals();
+    assert.strictEqual(out.results.length, 2);
+    assert.ok(out.results[0].error, 'the photo case without an Image File ID should error');
+    assert.strictEqual(out.results[1].amountScore, 100, 'the second (valid) case should still run fine');
+    assert.strictEqual(out.summary.casesErrored, 1);
+  });
+
+  await test('The run gets logged via logEvalRun with the right model/prompt version metadata', async () => {
+    const elements = {};
+    const cases = [{ caseId: 'EVAL-001', type: 'text', input: 'chai 20', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: null, imageFileId: '', notes: '' }];
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements,
+      fetchImpl: async (url) => {
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases) };
+        if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' }));
+    await sandbox.runEvals();
+    const logCall = fetchCalls.find(c => c.body && c.body.action === 'logEvalRun');
+    assert.ok(logCall, 'logEvalRun should have been called');
+    assert.strictEqual(logCall.body.model, 'gemini-3.1-flash-lite-preview');
+    assert.ok(logCall.body.textPromptVersion);
+    assert.strictEqual(logCall.opts.mode, 'no-cors');
+  });
+
+  await test('Eval runs do NOT pollute AI_Traces — no logAITrace calls during a run', async () => {
+    const elements = {};
+    const cases = [{ caseId: 'EVAL-001', type: 'text', input: 'chai 20', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: null, imageFileId: '', notes: '' }];
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements,
+      fetchImpl: async (url) => {
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases) };
+        if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' }));
+    await sandbox.runEvals();
+    const traceCalls = fetchCalls.filter(c => c.body && c.body.action === 'logAITrace');
+    assert.strictEqual(traceCalls.length, 0);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
 section('7. confirmAndSave() — validation still blocks bad input');
 {
   const elements = {};
