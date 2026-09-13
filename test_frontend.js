@@ -1005,6 +1005,43 @@ section('6i. runEvals() — full orchestration against the exact production code
     const traceCalls = fetchCalls.filter(c => c.body && c.body.action === 'logAITrace');
     assert.strictEqual(traceCalls.length, 0);
   });
+  await test('REGRESSION: errored cases count as 0 toward the score, not silently excluded from the average (the exact bug found in real use — 2 of 8 cases erroring still showed 100%)', async () => {
+    const elements = {};
+    const cases = [
+      { caseId: 'EVAL-001', type: 'text', input: 'chai 20', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: null, imageFileId: '', notes: '' },
+      { caseId: 'EVAL-002', type: 'photo', input: '', expectedItems: [{ item: 'X', amount: 1 }], expectedTotal: null, imageFileId: '', notes: '' }, // no imageFileId — will error
+    ];
+    const { sandbox } = buildSandbox({
+      elements,
+      fetchImpl: async (url) => {
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => ({ success: true, cases }) };
+        if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' }));
+    const out = await sandbox.runEvals();
+    assert.strictEqual(out.summary.casesRun, 2);
+    assert.strictEqual(out.summary.casesErrored, 1);
+    // 1 case scored 100%, 1 case errored (counts as 0) → average must be 50%, NOT 100%
+    assert.strictEqual(out.summary.amountScore, 50);
+    assert.strictEqual(out.summary.itemNameScore, 50);
+  });
+  await test('casesErrored is included in the logged run payload as its own field', async () => {
+    const elements = {};
+    const cases = [{ caseId: 'EVAL-002', type: 'photo', input: '', expectedItems: [], expectedTotal: null, imageFileId: '', notes: '' }];
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements,
+      fetchImpl: async (url) => {
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => ({ success: true, cases }) };
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' }));
+    await sandbox.runEvals();
+    const logCall = fetchCalls.find(c => c.body && c.body.action === 'logEvalRun');
+    assert.strictEqual(logCall.body.casesErrored, 1);
+  });
 }
 
 // ══════════════════════════════════════════════════════════

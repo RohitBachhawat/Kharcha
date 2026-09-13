@@ -630,16 +630,17 @@ test('getEvalImage fails cleanly when fileId is missing entirely', () => {
 
 section('17. logEvalRun — tracking scores over time');
 test('logEvalRun creates the Eval_Results sheet with proper headers and writes a row', () => {
-  const res = post({ action: 'logEvalRun', runId: 'RUN-1', model: 'gemini-3.1-flash-lite-preview', visionPromptVersion: 'vision-v2-receipttotal', textPromptVersion: 'text-v1', smsPromptVersion: 'sms-v1', casesRun: 8, amountScore: 87.5, itemNameScore: 92.0, categoryScore: 75.0, overallScore: 84.8, perCaseDetail: JSON.stringify([{ caseId: 'EVAL-001', pass: true }]) });
+  const res = post({ action: 'logEvalRun', runId: 'RUN-1', model: 'gemini-3.1-flash-lite-preview', visionPromptVersion: 'vision-v2-receipttotal', textPromptVersion: 'text-v1', smsPromptVersion: 'sms-v1', casesRun: 8, casesErrored: 2, amountScore: 75.0, itemNameScore: 92.0, categoryScore: 75.0, overallScore: 83.5, perCaseDetail: JSON.stringify([{ caseId: 'EVAL-001', pass: true }]) });
   assert.strictEqual(res.success, true);
   const sheet = fakeSS.getSheetByName('Eval_Results');
   assert.ok(sheet);
-  assert.strictEqual(JSON.stringify(sheet.rows[0]), JSON.stringify(['Run ID', 'Timestamp', 'Model', 'Vision Prompt Version', 'Text Prompt Version', 'SMS Prompt Version', 'Cases Run', 'Amount Score (%)', 'Item Name Score (%)', 'Category Score (%)', 'Overall Score (%)', 'Per-Case Detail (JSON)']));
+  assert.strictEqual(JSON.stringify(sheet.rows[0]), JSON.stringify(['Run ID', 'Timestamp', 'Model', 'Vision Prompt Version', 'Text Prompt Version', 'SMS Prompt Version', 'Cases Run', 'Cases Errored', 'Amount Score (%)', 'Item Name Score (%)', 'Category Score (%)', 'Overall Score (%)', 'Per-Case Detail (JSON)']));
   const row = sheet.rows[1];
   assert.strictEqual(row[0], 'RUN-1');
-  assert.strictEqual(row[6], 8);
-  assert.strictEqual(row[7], 87.5);
-  assert.strictEqual(row[10], 84.8);
+  assert.strictEqual(row[6], 8);  // Cases Run
+  assert.strictEqual(row[7], 2);  // Cases Errored — now its own visible column
+  assert.strictEqual(row[8], 75.0); // Amount Score
+  assert.strictEqual(row[11], 83.5); // Overall Score
 });
 test('Multiple runs accumulate as separate rows, giving a trend over time', () => {
   post({ action: 'logEvalRun', runId: 'RUN-2', overallScore: 90.0, casesRun: 8 });

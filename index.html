@@ -1145,18 +1145,23 @@ async function runEvals(onProgress){
     }
   }
   const valid=results.filter(r=>!r.error);
-  const avg=function(key){return valid.length?valid.reduce(function(s,r){return s+(r[key]||0);},0)/valid.length:0;};
+  // Errored cases count as 0 toward amount/item scores — averaged across ALL cases run,
+  // not just the ones that happened to succeed. A case that fails to execute entirely
+  // is a failure for scoring purposes, not something to quietly drop from the math.
+  // (Previously this averaged only over successful cases, which let a run with several
+  // outright-broken cases still report a misleadingly perfect score.)
+  const avgAll=function(key){return results.length?results.reduce(function(s,r){return s+(r.error?0:(r[key]||0));},0)/results.length:0;};
   const catValid=valid.filter(r=>r.categoryScore!=null);
   const summary={
     casesRun:cases.length,
     casesErrored:results.length-valid.length,
-    amountScore:Math.round(avg('amountScore')*10)/10,
-    itemNameScore:Math.round(avg('itemNameScore')*10)/10,
+    amountScore:Math.round(avgAll('amountScore')*10)/10,
+    itemNameScore:Math.round(avgAll('itemNameScore')*10)/10,
     categoryScore:catValid.length?Math.round((catValid.reduce(function(s,r){return s+r.categoryScore;},0)/catValid.length)*10)/10:null,
   };
   summary.overallScore=Math.round(((summary.amountScore+summary.itemNameScore)/2)*10)/10;
   const runId='RUN-'+Date.now();
-  fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'logEvalRun',runId:runId,model:GEMINI_MODEL,visionPromptVersion:VISION_PROMPT_VERSION,textPromptVersion:TEXT_EXPENSE_PROMPT_VERSION,smsPromptVersion:TEXT_SMS_PROMPT_VERSION,casesRun:summary.casesRun,amountScore:summary.amountScore,itemNameScore:summary.itemNameScore,categoryScore:summary.categoryScore,overallScore:summary.overallScore,perCaseDetail:JSON.stringify(results.map(function(r){return {caseId:r.caseId,error:r.error||null,amountScore:r.amountScore,itemNameScore:r.itemNameScore};}))})});
+  fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'logEvalRun',runId:runId,model:GEMINI_MODEL,visionPromptVersion:VISION_PROMPT_VERSION,textPromptVersion:TEXT_EXPENSE_PROMPT_VERSION,smsPromptVersion:TEXT_SMS_PROMPT_VERSION,casesRun:summary.casesRun,casesErrored:summary.casesErrored,amountScore:summary.amountScore,itemNameScore:summary.itemNameScore,categoryScore:summary.categoryScore,overallScore:summary.overallScore,perCaseDetail:JSON.stringify(results.map(function(r){return {caseId:r.caseId,error:r.error||null,amountScore:r.amountScore,itemNameScore:r.itemNameScore};}))})});
   return {runId:runId,summary:summary,results:results};
 }
 function checkTotalMismatch(items){
@@ -1791,6 +1796,7 @@ async function renderEvalsView(){
 }
 function renderEvalSummaryHtml(s){
   return '<div style="background:#181818;border:1px solid #333;border-radius:10px;padding:16px;margin-bottom:16px;">'
+    +(s.casesErrored?'<div style="background:rgba(255,82,82,0.15);border:1px solid #ff5252;color:#ff8a8a;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:600;">⚠️ '+s.casesErrored+' of '+s.casesRun+' case(s) FAILED TO RUN — the score below already counts each as a failure, not "not applicable". See the per-case list for which ones and why.</div>':'')
     +'<div style="font-size:28px;font-weight:700;">'+s.overallScore+'% overall</div>'
     +'<div style="margin-top:8px;color:#999;font-size:13px;">Amount: '+s.amountScore+'% · Item name: '+s.itemNameScore+'%'+(s.categoryScore!=null?' · Category: '+s.categoryScore+'%':' · Category: n/a')+'</div>'
     +'<div style="margin-top:4px;color:#999;font-size:13px;">'+s.casesRun+' case(s) run'+(s.casesErrored?', '+s.casesErrored+' errored':'')+'</div>'
