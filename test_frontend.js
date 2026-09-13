@@ -913,7 +913,7 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox } = buildSandbox({
       elements,
       fetchImpl: async (url, opts) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
         if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
         return { json: async () => ({ success: true }) }; // logEvalRun (no-cors, response unused)
       },
@@ -933,8 +933,8 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox } = buildSandbox({
       elements,
       fetchImpl: async (url, opts) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases) };
-        if (typeof url === 'string' && url.includes('action=getEvalImage')) return { json: async () => ({ success: true, base64Data: Buffer.from('fake-bill').toString('base64'), mimeType: 'image/jpeg' }) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
+        if (typeof url === 'string' && url.includes('action=getEvalImage')) { const r = { success: true, base64Data: Buffer.from('fake-bill').toString('base64'), mimeType: 'image/jpeg' }; return { json: async () => r, text: async () => JSON.stringify(r) }; }
         if (typeof url === 'string' && url.startsWith('https://generativelanguage.googleapis.com')) {
           return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"items":[{"item":"Tea","amount":20}],"receiptTotal":20}' }] } }] }) };
         }
@@ -956,7 +956,7 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox } = buildSandbox({
       elements,
       fetchImpl: async (url) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
         if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
         return { json: async () => ({ success: true }) };
       },
@@ -975,7 +975,7 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox, fetchCalls } = buildSandbox({
       elements,
       fetchImpl: async (url) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
         if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
         return { json: async () => ({ success: true }) };
       },
@@ -995,7 +995,7 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox, fetchCalls } = buildSandbox({
       elements,
       fetchImpl: async (url) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
         if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
         return { json: async () => ({ success: true }) };
       },
@@ -1014,7 +1014,7 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox } = buildSandbox({
       elements,
       fetchImpl: async (url) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => ({ success: true, cases }) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
         if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
         return { json: async () => ({ success: true }) };
       },
@@ -1033,7 +1033,7 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox, fetchCalls } = buildSandbox({
       elements,
       fetchImpl: async (url) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => ({ success: true, cases }) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
         return { json: async () => ({ success: true }) };
       },
     });
@@ -1041,6 +1041,69 @@ section('6i. runEvals() — full orchestration against the exact production code
     await sandbox.runEvals();
     const logCall = fetchCalls.find(c => c.body && c.body.action === 'logEvalRun');
     assert.strictEqual(logCall.body.casesErrored, 1);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('6j. Fixes for the real mixed-error eval run (503/404/malformed-HTML)');
+{
+  await test('safeJson (via getEvalCases) fails with a clear message when Google returns HTML instead of JSON', async () => {
+    const { sandbox } = buildSandbox({
+      elements: {},
+      fetchImpl: async () => ({ text: async () => '<!DOCTYPE html><html>Some Google error page</html>' }),
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key' }));
+    await assert.rejects(() => sandbox.runEvals(), /non-JSON response/);
+  });
+
+  await test('callGeminiProxy retries on a 503 (Gemini overload) the same way it retries on 429', async () => {
+    let attempts = 0;
+    const { sandbox } = buildSandbox({
+      elements: {},
+      fetchImpl: async () => {
+        attempts++;
+        if (attempts < 2) {
+          return { ok: true, status: 200, json: async () => ({ success: false, error: 'Gemini API error 503: {"error":{"code":503,"status":"UNAVAILABLE"}}' }) };
+        }
+        return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key' }));
+    const result = await sandbox.callGeminiProxy('some prompt', null);
+    assert.strictEqual(attempts, 2);
+    assert.strictEqual(result, '[{"item":"Tea","amount":20}]');
+  });
+
+  await test('callGeminiProxy gives up after MAX_RETRIES on persistent 503s, with a clear error', async () => {
+    const { sandbox } = buildSandbox({
+      elements: {},
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ success: false, error: '503 UNAVAILABLE: model overloaded' }) }),
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key' }));
+    await assert.rejects(() => sandbox.callGeminiProxy('some prompt', null), /Service Unavailable|All \d+ retries failed/);
+  });
+
+  await test('runEvals paces cases with a delay between each — not fired as a zero-delay burst', async () => {
+    const cases = [
+      { caseId: 'EVAL-001', type: 'text', input: 'chai 20', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: null, imageFileId: '', notes: '' },
+      { caseId: 'EVAL-002', type: 'text', input: 'sabzi 60', expectedItems: [{ item: 'Vegetables', amount: 60 }], expectedTotal: null, imageFileId: '', notes: '' },
+    ];
+    const timeoutDelays = [];
+    const elements = {};
+    const { sandbox } = buildSandbox({
+      elements,
+      fetchImpl: async (url) => {
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
+        if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"X","amount":1}]' }) };
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' }));
+    // Override setTimeout just for this test to record delays instead of the harness's always-instant version
+    const originalSetTimeout = sandbox.setTimeout;
+    sandbox.setTimeout = (fn, ms) => { timeoutDelays.push(ms); return originalSetTimeout(fn, ms); };
+    await sandbox.runEvals();
+    assert.ok(timeoutDelays.includes(1500), 'expected a 1500ms pacing delay between eval cases, got: ' + JSON.stringify(timeoutDelays));
   });
 }
 

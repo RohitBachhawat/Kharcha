@@ -767,10 +767,12 @@ async function callGeminiProxy(prompt,traceMeta){
     }
     if(!data.success){
       const m=data.error||'Unknown';
-      if(m.includes('429')){
-        if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:429,errorCategory:'rate_limit',errorMessage:m,latencyMs:Date.now()-t0}));
-        if(attempt<MAX_RETRIES){const wait=attempt*10000;showToast('Rate limit — retrying in '+attempt*10+'s ('+attempt+'/'+MAX_RETRIES+')...',wait);await new Promise(r=>setTimeout(r,wait));continue;}
-        throw new KharchaError('Rate Limit','Too many requests. All '+MAX_RETRIES+' retries failed.','Wait a minute and try again.');
+      const isRetryable=m.includes('429')||m.includes('503')||m.toUpperCase().includes('UNAVAILABLE');
+      if(isRetryable){
+        const statusCode=m.includes('429')?429:503;
+        if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:statusCode,errorCategory:statusCode===429?'rate_limit':'service_unavailable',errorMessage:m,latencyMs:Date.now()-t0}));
+        if(attempt<MAX_RETRIES){const wait=attempt*10000;showToast((statusCode===429?'Rate limit':'Gemini busy')+' — retrying in '+attempt*10+'s ('+attempt+'/'+MAX_RETRIES+')...',wait);await new Promise(r=>setTimeout(r,wait));continue;}
+        throw new KharchaError(statusCode===429?'Rate Limit':'Service Unavailable','All '+MAX_RETRIES+' retries failed: '+m,'Wait a minute and try again.');
       }
       const cat=(m.includes('400')||m.toLowerCase().includes('api key'))?'invalid_api_key':'gemini_error';
       if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,errorCategory:cat,errorMessage:m,latencyMs:Date.now()-t0}));
@@ -877,10 +879,11 @@ async function runVisionParse(cfg,base64Data,fileName,traceId){
       if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,errorCategory:'network_error',errorMessage:e.message,latencyMs:Date.now()-t0,fileName:fileName});
       throw new Error('Network error: '+e.message);
     }
-    if(res.status===429){
-      if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:429,errorCategory:'rate_limit',errorMessage:'429 rate limited',latencyMs:Date.now()-t0,fileName:fileName});
-      if(attempt<MAX_RETRIES){const w=attempt*10000;showToast('Rate limit, retrying in '+attempt*10+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}
-      throw new Error('Rate limit. Wait a minute and try again.');
+    if(res.status===429||res.status===503){
+      const cat=res.status===429?'rate_limit':'service_unavailable';
+      if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:cat,errorMessage:res.status+' '+cat,latencyMs:Date.now()-t0,fileName:fileName});
+      if(attempt<MAX_RETRIES){const w=attempt*10000;showToast((res.status===429?'Rate limit':'Gemini busy')+', retrying in '+attempt*10+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}
+      throw new Error(res.status===429?'Rate limit. Wait a minute and try again.':'Gemini is busy. Wait a minute and try again.');
     }
     if(!res.ok){
       const eb=await res.json().catch(()=>({}));
@@ -1107,6 +1110,15 @@ function scoreEvalCase(actualItems,expectedItems){
   };
 }
 
+// Parses a fetch Response as JSON, but fails with a clear, actionable message instead
+// of a cryptic "Unexpected token '<'" if Google's infrastructure returns an HTML error
+// page instead of the expected JSON (seen under burst/rate-limited conditions).
+async function safeJson(res,context){
+  const text=await res.text();
+  try{return JSON.parse(text);}
+  catch(e){throw new Error((context||'Request')+' returned a non-JSON response (likely a transient Google error under load) — try again: '+text.substring(0,120));}
+}
+
 // Runs every eval case through the EXACT production code paths (parseWithGemini for
 // text/sms, runVisionParse for photo) with tracing suppressed, scores each one, logs
 // the aggregate run, and returns everything for the UI to render.
@@ -1115,20 +1127,26 @@ async function runEvals(onProgress){
   if(!cfg.scriptUrl)throw new Error('Script URL not set — add it in Settings first.');
   const casesParams=new URLSearchParams({action:'getEvalCases'});
   const casesRes=await fetch(cfg.scriptUrl+'?'+casesParams.toString());
-  const casesData=await casesRes.json();
+  const casesData=await safeJson(casesRes,'getEvalCases');
   if(!casesData.success)throw new Error('Could not load eval cases: '+(casesData.error||'unknown error'));
   const cases=casesData.cases||[];
   const results=[];
   for(let i=0;i<cases.length;i++){
     const c=cases[i];
     if(onProgress)onProgress(i+1,cases.length,c.caseId);
+    // Pace real network calls instead of firing all 8 back-to-back — a burst of
+    // zero-delay calls to Apps Script + Gemini in a tight loop is not something a
+    // real user's usage pattern ever does, and was producing a mix of transient
+    // errors (Gemini 503s, Apps Script 404s, malformed responses) that a normal,
+    // one-at-a-time submission never triggers.
+    if(i>0)await new Promise(function(r){setTimeout(r,1500);});
     try{
       let actualItems,receiptTotal=null;
       if(c.type==='photo'){
         if(!c.imageFileId){results.push({caseId:c.caseId,type:c.type,error:'No Image File ID set for this case yet'});continue;}
         const imgParams=new URLSearchParams({action:'getEvalImage',fileId:c.imageFileId});
         const imgRes=await fetch(cfg.scriptUrl+'?'+imgParams.toString());
-        const imgData=await imgRes.json();
+        const imgData=await safeJson(imgRes,'getEvalImage');
         if(!imgData.success)throw new Error(imgData.error||'Could not fetch eval image');
         const visionResult=await runVisionParse(cfg,imgData.base64Data,c.caseId+'.jpg',null); // traceId=null → no trace log
         actualItems=visionResult.items;
