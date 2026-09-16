@@ -1047,6 +1047,37 @@ section('6i. runEvals() — full orchestration against the exact production code
 // ══════════════════════════════════════════════════════════
 section('6j. Fixes for the real mixed-error eval run (503/404/malformed-HTML)');
 {
+  await test('REGRESSION: showToast/showProgressToast do not crash when #toast genuinely does not exist (eval mode replaces the whole DOM and has no toast UI) — this was the actual cause of "Cannot set properties of null (setting \'innerHTML\')" during eval retries', async () => {
+    // Build a document where getElementById('toast') genuinely returns null, unlike the
+    // harness default which auto-stubs any missing element — this reproduces the real
+    // eval-mode DOM (document.body.innerHTML fully replaced, no #toast anywhere).
+    const elements = {};
+    const { sandbox } = buildSandbox({ elements, fetchImpl: async () => ({}) });
+    const originalGetById = sandbox.document.getElementById;
+    sandbox.document.getElementById = (id) => (id === 'toast' ? null : originalGetById(id));
+    assert.doesNotThrow(() => sandbox.showToast('some retry message'));
+    assert.doesNotThrow(() => sandbox.showProgressToast('some progress message'));
+  });
+  await test('REGRESSION: a full retry sequence (transient error → retry → success) completes without crashing even with no #toast element', async () => {
+    const elements = {};
+    let attempts = 0;
+    const { sandbox } = buildSandbox({
+      elements,
+      fetchImpl: async () => {
+        attempts++;
+        if (attempts === 1) return { ok: true, status: 200, json: async () => ({ success: false, error: 'Gemini API error 503: UNAVAILABLE' }) };
+        return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key' }));
+    const originalGetById = sandbox.document.getElementById;
+    sandbox.document.getElementById = (id) => (id === 'toast' ? null : originalGetById(id));
+    // This exact sequence (transient error → showToast retry notice → retry → success)
+    // is what crashed in production before the fix.
+    const result = await sandbox.callGeminiProxy('some prompt', null);
+    assert.strictEqual(attempts, 2);
+    assert.strictEqual(result, '[{"item":"Tea","amount":20}]');
+  });
   await test('safeJson (via getEvalCases) fails with a clear message when Google returns HTML instead of JSON', async () => {
     const { sandbox } = buildSandbox({
       elements: {},
