@@ -540,14 +540,27 @@ section('13. cleanupOldTraces — 365-day retention (TRACE_RETENTION_DAYS)');
 test('Deletes trace rows older than the retention window, keeps recent ones', () => {
   fakeSS.deleteSheet(fakeSS.getSheetByName('AI_Traces'));
   const sheet = sandbox.getOrCreateTraceSheet();
-  const oldDate = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toLocaleString('en-IN'); // 400 days ago
-  const recentDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toLocaleString('en-IN'); // 10 days ago
+  const oldDate = new Date(Date.now() - 400 * 24 * 60 * 60 * 1000); // 400 days ago — a real Date object, as logAITrace now actually stores
+  const recentDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000); // 10 days ago
   sheet.appendRow(['T-old', oldDate, 'photo']);
   sheet.appendRow(['T-recent', recentDate, 'photo']);
   sandbox.cleanupOldTraces();
   const remainingIds = sheet.rows.slice(1).map(r => r[0]);
   assert.ok(!remainingIds.includes('T-old'), 'row older than 365 days should be deleted');
   assert.ok(remainingIds.includes('T-recent'), 'row within 365 days should be kept');
+});
+test('REGRESSION: a Timestamp stored as a locale-formatted DD/MM/YYYY string (the actual bug found in production — toLocaleString(\'en-IN\') produces a string new Date() cannot reliably re-parse, silently breaking retention for any day-of-month over 12) must not crash cleanup, even though such legacy rows can\'t be safely dated and are left alone', () => {
+  fakeSS.deleteSheet(fakeSS.getSheetByName('AI_Traces'));
+  const sheet = sandbox.getOrCreateTraceSheet();
+  sheet.appendRow(['T-legacy', '15/9/2025, 5:00:58 am', 'photo']); // old-format string, day=15 > 12 → unparseable
+  assert.doesNotThrow(() => sandbox.cleanupOldTraces());
+});
+test('logAITrace now stores a real Date object for Timestamp, not a locale-formatted string that silently fails to re-parse', () => {
+  fakeSS.deleteSheet(fakeSS.getSheetByName('AI_Traces'));
+  post({ action: 'logAITrace', traceId: 'T-datecheck', type: 'text' });
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const timestampCell = sheet.rows[sheet.rows.length - 1][1];
+  assert.ok(timestampCell instanceof Date, 'Timestamp should be a real Date object so cleanupOldTraces can reliably parse it later');
 });
 test('Running cleanup on a sheet with only a header does not throw', () => {
   fakeSS.deleteSheet(fakeSS.getSheetByName('AI_Traces'));

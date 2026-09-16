@@ -754,16 +754,25 @@ async function callGeminiProxy(prompt,traceMeta){
     try{const p=new URLSearchParams({action:'geminiProxy',apiKey:cfg.apiKey,prompt});res=await fetch(cfg.scriptUrl+'?'+p.toString());}
     catch(e){
       if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,errorCategory:'network_error',errorMessage:e.message,latencyMs:Date.now()-t0}));
-      throw new KharchaError('Network Error','Could not reach Apps Script: '+e.message,'Check internet and Script URL.');
+      if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      throw new KharchaError('Network Error','Could not reach Apps Script after '+MAX_RETRIES+' attempts: '+e.message,'Check internet and Script URL.');
     }
+    // Apps Script's own infrastructure occasionally returns a transient non-200 status
+    // (seen in practice: sporadic 404s hitting a perfectly healthy, working deployment)
+    // for reasons outside the deployed code's control — this is a known Apps Script
+    // characteristic, not something specific to any one request's content. Retrying is
+    // the correct response, same as any other transient failure — previously this threw
+    // immediately on attempt 1 despite being inside a MAX_RETRIES loop.
     if(!res.ok){
       if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:res.status,errorCategory:'http_error',errorMessage:'Apps Script HTTP '+res.status,latencyMs:Date.now()-t0}));
-      throw new KharchaError('Proxy Error','Apps Script HTTP '+res.status,'Redeploy as Web App, access=Anyone.');
+      if(attempt<MAX_RETRIES){showToast('Apps Script hiccup ('+res.status+') — retrying...',3000);await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      throw new KharchaError('Proxy Error','Apps Script HTTP '+res.status+' after '+MAX_RETRIES+' attempts','Redeploy as Web App, access=Anyone.');
     }
     let data;
     try{data=await res.json();}catch(e){
       if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:res.status,errorCategory:'response_read_error',errorMessage:e.message,latencyMs:Date.now()-t0}));
-      throw new KharchaError('Response Error','Could not read response.','Deploy latest Code.gs.');
+      if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      throw new KharchaError('Response Error','Could not read response after '+MAX_RETRIES+' attempts.','Deploy latest Code.gs.');
     }
     if(!data.success){
       const m=data.error||'Unknown';
@@ -877,7 +886,8 @@ async function runVisionParse(cfg,base64Data,fileName,traceId){
     try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent?key='+cfg.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:base64Data}}]}],generationConfig:{maxOutputTokens:1000}})});}
     catch(e){
       if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,errorCategory:'network_error',errorMessage:e.message,latencyMs:Date.now()-t0,fileName:fileName});
-      throw new Error('Network error: '+e.message);
+      if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      throw new Error('Network error after '+MAX_RETRIES+' attempts: '+e.message);
     }
     if(res.status===429||res.status===503){
       const cat=res.status===429?'rate_limit':'service_unavailable';
@@ -889,7 +899,8 @@ async function runVisionParse(cfg,base64Data,fileName,traceId){
       const eb=await res.json().catch(()=>({}));
       const em=(eb&&eb.error?eb.error.message:'Unknown');
       if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:'http_error',errorMessage:em,latencyMs:Date.now()-t0,fileName:fileName});
-      throw new Error('Vision error '+res.status+': '+em);
+      if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      throw new Error('Vision error '+res.status+' after '+MAX_RETRIES+' attempts: '+em);
     }
     const data=await res.json();
     const raw=(data.candidates[0].content.parts[0].text||'').replace(/```json|```/g,'').trim();
@@ -1119,6 +1130,24 @@ async function safeJson(res,context){
   catch(e){throw new Error((context||'Request')+' returned a non-JSON response (likely a transient Google error under load) — try again: '+text.substring(0,120));}
 }
 
+// A plain GET to Apps Script with the same "retry transient failures" treatment as
+// callGeminiProxy/runVisionParse — Apps Script's own infrastructure occasionally
+// returns a sporadic non-200 status unrelated to anything about the specific request.
+async function fetchWithRetry(url,context,maxRetries){
+  maxRetries=maxRetries||3;
+  for(var attempt=1;attempt<=maxRetries;attempt++){
+    try{
+      const res=await fetch(url);
+      if(res.ok)return res;
+      if(attempt<maxRetries){await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      throw new Error((context||'Request')+' failed with HTTP '+res.status+' after '+maxRetries+' attempts');
+    }catch(e){
+      if(attempt<maxRetries){await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      throw e;
+    }
+  }
+}
+
 // Runs every eval case through the EXACT production code paths (parseWithGemini for
 // text/sms, runVisionParse for photo) with tracing suppressed, scores each one, logs
 // the aggregate run, and returns everything for the UI to render.
@@ -1126,7 +1155,7 @@ async function runEvals(onProgress){
   const cfg=loadConfig();
   if(!cfg.scriptUrl)throw new Error('Script URL not set — add it in Settings first.');
   const casesParams=new URLSearchParams({action:'getEvalCases'});
-  const casesRes=await fetch(cfg.scriptUrl+'?'+casesParams.toString());
+  const casesRes=await fetchWithRetry(cfg.scriptUrl+'?'+casesParams.toString(),'getEvalCases');
   const casesData=await safeJson(casesRes,'getEvalCases');
   if(!casesData.success)throw new Error('Could not load eval cases: '+(casesData.error||'unknown error'));
   const cases=casesData.cases||[];
@@ -1145,7 +1174,7 @@ async function runEvals(onProgress){
       if(c.type==='photo'){
         if(!c.imageFileId){results.push({caseId:c.caseId,type:c.type,error:'No Image File ID set for this case yet'});continue;}
         const imgParams=new URLSearchParams({action:'getEvalImage',fileId:c.imageFileId});
-        const imgRes=await fetch(cfg.scriptUrl+'?'+imgParams.toString());
+        const imgRes=await fetchWithRetry(cfg.scriptUrl+'?'+imgParams.toString(),'getEvalImage');
         const imgData=await safeJson(imgRes,'getEvalImage');
         if(!imgData.success)throw new Error(imgData.error||'Could not fetch eval image');
         const visionResult=await runVisionParse(cfg,imgData.base64Data,c.caseId+'.jpg',null); // traceId=null → no trace log

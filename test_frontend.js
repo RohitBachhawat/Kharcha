@@ -913,7 +913,7 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox } = buildSandbox({
       elements,
       fetchImpl: async (url, opts) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { ok: true, json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
         if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
         return { json: async () => ({ success: true }) }; // logEvalRun (no-cors, response unused)
       },
@@ -933,8 +933,8 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox } = buildSandbox({
       elements,
       fetchImpl: async (url, opts) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
-        if (typeof url === 'string' && url.includes('action=getEvalImage')) { const r = { success: true, base64Data: Buffer.from('fake-bill').toString('base64'), mimeType: 'image/jpeg' }; return { json: async () => r, text: async () => JSON.stringify(r) }; }
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { ok: true, json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
+        if (typeof url === 'string' && url.includes('action=getEvalImage')) { const r = { success: true, base64Data: Buffer.from('fake-bill').toString('base64'), mimeType: 'image/jpeg' }; return { ok: true, json: async () => r, text: async () => JSON.stringify(r) }; }
         if (typeof url === 'string' && url.startsWith('https://generativelanguage.googleapis.com')) {
           return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"items":[{"item":"Tea","amount":20}],"receiptTotal":20}' }] } }] }) };
         }
@@ -956,7 +956,7 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox } = buildSandbox({
       elements,
       fetchImpl: async (url) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { ok: true, json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
         if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
         return { json: async () => ({ success: true }) };
       },
@@ -975,7 +975,7 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox, fetchCalls } = buildSandbox({
       elements,
       fetchImpl: async (url) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { ok: true, json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
         if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
         return { json: async () => ({ success: true }) };
       },
@@ -995,7 +995,7 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox, fetchCalls } = buildSandbox({
       elements,
       fetchImpl: async (url) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { ok: true, json: async () => buildEvalCasesResponse(cases), text: async () => JSON.stringify(buildEvalCasesResponse(cases)) };
         if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
         return { json: async () => ({ success: true }) };
       },
@@ -1014,7 +1014,7 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox } = buildSandbox({
       elements,
       fetchImpl: async (url) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { ok: true, json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
         if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
         return { json: async () => ({ success: true }) };
       },
@@ -1033,7 +1033,7 @@ section('6i. runEvals() — full orchestration against the exact production code
     const { sandbox, fetchCalls } = buildSandbox({
       elements,
       fetchImpl: async (url) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { ok: true, json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
         return { json: async () => ({ success: true }) };
       },
     });
@@ -1050,7 +1050,7 @@ section('6j. Fixes for the real mixed-error eval run (503/404/malformed-HTML)');
   await test('safeJson (via getEvalCases) fails with a clear message when Google returns HTML instead of JSON', async () => {
     const { sandbox } = buildSandbox({
       elements: {},
-      fetchImpl: async () => ({ text: async () => '<!DOCTYPE html><html>Some Google error page</html>' }),
+      fetchImpl: async () => ({ ok: true, text: async () => '<!DOCTYPE html><html>Some Google error page</html>' }),
     });
     sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key' }));
     await assert.rejects(() => sandbox.runEvals(), /non-JSON response/);
@@ -1093,7 +1093,7 @@ section('6j. Fixes for the real mixed-error eval run (503/404/malformed-HTML)');
     const { sandbox } = buildSandbox({
       elements,
       fetchImpl: async (url) => {
-        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { ok: true, json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
         if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"X","amount":1}]' }) };
         return { json: async () => ({ success: true }) };
       },
@@ -1104,6 +1104,44 @@ section('6j. Fixes for the real mixed-error eval run (503/404/malformed-HTML)');
     sandbox.setTimeout = (fn, ms) => { timeoutDelays.push(ms); return originalSetTimeout(fn, ms); };
     await sandbox.runEvals();
     assert.ok(timeoutDelays.includes(1500), 'expected a 1500ms pacing delay between eval cases, got: ' + JSON.stringify(timeoutDelays));
+  });
+
+  await test('REGRESSION: a transient Apps Script HTTP error (e.g. 404) now retries instead of failing on attempt 1 — this was the actual bug behind the real-world "Apps Script HTTP 404" failures, since the retry loop only ever retried Gemini\'s own 429/503, not Apps Script\'s own transient errors', async () => {
+    let attempts = 0;
+    const { sandbox } = buildSandbox({
+      elements: {},
+      fetchImpl: async () => {
+        attempts++;
+        if (attempts === 1) return { ok: false, status: 404 }; // simulates the exact real-world symptom
+        return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key' }));
+    const result = await sandbox.callGeminiProxy('some prompt', null);
+    assert.strictEqual(attempts, 2, 'should have retried once after the transient 404 and succeeded on attempt 2');
+    assert.strictEqual(result, '[{"item":"Tea","amount":20}]');
+  });
+  await test('REGRESSION: a persistent Apps Script HTTP error still fails cleanly after exhausting retries, not silently', async () => {
+    const { sandbox } = buildSandbox({
+      elements: {},
+      fetchImpl: async () => ({ ok: false, status: 404 }),
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key' }));
+    await assert.rejects(() => sandbox.callGeminiProxy('some prompt', null), /Apps Script HTTP 404 after \d+ attempts/);
+  });
+  await test('fetchWithRetry (used by getEvalCases/getEvalImage) also retries past a transient HTTP error', async () => {
+    let attempts = 0;
+    const { sandbox } = buildSandbox({
+      elements: {},
+      fetchImpl: async () => {
+        attempts++;
+        if (attempts === 1) return { ok: false, status: 404 };
+        return { ok: true, text: async () => 'success-body' };
+      },
+    });
+    const res = await sandbox.fetchWithRetry('https://script.google.com/fake?action=getEvalCases', 'getEvalCases');
+    assert.strictEqual(attempts, 2);
+    assert.strictEqual(await res.text(), 'success-body');
   });
 }
 
