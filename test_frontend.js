@@ -191,7 +191,7 @@ section('2. confirmAndSave() — text-only entry (no image)');
     assert.strictEqual(rowCall.body.amount, '20');
     assert.strictEqual(rowCall.body.sheetName, 'Expenses');
   });
-  await test('A local-parse entry (pendingTraceId never set) saves with an empty traceId, not undefined', () => {
+  await test('An entry with no pending Trace ID saves with an empty traceId, not undefined', () => {
     const rowCall = fetchCalls.find(c => c.body && c.body.item === 'Tea');
     assert.strictEqual(rowCall.body.traceId, '');
   });
@@ -775,7 +775,7 @@ section('6f. confirmAndSave() — outcome tracking integration');
     assert.strictEqual(outcomeCall.body.outcome, 'saved_edited');
     assert.strictEqual(outcomeCall.body.editedFields, 'amount');
   });
-  await test('No outcome trace at all for a local-parse entry (pendingTraceId never set)', async () => {
+  await test('No outcome trace at all when there is no pending Trace ID', async () => {
     const { sandbox, fetchCalls } = setup(makeTextElements('Tea', '20'));
     sandbox.__setState({ parsedItems: ([{ item: 'Tea', amount: 20 }]), multiMode: ('separate') });
     await sandbox.confirmAndSave();
@@ -833,7 +833,7 @@ section('6g. closeReview() — abandonment tracking');
     assert.strictEqual(abandonedCalls.length, 1);
     assert.strictEqual(abandonedCalls[0].body.traceId, 'T-seq2');
   });
-  await test('No abandonment log for a local-parse review (pendingTraceId never set)', () => {
+  await test('No abandonment log when there is no pending Trace ID', () => {
     const { sandbox, fetchCalls } = setup();
     sandbox.closeReview();
     assert.strictEqual(fetchCalls.length, 0);
@@ -1204,6 +1204,253 @@ section('7. confirmAndSave() — validation still blocks bad input');
   await test('Missing item name blocks save entirely — no fetch calls at all', async () => {
     await sandbox.confirmAndSave();
     assert.strictEqual(fetchCalls.length, 0);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('18. Observability: latency / token / model metadata on text+SMS+photo traces');
+{
+  function setupMetaSandbox(proxyBody) {
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements: {},
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => proxyBody }),
+    });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' }));
+    return { sandbox, fetchCalls };
+  }
+  await test('A text parse trace now carries latency, token counts, finish reason and served model', async () => {
+    const { sandbox, fetchCalls } = setupMetaSandbox({ success: true, result: '[{"item":"Tea","amount":20}]', meta: { promptTokens: 210, outputTokens: 35, totalTokens: 245, finishReason: 'STOP', safety: '', servedModel: 'gem-x' } });
+    await sandbox.parseWithGemini('chai and samosa at the corner shop');
+    const t = fetchCalls.find(c => c.body && c.body.action === 'logAITrace');
+    assert.ok(t);
+    assert.strictEqual(typeof t.body.latencyMs, 'number');
+    assert.strictEqual(t.body.promptTokens, 210);
+    assert.strictEqual(t.body.outputTokens, 35);
+    assert.strictEqual(t.body.totalTokens, 245);
+    assert.strictEqual(t.body.finishReason, 'STOP');
+    assert.strictEqual(t.body.servedModel, 'gem-x');
+    assert.strictEqual(t.body.attempt, 1);
+  });
+  await test('An older backend with no meta block still parses and logs a trace (with latency only)', async () => {
+    const { sandbox, fetchCalls } = setupMetaSandbox({ success: true, result: '[{"item":"Tea","amount":20}]' });
+    const items = await sandbox.parseWithGemini('chai and samosa at the corner shop');
+    assert.strictEqual(items.length, 1);
+    const t = fetchCalls.find(c => c.body && c.body.action === 'logAITrace');
+    assert.strictEqual(typeof t.body.latencyMs, 'number');
+    assert.strictEqual(t.body.promptTokens, undefined);
+  });
+  await test('A JSON parse failure trace also carries the metadata (useful for diagnosing truncation)', async () => {
+    const { sandbox, fetchCalls } = setupMetaSandbox({ success: true, result: 'not json', meta: { finishReason: 'MAX_TOKENS', totalTokens: 700 } });
+    await assert.rejects(() => sandbox.parseWithGemini('some garbled input'));
+    const t = fetchCalls.find(c => c.body && c.body.errorCategory === 'json_parse_error');
+    assert.strictEqual(t.body.finishReason, 'MAX_TOKENS');
+    assert.strictEqual(t.body.totalTokens, 700);
+  });
+  await test('Eval runs (skipTrace) still log nothing even though metadata is now captured', async () => {
+    const { sandbox, fetchCalls } = setupMetaSandbox({ success: true, result: '[{"item":"Tea","amount":20}]', meta: { totalTokens: 50 } });
+    await sandbox.parseWithGemini('chai and samosa at the corner shop', true);
+    assert.strictEqual(fetchCalls.filter(c => c.body && c.body.action === 'logAITrace').length, 0);
+  });
+  await test('Photo path extracts metadata straight from the Gemini response', () => {
+    const { sandbox } = setupMetaSandbox({});
+    const m = sandbox.extractGeminiMeta({ candidates: [{ finishReason: 'STOP', safetyRatings: [{ category: 'C1', probability: 'MEDIUM' }] }], usageMetadata: { promptTokenCount: 900, candidatesTokenCount: 120, totalTokenCount: 1020 }, modelVersion: 'gem-v' });
+    assert.strictEqual(m.promptTokens, 900);
+    assert.strictEqual(m.servedModel, 'gem-v');
+    assert.strictEqual(m.safety, 'C1:MEDIUM');
+    assert.doesNotThrow(() => sandbox.extractGeminiMeta({}));
+  });
+  await test('A photo parse trace carries the metadata too', async () => {
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements: {},
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '{"items":[{"item":"Tea","amount":20}],"receiptTotal":20}' }] } }], usageMetadata: { promptTokenCount: 800, candidatesTokenCount: 40, totalTokenCount: 840 }, modelVersion: 'gem-v' }) }),
+    });
+    const cfg = { scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' };
+    await sandbox.runVisionParse(cfg, 'AAAA', 'bill.jpg', 'T-photo-meta');
+    const t = fetchCalls.find(c => c.body && c.body.action === 'logAITrace' && c.body.traceId === 'T-photo-meta');
+    assert.ok(t);
+    assert.strictEqual(t.body.totalTokens, 840);
+    assert.strictEqual(t.body.finishReason, 'STOP');
+    assert.strictEqual(t.body.servedModel, 'gem-v');
+    assert.strictEqual(typeof t.body.latencyMs, 'number');
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('19. Fast-path (local parser) entries are traced too, without raw text');
+{
+  function setupLocal(text) {
+    const elements = {};
+    setInput(elements, 'expenseInput', text);
+    elements['expenseInput'].dataset.imageParsed = '';
+    const { sandbox, fetchCalls } = buildSandbox({ elements, fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }) });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', userName: 'RB' }));
+    return { sandbox, fetchCalls };
+  }
+  await test('"chai 20" logs a type=local trace with the local-parser model and no Gemini call', async () => {
+    const { sandbox, fetchCalls } = setupLocal('chai 20');
+    await sandbox.submitExpense();
+    assert.strictEqual(fetchCalls.filter(c => c.url && String(c.url).includes('action=geminiProxy')).length, 0);
+    const t = fetchCalls.find(c => c.body && c.body.action === 'logAITrace' && c.body.type === 'local');
+    assert.ok(t, 'a local trace should have been logged');
+    assert.strictEqual(t.body.model, 'local-parser');
+    assert.strictEqual(t.body.promptVersion, 'local-v1');
+    assert.strictEqual(t.body.itemsCountFiltered, 1);
+    assert.strictEqual(t.body.itemsSum, 20);
+    assert.match(t.body.traceId, /^T-/);
+  });
+  await test('The local trace never contains the raw input text', async () => {
+    const { sandbox, fetchCalls } = setupLocal('chai 20');
+    await sandbox.submitExpense();
+    const t = fetchCalls.find(c => c.body && c.body.action === 'logAITrace' && c.body.type === 'local');
+    assert.strictEqual(t.body.rawResponse, undefined);
+    assert.strictEqual(t.body.rawText, undefined);
+    assert.ok(!JSON.stringify(t.body).includes('chai'));
+  });
+  await test('The pending Trace ID and type are set so the saved row links back to the trace', async () => {
+    const { sandbox, fetchCalls } = setupLocal('chai 20');
+    await sandbox.submitExpense();
+    const t = fetchCalls.find(c => c.body && c.body.action === 'logAITrace' && c.body.type === 'local');
+    assert.strictEqual(vm.runInContext('pendingTraceId', sandbox), t.body.traceId);
+    assert.strictEqual(vm.runInContext('pendingTraceType', sandbox), 'local');
+  });
+  await test('Saving a local-parse entry logs a saved_as_is outcome tagged type=local, and the row carries the Trace ID', async () => {
+    const elements = {};
+    setInput(elements, 'expenseInput', 'chai 20'); elements['expenseInput'].dataset.imageParsed = '';
+    setInput(elements, 'rv-date-0', '2026-09-04'); setInput(elements, 'rv-cat-0', 'Food'); setInput(elements, 'rv-tag-0', 'Regular');
+    setInput(elements, 'rv-item-0', 'Tea'); setInput(elements, 'rv-shop-0', ''); setInput(elements, 'rv-comment-0', '');
+    setInput(elements, 'rv-amount-0', '20'); setInput(elements, 'rv-pay-0', 'Cash');
+    const { sandbox, fetchCalls } = buildSandbox({ elements, fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }) });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', userName: 'RB' }));
+    sandbox.__setState({ parsedItems: ([{ date: '04 Sep 2026', item: 'Tea', amount: 20, category: 'Food' }]), multiMode: ('separate'), pendingTraceId: ('T-local-x'), pendingTraceType: ('local') });
+    await sandbox.confirmAndSave();
+    const outcome = fetchCalls.find(c => c.body && c.body.action === 'logAITrace' && c.body.outcome);
+    assert.ok(outcome);
+    assert.strictEqual(outcome.body.type, 'local');
+    assert.strictEqual(outcome.body.outcome, 'saved_as_is');
+    const rowCall = fetchCalls.find(c => c.body && c.body.item === 'Tea');
+    assert.strictEqual(rowCall.body.traceId, 'T-local-x');
+  });
+  await test('Abandoning a local-parse review logs an abandoned outcome', () => {
+    const { sandbox, fetchCalls } = setupLocal('chai 20');
+    sandbox.__setState({ pendingTraceId: ('T-local-ab'), pendingTraceType: ('local'), multiMode: ('separate'), reviewJustSaved: (false) });
+    sandbox.closeReview();
+    const t = fetchCalls.find(c => c.body && c.body.outcome === 'abandoned');
+    assert.ok(t);
+    assert.strictEqual(t.body.type, 'local');
+  });
+  await test('A complex input still goes to Gemini and gets a text trace, not a local one', async () => {
+    const elements = {};
+    setInput(elements, 'expenseInput', 'chai 20, samosa 15'); elements['expenseInput'].dataset.imageParsed = '';
+    const { sandbox, fetchCalls } = buildSandbox({ elements, fetchImpl: async (url) => ({ ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20},{"item":"Samosa","amount":15}]' }) }) });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' }));
+    await sandbox.submitExpense();
+    assert.strictEqual(fetchCalls.filter(c => c.body && c.body.type === 'local').length, 0);
+    assert.ok(fetchCalls.find(c => c.body && c.body.action === 'logAITrace' && c.body.type === 'text'));
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('19b. scoreEvalCase grades shop judgement in both directions');
+{
+  const { sandbox } = buildSandbox({ elements: {} });
+  await test('A matching shop scores 100% (either string may contain the other)', () => {
+    assert.strictEqual(sandbox.scoreEvalCase([{ item: 'Pen', amount: 100, shop: 'Sharma Stationers' }], [{ item: 'Pen', amount: 100, shop: 'Sharma' }]).shopScore, 100);
+    assert.strictEqual(sandbox.scoreEvalCase([{ item: 'Pen', amount: 100, shop: 'sharma' }], [{ item: 'Pen', amount: 100, shop: 'Sharma Stationers' }]).shopScore, 100);
+  });
+  await test('A missed shop (Gemini returned none) scores 0%', () => {
+    assert.strictEqual(sandbox.scoreEvalCase([{ item: 'Tea', amount: 20, shop: null }], [{ item: 'Tea', amount: 20, shop: 'Tapri' }]).shopScore, 0);
+  });
+  await test('A wrong shop scores 0%', () => {
+    assert.strictEqual(sandbox.scoreEvalCase([{ item: 'Tea', amount: 20, shop: 'Cafe' }], [{ item: 'Tea', amount: 20, shop: 'Tapri' }]).shopScore, 0);
+  });
+  await test('Expected shop null: no shop invented = 100%, an invented shop = 0%', () => {
+    assert.strictEqual(sandbox.scoreEvalCase([{ item: 'Pizza', amount: 500, shop: null }], [{ item: 'Pizza', amount: 500, shop: null }]).shopScore, 100);
+    assert.strictEqual(sandbox.scoreEvalCase([{ item: 'Pizza', amount: 500, shop: '' }], [{ item: 'Pizza', amount: 500, shop: null }]).shopScore, 100);
+    assert.strictEqual(sandbox.scoreEvalCase([{ item: 'Pizza', amount: 500, shop: 'Office Party' }], [{ item: 'Pizza', amount: 500, shop: null }]).shopScore, 0);
+  });
+  await test('A case with no shop expectation is not graded on shop (null = not applicable)', () => {
+    assert.strictEqual(sandbox.scoreEvalCase([{ item: 'Tea', amount: 20, shop: 'Whatever' }], [{ item: 'Tea', amount: 20 }]).shopScore, null);
+  });
+  await test('Shop grading never changes the amount or item-name scores', () => {
+    const r = sandbox.scoreEvalCase([{ item: 'Tea', amount: 20, shop: 'Cafe' }], [{ item: 'Tea', amount: 20, shop: 'Tapri' }]);
+    assert.strictEqual(r.amountScore, 100);
+    assert.strictEqual(r.itemNameScore, 100);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('20. Local parser hands space-separated multi-item input to Gemini');
+{
+  const { sandbox } = buildSandbox({ elements: {} });
+  await test('"chai 20 samosa 15 at tapri" is NOT parsed locally (it used to save one mangled item for Rs.20)', () => {
+    assert.strictEqual(sandbox.localParse('chai 20 samosa 15 at tapri'), null);
+    assert.strictEqual(sandbox.needsGemini('chai 20 samosa 15 at tapri'), true);
+  });
+  await test('Three space-separated items also go to Gemini', () => {
+    assert.strictEqual(sandbox.needsGemini('chai 20 samosa 15 pani puri 30'), true);
+  });
+  await test('Single-amount entries still take the fast path', () => {
+    for (const t of ['chai 20', 'chai ₹20', 'rs 20 chai', 'chai rs20', 'kal chai 20']) {
+      assert.strictEqual(sandbox.needsGemini(t), false, t);
+      const r = sandbox.localParse(t);
+      assert.ok(r && r.length === 1, t);
+      assert.strictEqual(String(r[0].amount), '20', t);
+    }
+  });
+  await test('Arithmetic amounts count as one amount and stay local', () => {
+    const r = sandbox.localParse('chai 50+30');
+    assert.ok(r && r.length === 1);
+    assert.strictEqual(String(r[0].amount), '80');
+  });
+  await test('An explicit "date DD/MM" is not mistaken for a second amount', () => {
+    assert.strictEqual(sandbox.needsGemini('chai 20 date 15/09'), false);
+    assert.ok(sandbox.localParse('chai 20 date 15/09'));
+  });
+  await test('Existing comma and newline multi-item detection is unchanged', () => {
+    assert.strictEqual(sandbox.needsGemini('chai 20, samosa 15'), true);
+    assert.strictEqual(sandbox.needsGemini('chai 20\nsamosa 15'), true);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('21. Local parser: dash separators; shop judgement is left to Gemini');
+{
+  const { sandbox } = buildSandbox({ elements: {} });
+  const parse = (t) => { const r = sandbox.localParse(t); return r && r[0]; };
+  await test('"pen - 100" gives item Pen, amount 100, and no dash anywhere in the item', () => {
+    for (const t of ['pen - 100', 'pen-100', 'pen: 100', '100 - pen', 'Pen – 100']) {
+      const r = parse(t);
+      assert.ok(r, t);
+      assert.strictEqual(r.item, 'Pen', t);
+      assert.strictEqual(String(r.amount), '100', t);
+      assert.ok(!/[-–—]/.test(r.item), t);
+    }
+  });
+  await test('Anything that mentions where it was bought is handed to Gemini, never split by a local rule', () => {
+    for (const t of ['bought pen from sharma stationers 100', 'bought pen 100 from sharma', 'pen shop sharma 100', 'pen shop: sharma stores 100',
+                     'pen from shop sharma 100', 'bought tape from big bazaar shop 50', 'chai 20 at tapri', 'dukan se doodh 60', 'from sharma 100']) {
+      assert.strictEqual(sandbox.localParse(t), null, t);
+    }
+  });
+  await test('Words that merely contain a hint ("shopping", "attar", "pencil") do not trigger the hand-off', () => {
+    for (const t of ['shopping 500', 'attar 200', 'pencil 10', 'father 100']) {
+      assert.ok(parse(t), t);
+    }
+  });
+  await test('Plain entries still take the fast path with an empty shop, and arithmetic/hyphenated words survive', () => {
+    assert.strictEqual(parse('chai 20').shop, '');
+    assert.strictEqual(String(parse('chai 50-20').amount), '30');
+    assert.strictEqual(String(parse('clothes-2000-20').amount), '1980');
+    assert.strictEqual(parse('clothes-2000-20').item, 'Clothes');
+    assert.strictEqual(parse('t-shirt 500').item, 'T-shirt');
+  });
+  await test('The Gemini prompt tells the model to use judgement on shops, not follow a fixed rule', () => {
+    const p = sandbox.buildExpensePrompt('bought pen from sharma 100');
+    assert.ok(p.includes('use your own judgement'));
+    assert.ok(p.includes('guidance, not rules'));
+    assert.ok(p.includes('leave shop=null rather than guessing'));
+    assert.ok(p.includes('"pen - 100"'));
+    assert.strictEqual(vm.runInContext('TEXT_EXPENSE_PROMPT_VERSION', sandbox), 'text-v3-shop-judgement');
   });
 }
 

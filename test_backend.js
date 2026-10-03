@@ -417,7 +417,7 @@ test('logAITrace creates the AI_Traces sheet with the full v2 schema on first us
   assert.strictEqual(res.success, true);
   const sheet = fakeSS.getSheetByName('AI_Traces');
   assert.ok(sheet, 'AI_Traces sheet should be auto-created');
-  assert.strictEqual(JSON.stringify(sheet.rows[0]), JSON.stringify(['Trace ID','Timestamp','Type','Attempt','Model','Prompt Version','Items (raw)','Items (kept)','Items Sum','Receipt Total','Mismatch?','Mismatch Amount','HTTP Status','Error Category','Error Message','Latency (ms)','Outcome','Edited Fields','User Agent','Logged By','File Name','Raw Model Response']));
+  assert.strictEqual(JSON.stringify(sheet.rows[0]), JSON.stringify(['Trace ID','Timestamp','Type','Attempt','Model','Prompt Version','Items (raw)','Items (kept)','Items Sum','Receipt Total','Mismatch?','Mismatch Amount','HTTP Status','Error Category','Error Message','Latency (ms)','Prompt Tokens','Output Tokens','Total Tokens','Finish Reason','Served Model','Outcome','Edited Fields','User Agent','Logged By','File Name','Raw Model Response']));
 });
 test('logAITrace writes a photo-type row with all fields correctly placed', () => {
   const sheet = fakeSS.getSheetByName('AI_Traces');
@@ -434,12 +434,12 @@ test('logAITrace writes a photo-type row with all fields correctly placed', () =
   assert.strictEqual(row[10], 'YES');         // Mismatch?
   assert.strictEqual(row[11], -1840);         // Mismatch amount
   assert.strictEqual(row[12], 200);           // HTTP status
-  assert.strictEqual(row[16], '');            // Outcome (not applicable to this row)
-  assert.strictEqual(row[17], '');            // Edited Fields (not applicable)
-  assert.strictEqual(row[18], 'Mozilla/5.0 (iPhone)'); // User agent
-  assert.strictEqual(row[19], 'RB');          // Logged by
-  assert.strictEqual(row[20], 'bill.jpg');    // File name
-  assert.ok(row[21].includes('items'));       // Raw response
+  assert.strictEqual(row[21], '');            // Outcome (not applicable to this row)
+  assert.strictEqual(row[22], '');            // Edited Fields (not applicable)
+  assert.strictEqual(row[23], 'Mozilla/5.0 (iPhone)'); // User agent
+  assert.strictEqual(row[24], 'RB');          // Logged by
+  assert.strictEqual(row[25], 'bill.jpg');    // File name
+  assert.ok(row[26].includes('items'));       // Raw response
 });
 test('logAITrace writes a text-type ERROR row (a retry attempt) with no items/file, just error info', () => {
   const res = post({ action: 'logAITrace', traceId: 'T-text1', type: 'text', attempt: 1, model: 'gemini-3.1-flash-lite-preview', promptVersion: 'text-v1', httpStatus: 429, errorCategory: 'rate_limit', errorMessage: 'Too many requests', latencyMs: 850, loggedBy: 'RB' });
@@ -466,7 +466,7 @@ test('logAITrace truncates a very long raw response so it can never blow up a sh
   post({ action: 'logAITrace', traceId: 'T-huge', type: 'photo', rawResponse: hugeResponse, fileName: 'huge.jpg' });
   const sheet = fakeSS.getSheetByName('AI_Traces');
   const row = sheet.rows[sheet.rows.length - 1];
-  assert.ok(row[21].length <= 3000);
+  assert.ok(row[26].length <= 3000);
 });
 test('logAITrace never throws even with a malformed/missing payload (must never break the main flow)', () => {
   const res = post({ action: 'logAITrace' }); // nothing but the action itself
@@ -483,30 +483,105 @@ test('An outcome row for "saved as-is" logs correctly', () => {
   assert.strictEqual(res.success, true);
   const sheet = fakeSS.getSheetByName('AI_Traces');
   const row = sheet.rows[sheet.rows.length - 1];
-  assert.strictEqual(row[16], 'saved_as_is');
-  assert.strictEqual(row[17], '');
+  assert.strictEqual(row[21], 'saved_as_is');
+  assert.strictEqual(row[22], '');
 });
 test('An outcome row for "saved edited" logs which fields changed', () => {
   const res = post({ action: 'logAITrace', traceId: 'T-outcome2', type: 'text', outcome: 'saved_edited', editedFields: 'amount,category' });
   assert.strictEqual(res.success, true);
   const sheet = fakeSS.getSheetByName('AI_Traces');
   const row = sheet.rows[sheet.rows.length - 1];
-  assert.strictEqual(row[16], 'saved_edited');
-  assert.strictEqual(row[17], 'amount,category');
+  assert.strictEqual(row[21], 'saved_edited');
+  assert.strictEqual(row[22], 'amount,category');
 });
 test('An outcome row for "abandoned" logs correctly', () => {
   const res = post({ action: 'logAITrace', traceId: 'T-outcome3', type: 'sms', outcome: 'abandoned' });
   assert.strictEqual(res.success, true);
   const sheet = fakeSS.getSheetByName('AI_Traces');
   const row = sheet.rows[sheet.rows.length - 1];
-  assert.strictEqual(row[16], 'abandoned');
+  assert.strictEqual(row[21], 'abandoned');
 });
 test('A normal attempt/summary row (no outcome) leaves Outcome/Edited Fields blank', () => {
   post({ action: 'logAITrace', traceId: 'T-normal', type: 'photo', itemsCountRaw: 3 });
   const sheet = fakeSS.getSheetByName('AI_Traces');
   const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[21], '');
+  assert.strictEqual(row[22], '');
+});
+
+section('11c. logAITrace: latency / token / finish reason / served model columns');
+test('Token, finish reason and served model land in their own columns', () => {
+  const res = post({ action: 'logAITrace', traceId: 'T-meta1', type: 'text', attempt: 1, latencyMs: 640, promptTokens: 210, outputTokens: 35, totalTokens: 245, finishReason: 'STOP', servedModel: 'gemini-3.1-flash-lite-preview-0901' });
+  assert.strictEqual(res.success, true);
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[15], 640);   // Latency
+  assert.strictEqual(row[16], 210);   // Prompt Tokens
+  assert.strictEqual(row[17], 35);    // Output Tokens
+  assert.strictEqual(row[18], 245);   // Total Tokens
+  assert.strictEqual(row[19], 'STOP'); // Finish Reason
+  assert.strictEqual(row[20], 'gemini-3.1-flash-lite-preview-0901'); // Served Model
+});
+test('Flagged safety ratings are folded into the Finish Reason column', () => {
+  post({ action: 'logAITrace', traceId: 'T-meta2', type: 'text', finishReason: 'SAFETY', safety: 'HARM_CATEGORY_DANGEROUS_CONTENT:HIGH' });
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[19], 'SAFETY | HARM_CATEGORY_DANGEROUS_CONTENT:HIGH');
+});
+test('Safety with no finish reason does not leave a dangling separator', () => {
+  post({ action: 'logAITrace', traceId: 'T-meta3', type: 'text', safety: 'PROMPT_BLOCKED:SAFETY' });
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[19], 'PROMPT_BLOCKED:SAFETY');
+});
+test('A local-parse trace (no tokens, no served model) leaves those columns blank', () => {
+  post({ action: 'logAITrace', traceId: 'T-local1', type: 'local', attempt: 1, model: 'local-parser', promptVersion: 'local-v1', itemsCountRaw: 1, itemsCountFiltered: 1, itemsSum: 20, latencyMs: 0 });
+  const sheet = fakeSS.getSheetByName('AI_Traces');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[2], 'local');
+  assert.strictEqual(row[4], 'local-parser');
   assert.strictEqual(row[16], '');
-  assert.strictEqual(row[17], '');
+  assert.strictEqual(row[19], '');
+  assert.strictEqual(row[20], '');
+  assert.strictEqual(row[26], ''); // no raw model response for a local parse
+});
+test('extractGeminiMeta pulls usage, finish reason, model and only MEDIUM/HIGH safety ratings', () => {
+  const m = sandbox.extractGeminiMeta({
+    candidates: [{ finishReason: 'STOP', safetyRatings: [{ category: 'HARM_CATEGORY_A', probability: 'NEGLIGIBLE' }, { category: 'HARM_CATEGORY_B', probability: 'HIGH' }] }],
+    usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 },
+    modelVersion: 'gem-x'
+  });
+  assert.strictEqual(m.promptTokens, 10);
+  assert.strictEqual(m.outputTokens, 5);
+  assert.strictEqual(m.totalTokens, 15);
+  assert.strictEqual(m.finishReason, 'STOP');
+  assert.strictEqual(m.servedModel, 'gem-x');
+  assert.strictEqual(m.safety, 'HARM_CATEGORY_B:HIGH');
+});
+test('extractGeminiMeta surfaces a prompt-level block reason', () => {
+  const m = sandbox.extractGeminiMeta({ promptFeedback: { blockReason: 'SAFETY' } });
+  assert.strictEqual(m.safety, 'PROMPT_BLOCKED:SAFETY');
+});
+test('extractGeminiMeta never throws on a response with no metadata at all', () => {
+  const m = sandbox.extractGeminiMeta({});
+  assert.strictEqual(m.promptTokens, null);
+  assert.strictEqual(m.finishReason, '');
+  assert.strictEqual(m.servedModel, '');
+  assert.doesNotThrow(() => sandbox.extractGeminiMeta(null));
+});
+test('geminiProxy returns the text as before, plus the new meta block', () => {
+  const realFetch = UrlFetchApp.fetch;
+  UrlFetchApp.fetch = () => ({
+    getResponseCode: () => 200,
+    getContentText: () => JSON.stringify({ candidates: [{ content: { parts: [{ text: '[{"item":"Tea","amount":20}]' }] }, finishReason: 'STOP' }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 12, totalTokenCount: 112 }, modelVersion: 'gem-x' })
+  });
+  try {
+    const res = get({ action: 'geminiProxy', apiKey: 'k', prompt: 'p' });
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(res.result, '[{"item":"Tea","amount":20}]'); // unchanged, older frontends keep working
+    assert.strictEqual(res.meta.totalTokens, 112);
+    assert.strictEqual(res.meta.servedModel, 'gem-x');
+  } finally { UrlFetchApp.fetch = realFetch; }
 });
 
 section('12. getOrCreateTraceSheet — schema self-healing');
@@ -587,18 +662,18 @@ test('seedEvalCases populates the Evals sheet with the starter set', () => {
   const sheet = fakeSS.getSheetByName('Evals');
   assert.ok(sheet, 'Evals sheet should be created');
   assert.strictEqual(JSON.stringify(sheet.rows[0]), JSON.stringify(['Case ID', 'Type', 'Input', 'Expected Items (JSON)', 'Expected Total', 'Image File ID', 'Notes']));
-  assert.strictEqual(sheet.rows.length, 9); // header + 8 starter cases
+  assert.strictEqual(sheet.rows.length, 17); // header + 8 starter cases + 8 shop-judgement cases
 });
 test('seedEvalCases is safe to re-run — clears and rewrites rather than duplicating', () => {
   sandbox.seedEvalCases();
   sandbox.seedEvalCases();
   const sheet = fakeSS.getSheetByName('Evals');
-  assert.strictEqual(sheet.rows.length, 9); // still 9, not 17
+  assert.strictEqual(sheet.rows.length, 17); // still 17, not 33
 });
 test('getEvalCases returns properly parsed case objects via the real GET action', () => {
   const res = get({ action: 'getEvalCases' });
   assert.strictEqual(res.success, true);
-  assert.strictEqual(res.cases.length, 8);
+  assert.strictEqual(res.cases.length, 16);
   const simple = res.cases.find(c => c.caseId === 'EVAL-001');
   assert.strictEqual(simple.type, 'text');
   assert.strictEqual(simple.input, 'chai 20');
@@ -620,6 +695,37 @@ test('getEvalCases returns an empty array (not an error) when the sheet has no c
   assert.strictEqual(res.success, true);
   assert.strictEqual(res.cases.length, 0);
   sandbox.seedEvalCases(); // restore for subsequent tests
+});
+
+test('The shop eval cases carry their expectations, including "no shop" cases as an explicit null', () => {
+  const res = get({ action: 'getEvalCases' });
+  const byId = id => res.cases.find(c => c.caseId === id);
+  assert.strictEqual(byId('EVAL-009').expectedItems[0].shop, 'Sharma Stationers');
+  assert.strictEqual(byId('EVAL-011').input, 'chai 20 at tapri');
+  assert.strictEqual(byId('EVAL-010').expectedItems[0].shop, null);   // dash case: no shop should be invented
+  assert.strictEqual(byId('EVAL-015').expectedItems[0].shop, null);   // "office party" is not a shop
+  assert.strictEqual(byId('EVAL-016').expectedItems[0].shop, null);   // "shop" as premises, not a merchant
+  assert.ok(res.cases.filter(c => /^EVAL-0(09|1\d)$/.test(c.caseId)).every(c => c.type === 'text'));
+});
+test('addShopEvalCases tops up a live sheet without erasing the user\'s own cases or the photo file ID', () => {
+  const ss = fakeSS.deleteSheet(fakeSS.getSheetByName('Evals'));
+  const sheet = sandbox.getOrCreateEvalsSheet();
+  sheet.appendRow(['EVAL-001', 'text', 'chai 20', JSON.stringify([{ item: 'Tea', amount: 20 }]), '', '', 'mine']);
+  sheet.appendRow(['EVAL-008', 'photo', '', JSON.stringify([{ item: 'X', amount: 1 }]), 4193, 'REAL_DRIVE_ID', 'mine']);
+  sheet.appendRow(['EVAL-100', 'text', 'my own custom case', JSON.stringify([{ item: 'Z', amount: 5 }]), '', '', 'custom']);
+  const added = sandbox.addShopEvalCases();
+  assert.strictEqual(added, 8);
+  const res = get({ action: 'getEvalCases' });
+  assert.strictEqual(res.cases.length, 11);
+  assert.strictEqual(res.cases.find(c => c.caseId === 'EVAL-008').imageFileId, 'REAL_DRIVE_ID'); // untouched
+  assert.ok(res.cases.find(c => c.caseId === 'EVAL-100'));                                         // custom case survives
+  assert.strictEqual(res.cases.find(c => c.caseId === 'EVAL-001').notes, 'mine');
+});
+test('addShopEvalCases is idempotent: a second run adds nothing', () => {
+  const again = sandbox.addShopEvalCases();
+  assert.strictEqual(again, 0);
+  assert.strictEqual(get({ action: 'getEvalCases' }).cases.length, 11);
+  sandbox.seedEvalCases(); // restore the full starter set for later tests
 });
 
 section('16. getEvalImage — serving a fixture photo for photo eval cases');
@@ -654,6 +760,22 @@ test('logEvalRun creates the Eval_Results sheet with proper headers and writes a
   assert.strictEqual(row[7], 2);  // Cases Errored — now its own visible column
   assert.strictEqual(row[8], 75.0); // Amount Score
   assert.strictEqual(row[11], 83.5); // Overall Score
+});
+test('Eval_Results with an old 12-column header is archived, not misaligned or destroyed', () => {
+  fakeSS.deleteSheet(fakeSS.getSheetByName('Eval_Results'));
+  const old = fakeSS.insertSheet('Eval_Results');
+  old.appendRow(['Run ID', 'Timestamp', 'Model', 'Vision Prompt Version', 'Text Prompt Version', 'SMS Prompt Version', 'Cases Run', 'Amount Score (%)', 'Item Name Score (%)', 'Category Score (%)', 'Overall Score (%)', 'Per-Case Detail (JSON)']);
+  old.appendRow(['RUN-OLD', 'x', 'm', 'v', 't', 's', 8, 70, 80, 60, 70, '[]']);
+  post({ action: 'logEvalRun', runId: 'RUN-NEW', casesRun: 8, casesErrored: 1, overallScore: 88 });
+  const fresh = fakeSS.getSheetByName('Eval_Results');
+  assert.strictEqual(fresh.rows[0][7], 'Cases Errored');
+  assert.strictEqual(fresh.rows[1][0], 'RUN-NEW');
+  assert.strictEqual(fresh.rows[1][7], 1);
+  const archived = Object.keys(fakeSS._sheets).filter(n => n.startsWith('Eval_Results_archive_'));
+  assert.strictEqual(archived.length, 1, 'old run history must be preserved under an archive name');
+  assert.strictEqual(fakeSS._sheets[archived[0]].rows[1][0], 'RUN-OLD');
+  fakeSS.deleteSheet(fakeSS.getSheetByName('Eval_Results')); // restore the state the next test expects
+  post({ action: 'logEvalRun', runId: 'RUN-1', casesRun: 8, casesErrored: 2, overallScore: 83.5 });
 });
 test('Multiple runs accumulate as separate rows, giving a trend over time', () => {
   post({ action: 'logEvalRun', runId: 'RUN-2', overallScore: 90.0, casesRun: 8 });
