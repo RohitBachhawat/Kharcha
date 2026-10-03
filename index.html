@@ -445,8 +445,22 @@ const GEMINI_MODEL='gemini-3.1-flash-lite-preview';
 // logic that was actually live when it was captured — without it, "why did this parse
 // badly three weeks ago" is unanswerable once the prompt has since been edited.
 const VISION_PROMPT_VERSION='vision-v2-receipttotal';
-const TEXT_EXPENSE_PROMPT_VERSION='text-v1';
+const TEXT_EXPENSE_PROMPT_VERSION='text-v3-shop-judgement';
 const TEXT_SMS_PROMPT_VERSION='sms-v1';
+const LOCAL_PARSER_VERSION='local-v1'; // bump when localParse()/guessCategory rules change, so local-parse quality is comparable across versions
+// Latency/token/model details of the most recent successful text/SMS Gemini call, stashed here by
+// callGeminiProxy() so its return type stays a plain string (four call sites and the eval suite rely on that).
+let lastGeminiMeta=null;
+// Mirrors extractGeminiMeta() in backend.gs, for the photo path which calls Gemini directly from the browser.
+// Tolerant: missing fields come back null/'' so a response without metadata never breaks a parse.
+function extractGeminiMeta(data){
+  const cand=(data&&data.candidates&&data.candidates[0])||{};
+  const usage=(data&&data.usageMetadata)||{};
+  const flagged=(cand.safetyRatings||[]).filter(function(r){return r.probability==='MEDIUM'||r.probability==='HIGH';}).map(function(r){return r.category+':'+r.probability;});
+  const block=data&&data.promptFeedback&&data.promptFeedback.blockReason;
+  if(block)flagged.unshift('PROMPT_BLOCKED:'+block);
+  return {promptTokens:usage.promptTokenCount!=null?usage.promptTokenCount:null,outputTokens:usage.candidatesTokenCount!=null?usage.candidatesTokenCount:null,totalTokens:usage.totalTokenCount!=null?usage.totalTokenCount:null,finishReason:cand.finishReason||'',safety:flagged.join(';'),servedModel:(data&&data.modelVersion)||''};
+}
 
 // Replaced at deploy time by Vercel build command (see vercel.json).
 // If not replaced (local dev / manual hosting), app falls back to
@@ -614,7 +628,13 @@ function looksMultiItem(text) {
     const withNums = separators.filter(s => /\d/.test(s));
     if (withNums.length > 1) return true;
   }
-  return false;
+  // Space-separated multi-item, e.g. "chai 20 samosa 15 at tapri": two or more standalone amount tokens.
+  // localParse() only extracts ONE amount and glues every other word into the item name, so it would
+  // silently save "Tea Samosa 15 Tapri" for Rs.20. An explicit "date DD/MM" is not an amount, so strip it first.
+  // Arithmetic like "50+30" is a single token and still counts as one amount.
+  const noDate = text.replace(/\bdate\s+\d{1,2}[\/\-]\d{1,2}\b/i, ' ');
+  const amountTokens = noDate.toLowerCase().split(/\s+/).filter(tok => /^(?:₹|rs\.?)?\d[\d\.\+\-\*\/]*$/.test(tok));
+  return amountTokens.length > 1;
 }
 
 // The main local parser
@@ -628,6 +648,11 @@ function localParse(text) {
   // Multi-item with commas/newlines — let Gemini handle
   if (looksMultiItem(t)) return null;
 
+  // Anything that talks about WHERE it was bought ("from", "at", "shop", "se", ...) goes to Gemini.
+  // The local parser deliberately has NO shop-extraction rules: whether a phrase is a shop, a place or just
+  // part of the item is a judgement call, and Gemini makes it. This only decides who handles the entry.
+  if (/\b(from|at|shop|bought|purchased|buy|se|par|mein)\b/i.test(t)) return null;
+
   // Look for a date token — including "date DD/MM" or "date D/M" patterns
   let dateToken = TODAY_STR;
   let cleanTokens = [];
@@ -640,7 +665,10 @@ function localParse(text) {
     const yr=now2.getUTCFullYear();
     dateToken=yr+'-'+mm+'-'+dd;
   }
-  const textForTokens=datePat?t.replace(/\bdate\s+\d{1,2}[\/\-]\d{1,2}\b/i,''):t;
+  let textForTokens=datePat?t.replace(/\bdate\s+\d{1,2}[\/\-]\d{1,2}\b/i,''):t;
+  // "pen - 100", "pen-100", "pen: 100": a dash/colon/= between a word and an amount is a separator, not part of the item.
+  // Needs a non-digit on the left, so arithmetic like "50-20" and dates like "15-09" are left alone.
+  textForTokens=textForTokens.replace(/([^\d\s+\-*\/–—])\s*[-–—:=]+\s*(?=(?:₹|rs\.?)?\d)/gi,'$1 ');
   for (const tok of textForTokens.toLowerCase().split(/\s+/)) {
     if (['kal','parso','yesterday','aaj','today'].includes(tok)) {
       dateToken = resolveDate(tok);
@@ -672,7 +700,10 @@ function localParse(text) {
   // Remove amount token
   if (amountIdx >= 0) cleanTokens.splice(amountIdx, 1);
 
-  // Everything remaining is the item + shop description
+  // Standalone separators ("pen - 100", "100 - pen") are never part of the item name
+  cleanTokens = cleanTokens.filter(tok => !/^[-–—:=]+$/.test(tok));
+
+  // Everything remaining is the item description
   const itemTokens = cleanTokens.filter(tok =>
     tok.length > 0 &&
     !/^(at|from|for|in|on|and|ka|ki|ke|se|par|mein|ko)$/.test(tok)
@@ -742,7 +773,7 @@ function buildSmsPrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateSt
 
 function autoSetUpiCategory(text){if(!isBankSms(text))return;document.querySelectorAll('.cat-picker').forEach(function(picker){var idx=picker.id.replace('catpicker-','');var hidden=document.getElementById('rv-cat-'+idx);if(!hidden||hidden.value)return;picker.querySelectorAll('.cat-pill').forEach(function(p){p.classList.remove('active');});var upiPill=picker.querySelector('[data-cat="UPI/Online"]');if(upiPill){upiPill.classList.add('active');hidden.value='UPI/Online';}});}
 
-function buildExpensePrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);const d2=new Date(now);d2.setDate(now.getDate()-2);const d3=new Date(now);d3.setDate(now.getDate()-3);const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];return 'You are a family expense parser for an Indian family. Return ONLY a valid JSON array, no markdown.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+', 2daysago='+fmt(d2)+', 3daysago='+fmt(d3)+', Day='+dn+'\n\nRules:\n1. Translate Hindi/Hinglish to English: chai=Tea, sabzi=Vegetables, doodh=Milk, dawai=Medicine, kapde=Clothes, bijli=Electricity, auto=Auto Rickshaw, kal=yesterday, aaj=today\n2. Detect multiple items if multiple expenses in text\n3. Resolve relative dates\n4. AMOUNT EXPRESSIONS: keep arithmetic as string: "clothes-2000-20" => amount="2000-20", "metro-50/2" => amount="50/2". Dashes between item and amount are separators not subtraction unless both sides are numbers.\n5. Category: Food/Transport/Shopping/Utilities/Health/Entertainment/Other or null if unsure\n\nReturn: [{"date":"DD Mon YYYY","item":"English name","amount":"expr_or_number_or_null","shop":"name_or_null","comment":"extra_or_null","category":"cat_or_null"}]\n\nOnly JSON array.';}
+function buildExpensePrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);const d2=new Date(now);d2.setDate(now.getDate()-2);const d3=new Date(now);d3.setDate(now.getDate()-3);const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];return 'You are a family expense parser for an Indian family. Return ONLY a valid JSON array, no markdown.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+', 2daysago='+fmt(d2)+', 3daysago='+fmt(d3)+', Day='+dn+'\n\nRules:\n1. Translate Hindi/Hinglish to English: chai=Tea, sabzi=Vegetables, doodh=Milk, dawai=Medicine, kapde=Clothes, bijli=Electricity, auto=Auto Rickshaw, kal=yesterday, aaj=today\n2. Detect multiple items if multiple expenses in text\n3. Resolve relative dates\n4. AMOUNT EXPRESSIONS: keep arithmetic as string: "clothes-2000-20" => amount="2000-20", "metro-50/2" => amount="50/2". Dashes between item and amount are separators not subtraction unless both sides are numbers, and the dash must never appear in the item name: "pen - 100" => item="Pen", amount=100.\n5. SHOP: use your own judgement. If the text names where something was bought or paid (for example "bought X from Y", "X at Y", "Y se X", or an explicit word like "shop"), and you think Y really is a shop, vendor or place, put Y in shop and keep it out of item. If you are not reasonably sure it is a shop (it could be part of the item or a comment), leave shop=null rather than guessing. These examples are guidance, not rules.\n6. Category: Food/Transport/Shopping/Utilities/Health/Entertainment/Other or null if unsure\n\nReturn: [{"date":"DD Mon YYYY","item":"English name","amount":"expr_or_number_or_null","shop":"name_or_null","comment":"extra_or_null","category":"cat_or_null"}]\n\nOnly JSON array.';}
 
 async function callGeminiProxy(prompt,traceMeta){
   const cfg=loadConfig();
@@ -788,6 +819,7 @@ async function callGeminiProxy(prompt,traceMeta){
       if(cat==='invalid_api_key')throw new KharchaError('Invalid API Key',m,'Get key at aistudio.google.com.');
       throw new KharchaError('Gemini Error',m,'Check API key in settings.');
     }
+    lastGeminiMeta=Object.assign({attempt:attempt,latencyMs:Date.now()-t0},data.meta||{});
     return data.result||'';
   }
 }
@@ -801,14 +833,16 @@ async function parseWithGemini(text,skipTrace){
   pendingTraceId=generateTraceId();
   pendingTraceType=type;
   const traceMeta=skipTrace?null:{traceId:pendingTraceId,type:type,model:GEMINI_MODEL,promptVersion:promptVersion};
+  lastGeminiMeta=null;
   const raw=await callGeminiProxy(prompt,traceMeta);
+  const meta=lastGeminiMeta||{};
   const clean=raw.replace(/```json|```/g,'').trim();
   let arr;
   try{
     const p=JSON.parse(clean);
     arr=Array.isArray(p)?p:[p];
   }catch(e){
-    if(!skipTrace)logAITrace(cfg,Object.assign({},traceMeta,{errorCategory:'json_parse_error',errorMessage:e.message,rawResponse:clean}));
+    if(!skipTrace)logAITrace(cfg,Object.assign({},traceMeta,meta,{errorCategory:'json_parse_error',errorMessage:e.message,rawResponse:clean}));
     throw new KharchaError('Parse Error','Bad JSON: '+clean.substring(0,80),'Try simpler text.');
   }
   arr=arr.map(item=>{
@@ -819,7 +853,7 @@ async function parseWithGemini(text,skipTrace){
   });
   const rawCount=arr.length;
   const filtered=filterValidAmountItems(arr);
-  if(!skipTrace)logAITrace(cfg,Object.assign({},traceMeta,{itemsCountRaw:rawCount,itemsCountFiltered:filtered.length,itemsSum:sumItemAmounts(filtered),rawResponse:clean}));
+  if(!skipTrace)logAITrace(cfg,Object.assign({},traceMeta,meta,{itemsCountRaw:rawCount,itemsCountFiltered:filtered.length,itemsSum:sumItemAmounts(filtered),rawResponse:clean}));
   return filtered;
 }
 
@@ -903,11 +937,12 @@ async function runVisionParse(cfg,base64Data,fileName,traceId){
       throw new Error('Vision error '+res.status+' after '+MAX_RETRIES+' attempts: '+em);
     }
     const data=await res.json();
+    const meta=extractGeminiMeta(data);
     const raw=(data.candidates[0].content.parts[0].text||'').replace(/```json|```/g,'').trim();
     let parsed;
     try{parsed=JSON.parse(raw);}
     catch(e){
-      if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:'json_parse_error',errorMessage:e.message,latencyMs:Date.now()-t0,fileName:fileName,rawResponse:raw});
+      if(traceId)logAITrace(cfg,Object.assign({traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:'json_parse_error',errorMessage:e.message,latencyMs:Date.now()-t0,fileName:fileName,rawResponse:raw},meta));
       throw new Error('Could not read the AI response for this photo. Try again.');
     }
     // Backward/defensive compatible: accept {items,receiptTotal}, a bare array, or a single object.
@@ -917,7 +952,7 @@ async function runVisionParse(cfg,base64Data,fileName,traceId){
     else{items=[parsed];}
     const droppedCount=items.length;
     items=filterValidAmountItems(items);
-    if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,itemsCountRaw:droppedCount,itemsCountFiltered:items.length,itemsSum:sumItemAmounts(items),receiptTotal:receiptTotal,latencyMs:Date.now()-t0,fileName:fileName,rawResponse:raw});
+    if(traceId)logAITrace(cfg,Object.assign({traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,itemsCountRaw:droppedCount,itemsCountFiltered:items.length,itemsSum:sumItemAmounts(items),receiptTotal:receiptTotal,latencyMs:Date.now()-t0,fileName:fileName,rawResponse:raw},meta));
     if(items.length===0)throw new Error('Could not read any valid amounts from this photo. Try a clearer photo, or enter the expense manually.');
     return {items:items,receiptTotal:receiptTotal,rawResponse:raw,droppedCount:droppedCount};
   }
@@ -934,7 +969,7 @@ let pendingImageBase64=null,pendingImageMimeType=null,pendingImageFileName=null;
 let pendingReceiptTotal=null;
 // Set whenever an entry is going through an AI parse (text/SMS/photo) — carried through
 // to the saved row's "Trace ID" column so it can be looked up in AI_Traces later.
-// Stays null for entries the fast local parser handles without ever calling Gemini.
+// Entries handled by the fast local parser (no Gemini call) get one too, with type 'local'.
 let pendingTraceId=null;
 // Which type (text/sms/photo) the current pendingTraceId belongs to — needed so the
 // eventual outcome log (saved_as_is/saved_edited/abandoned) is tagged correctly.
@@ -978,10 +1013,14 @@ async function submitExpense(){
 
   // ── Fast path: try local parser first ──
   if(!needsGemini(text)){
+    const tLocal=Date.now();
     const local=localParse(text);
     if(local&&local.length>0){
       parsedItems=local;
-      pendingTraceId=null;pendingTraceType=null; // no AI was involved — leave the Trace ID column blank for this entry
+      // No AI involved, but still traced (type 'local') so outcome tracking (saved_as_is / saved_edited /
+      // abandoned) can measure local-parser quality too. Raw input text is deliberately NOT logged.
+      pendingTraceId=generateTraceId();pendingTraceType='local';
+      logAITrace(cfg,{traceId:pendingTraceId,type:'local',attempt:1,model:'local-parser',promptVersion:LOCAL_PARSER_VERSION,itemsCountRaw:local.length,itemsCountFiltered:local.length,itemsSum:sumItemAmounts(local),latencyMs:Date.now()-tLocal});
       openReview(parsedItems);
       return;
     }
@@ -1085,7 +1124,7 @@ function logOutcomeTrace(cfg,traceId,type,outcome,editedFields){
 // (informational — many expected items don't specify one) on each matched pair.
 function scoreEvalCase(actualItems,expectedItems){
   const remaining=(actualItems||[]).slice();
-  let amountHits=0,itemNameHits=0,categoryHits=0,categoryTotal=0;
+  let amountHits=0,itemNameHits=0,categoryHits=0,categoryTotal=0,shopHits=0,shopTotal=0;
   const details=[];
   (expectedItems||[]).forEach(function(exp){
     let bestIdx=-1,bestDiff=Infinity;
@@ -1108,6 +1147,17 @@ function scoreEvalCase(actualItems,expectedItems){
       categoryTotal++;
       if((act.category||'').toLowerCase()===exp.category.toLowerCase())categoryHits++;
     }
+    // Shop judgement is graded in BOTH directions, only when the case states an expectation:
+    //   exp.shop = "Sharma"  -> Gemini should have named a shop that matches (either string may contain the other)
+    //   exp.shop = null      -> Gemini should NOT have invented a shop (catches over-eager shop detection)
+    //   no "shop" key        -> not graded
+    if(Object.prototype.hasOwnProperty.call(exp,'shop')){
+      shopTotal++;
+      const expShop=(exp.shop||'').toLowerCase().trim();
+      const actShop=(act.shop||'').toLowerCase().trim();
+      if(!expShop){if(!actShop)shopHits++;}
+      else if(actShop&&(expShop.includes(actShop)||actShop.includes(expShop)))shopHits++;
+    }
     details.push({expectedItem:exp.item,expectedAmount:exp.amount,matchedItem:act.item,matchedAmount:act.amount,amountMatch:amountMatch,itemMatch:itemMatch});
     remaining.splice(bestIdx,1); // claim this actual item so it can't be double-matched
   });
@@ -1116,6 +1166,7 @@ function scoreEvalCase(actualItems,expectedItems){
     amountScore:n?Math.round((amountHits/n)*1000)/10:100,
     itemNameScore:n?Math.round((itemNameHits/n)*1000)/10:100,
     categoryScore:categoryTotal?Math.round((categoryHits/categoryTotal)*1000)/10:null, // null = not applicable
+    shopScore:shopTotal?Math.round((shopHits/shopTotal)*1000)/10:null, // null = not applicable
     extraActualItems:remaining.length, // actual items that matched nothing expected — possible hallucination
     details:details,
   };
@@ -1199,16 +1250,18 @@ async function runEvals(onProgress){
   // outright-broken cases still report a misleadingly perfect score.)
   const avgAll=function(key){return results.length?results.reduce(function(s,r){return s+(r.error?0:(r[key]||0));},0)/results.length:0;};
   const catValid=valid.filter(r=>r.categoryScore!=null);
+  const shopValid=valid.filter(r=>r.shopScore!=null);
   const summary={
     casesRun:cases.length,
     casesErrored:results.length-valid.length,
     amountScore:Math.round(avgAll('amountScore')*10)/10,
     itemNameScore:Math.round(avgAll('itemNameScore')*10)/10,
     categoryScore:catValid.length?Math.round((catValid.reduce(function(s,r){return s+r.categoryScore;},0)/catValid.length)*10)/10:null,
+    shopScore:shopValid.length?Math.round((shopValid.reduce(function(s,r){return s+r.shopScore;},0)/shopValid.length)*10)/10:null,
   };
   summary.overallScore=Math.round(((summary.amountScore+summary.itemNameScore)/2)*10)/10;
   const runId='RUN-'+Date.now();
-  fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'logEvalRun',runId:runId,model:GEMINI_MODEL,visionPromptVersion:VISION_PROMPT_VERSION,textPromptVersion:TEXT_EXPENSE_PROMPT_VERSION,smsPromptVersion:TEXT_SMS_PROMPT_VERSION,casesRun:summary.casesRun,casesErrored:summary.casesErrored,amountScore:summary.amountScore,itemNameScore:summary.itemNameScore,categoryScore:summary.categoryScore,overallScore:summary.overallScore,perCaseDetail:JSON.stringify(results.map(function(r){return {caseId:r.caseId,error:r.error||null,amountScore:r.amountScore,itemNameScore:r.itemNameScore};}))})});
+  fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'logEvalRun',runId:runId,model:GEMINI_MODEL,visionPromptVersion:VISION_PROMPT_VERSION,textPromptVersion:TEXT_EXPENSE_PROMPT_VERSION,smsPromptVersion:TEXT_SMS_PROMPT_VERSION,casesRun:summary.casesRun,casesErrored:summary.casesErrored,amountScore:summary.amountScore,itemNameScore:summary.itemNameScore,categoryScore:summary.categoryScore,overallScore:summary.overallScore,perCaseDetail:JSON.stringify(results.map(function(r){return {caseId:r.caseId,error:r.error||null,amountScore:r.amountScore,itemNameScore:r.itemNameScore,shopScore:r.shopScore!=null?r.shopScore:null};}))})});
   return {runId:runId,summary:summary,results:results};
 }
 function checkTotalMismatch(items){
@@ -1845,7 +1898,7 @@ function renderEvalSummaryHtml(s){
   return '<div style="background:#181818;border:1px solid #333;border-radius:10px;padding:16px;margin-bottom:16px;">'
     +(s.casesErrored?'<div style="background:rgba(255,82,82,0.15);border:1px solid #ff5252;color:#ff8a8a;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;font-weight:600;">⚠️ '+s.casesErrored+' of '+s.casesRun+' case(s) FAILED TO RUN — the score below already counts each as a failure, not "not applicable". See the per-case list for which ones and why.</div>':'')
     +'<div style="font-size:28px;font-weight:700;">'+s.overallScore+'% overall</div>'
-    +'<div style="margin-top:8px;color:#999;font-size:13px;">Amount: '+s.amountScore+'% · Item name: '+s.itemNameScore+'%'+(s.categoryScore!=null?' · Category: '+s.categoryScore+'%':' · Category: n/a')+'</div>'
+    +'<div style="margin-top:8px;color:#999;font-size:13px;">Amount: '+s.amountScore+'% · Item name: '+s.itemNameScore+'%'+(s.categoryScore!=null?' · Category: '+s.categoryScore+'%':' · Category: n/a')+(s.shopScore!=null?' · Shop: '+s.shopScore+'%':' · Shop: n/a')+'</div>'
     +'<div style="margin-top:4px;color:#999;font-size:13px;">'+s.casesRun+' case(s) run'+(s.casesErrored?', '+s.casesErrored+' errored':'')+'</div>'
     +'</div>';
 }
@@ -1856,6 +1909,7 @@ function renderEvalResultsHtml(results){
     return '<div style="padding:10px 0;border-bottom:1px solid #2a2a2a;font-size:13px;">'
       +'<b>'+r.caseId+'</b> ('+r.type+') — <span style="color:'+color+';">amount '+r.amountScore+'%</span>, item name '+r.itemNameScore+'%'
       +(r.categoryScore!=null?', category '+r.categoryScore+'%':'')
+      +(r.shopScore!=null?', shop '+r.shopScore+'%':'')
       +(r.totalMatch!=null?(', total match: '+(r.totalMatch?'✅':'❌')):'')
       +(r.extraActualItems?(' — ⚠️ '+r.extraActualItems+' extra unmatched item(s)'):'')
       +'</div>';
