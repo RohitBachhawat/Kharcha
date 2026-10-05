@@ -224,8 +224,9 @@ function doGet(e) {
       const apiKey = e.parameter.apiKey;
       const prompt = e.parameter.prompt;
       if (!apiKey || !prompt) throw new Error('Missing apiKey or prompt');
-      const result = callGemini(apiKey, prompt, null, null);
-      return ok({ result: result });
+      const gem = callGemini(apiKey, prompt);
+      // `result` stays a plain string so older cached frontends keep working; `meta` is additive.
+      return ok({ result: gem.text, meta: gem.meta });
     }
 
     // ── Gemini Vision (image/PDF) ────────────────────────
@@ -402,7 +403,7 @@ function writeToSheet(data, sheetName) {
       data.rawText  || '',
       ts,
       ts,
-      data.payMode  || 'Cash',
+      data.payMode  || 'Online',
       data.additionalInfo || '',
       data.traceId || ''
     ]);
@@ -442,7 +443,29 @@ function callGemini(apiKey, prompt) {
   const body = response.getContentText();
   if (code !== 200) throw new Error('Gemini API error ' + code + ': ' + body.substring(0, 300));
   const json = JSON.parse(body);
-  return json.candidates[0].content.parts[0].text;
+  return { text: json.candidates[0].content.parts[0].text, meta: extractGeminiMeta(json) };
+}
+
+// Pulls the observability fields out of a raw Gemini response. Tolerant by design: any
+// missing field comes back as null/'' so a response without metadata never breaks a parse.
+// Safety: only ratings at MEDIUM/HIGH are kept (NEGLIGIBLE/LOW on every call would be noise),
+// plus a prompt-level block reason if the request itself was refused.
+function extractGeminiMeta(json) {
+  const cand  = (json && json.candidates && json.candidates[0]) || {};
+  const usage = (json && json.usageMetadata) || {};
+  const flagged = (cand.safetyRatings || [])
+    .filter(function(r) { return r.probability === 'MEDIUM' || r.probability === 'HIGH'; })
+    .map(function(r) { return r.category + ':' + r.probability; });
+  const block = json && json.promptFeedback && json.promptFeedback.blockReason;
+  if (block) flagged.unshift('PROMPT_BLOCKED:' + block);
+  return {
+    promptTokens: usage.promptTokenCount != null ? usage.promptTokenCount : null,
+    outputTokens: usage.candidatesTokenCount != null ? usage.candidatesTokenCount : null,
+    totalTokens:  usage.totalTokenCount != null ? usage.totalTokenCount : null,
+    finishReason: cand.finishReason || '',
+    safety:       flagged.join(';'),
+    servedModel:  (json && json.modelVersion) || ''
+  };
 }
 
 // ══════════════════════════════════════════════════════════
@@ -527,8 +550,8 @@ function getOrCreateBillsFolder() {
 // match TRACE_HEADERS, it archives the old sheet (if it has real data) or replaces it
 // outright (if it's still just an empty header) and creates a fresh one. No manual
 // migration function needed for this particular sheet, unlike Expenses/Shaadi.
-const TRACE_HEADERS = ['Trace ID','Timestamp','Type','Attempt','Model','Prompt Version','Items (raw)','Items (kept)','Items Sum','Receipt Total','Mismatch?','Mismatch Amount','HTTP Status','Error Category','Error Message','Latency (ms)','Outcome','Edited Fields','User Agent','Logged By','File Name','Raw Model Response'];
-const TRACE_COL_WIDTHS = [110, 140, 60, 60, 150, 130, 80, 80, 90, 100, 85, 110, 90, 130, 220, 90, 110, 160, 220, 100, 140, 400];
+const TRACE_HEADERS = ['Trace ID','Timestamp','Type','Attempt','Model','Prompt Version','Items (raw)','Items (kept)','Items Sum','Receipt Total','Mismatch?','Mismatch Amount','HTTP Status','Error Category','Error Message','Latency (ms)','Prompt Tokens','Output Tokens','Total Tokens','Finish Reason','Served Model','Outcome','Edited Fields','User Agent','Logged By','File Name','Raw Model Response'];
+const TRACE_COL_WIDTHS = [110, 140, 60, 60, 150, 130, 80, 80, 90, 100, 85, 110, 90, 130, 220, 90, 90, 90, 90, 150, 150, 110, 160, 220, 100, 140, 400];
 
 function logAITrace(data) {
   const sheet = getOrCreateTraceSheet();
@@ -536,7 +559,7 @@ function logAITrace(data) {
   const rawText = String(data.rawResponse || '').substring(0, 3000); // cap so one weird response can't blow up a cell
   sheet.appendRow([
     data.traceId || '',
-    now.toLocaleString('en-IN'),
+    now, // real Date object, NOT toLocaleString('en-IN'): that yields DD/MM/YYYY strings which new Date() can't re-parse for days 13-31, silently breaking cleanupOldTraces
     data.type || '',
     data.attempt != null ? data.attempt : '',
     data.model || '',
@@ -551,6 +574,12 @@ function logAITrace(data) {
     data.errorCategory || '',
     data.errorMessage || '',
     data.latencyMs != null ? data.latencyMs : '',
+    data.promptTokens != null ? data.promptTokens : '',
+    data.outputTokens != null ? data.outputTokens : '',
+    data.totalTokens != null ? data.totalTokens : '',
+    // Finish reason and any flagged safety ratings share one column, e.g. "SAFETY | HARM_CATEGORY_X:HIGH"
+    (data.finishReason || '') + (data.safety ? (data.finishReason ? ' | ' : '') + data.safety : ''),
+    data.servedModel || '',
     data.outcome || '',
     data.editedFields || '',
     data.userAgent || '',
@@ -631,7 +660,7 @@ function installTraceCleanupTrigger() {
 // SCHEMA CHANGES: extend EVAL_HEADERS + the appendRow in seedEvalCases()/addEvalCase()
 // (same order), and update the frontend's case-reading code to use the new field.
 const EVAL_HEADERS = ['Case ID', 'Type', 'Input', 'Expected Items (JSON)', 'Expected Total', 'Image File ID', 'Notes'];
-const EVAL_RESULT_HEADERS = ['Run ID', 'Timestamp', 'Model', 'Vision Prompt Version', 'Text Prompt Version', 'SMS Prompt Version', 'Cases Run', 'Amount Score (%)', 'Item Name Score (%)', 'Category Score (%)', 'Overall Score (%)', 'Per-Case Detail (JSON)'];
+const EVAL_RESULT_HEADERS = ['Run ID', 'Timestamp', 'Model', 'Vision Prompt Version', 'Text Prompt Version', 'SMS Prompt Version', 'Cases Run', 'Cases Errored', 'Amount Score (%)', 'Item Name Score (%)', 'Category Score (%)', 'Overall Score (%)', 'Per-Case Detail (JSON)'];
 
 function getOrCreateEvalsSheet() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
@@ -649,13 +678,27 @@ function getOrCreateEvalsSheet() {
 function getOrCreateEvalResultsSheet() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   let sheet = ss.getSheetByName(SHEET_EVAL_RESULTS);
-  if (sheet) return sheet;
+  if (sheet) {
+    // The live sheet may predate the "Cases Errored" column. Appending 13-column rows under
+    // a 12-column header would silently misalign every score, so if the header doesn't match,
+    // archive the old tab (never destroy history) and start a fresh one. Same pattern as AI_Traces.
+    const lastCol = sheet.getLastColumn();
+    const currentHeaders = lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+    if (JSON.stringify(currentHeaders) === JSON.stringify(EVAL_RESULT_HEADERS)) return sheet;
+    if (sheet.getLastRow() > 1) {
+      const archiveName = SHEET_EVAL_RESULTS + '_archive_' + new Date().getTime();
+      sheet.setName(archiveName);
+      Logger.log('Eval_Results schema changed — archived old sheet as ' + archiveName);
+    } else {
+      ss.deleteSheet(sheet);
+    }
+  }
   sheet = ss.insertSheet(SHEET_EVAL_RESULTS);
   sheet.appendRow(EVAL_RESULT_HEADERS);
   const r = sheet.getRange(1, 1, 1, EVAL_RESULT_HEADERS.length);
   r.setBackground('#1a2e1a'); r.setFontColor('#a8ffb3'); r.setFontWeight('bold');
   sheet.setFrozenRows(1);
-  [110, 140, 150, 130, 130, 130, 80, 100, 110, 110, 100, 400].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
+  [110, 140, 150, 130, 130, 130, 80, 90, 100, 110, 110, 100, 400].forEach((w, i) => sheet.setColumnWidth(i + 1, w));
   return sheet;
 }
 
@@ -691,12 +734,44 @@ function logEvalRun(data) {
     data.textPromptVersion || '',
     data.smsPromptVersion || '',
     data.casesRun != null ? data.casesRun : '',
+    data.casesErrored != null ? data.casesErrored : '',
     data.amountScore != null ? data.amountScore : '',
     data.itemNameScore != null ? data.itemNameScore : '',
     data.categoryScore != null ? data.categoryScore : '',
     data.overallScore != null ? data.overallScore : '',
-    String(data.perCaseDetail || '').substring(0, 3000),
+    String(data.perCaseDetail || '').substring(0, 45000), // per-case detail now carries input/expected/actual/timing; Sheets cell limit is 50,000
   ]);
+}
+
+// Eval cases for Gemini's shop judgement (added alongside the "use your own judgement" shop prompt).
+// An expected shop of null means "Gemini should NOT invent a shop here" and is graded as such.
+// Used by seedEvalCases() (fresh setup) and addShopEvalCases() (safe top-up of a live sheet).
+const SHOP_EVAL_CASES = [
+  ['EVAL-009', 'text', 'bought pen from sharma stationers 100', JSON.stringify([{ item: 'Pen', amount: 100, shop: 'Sharma Stationers' }]), '', '', 'Classic "bought X from Y" — Y should become the shop and stay out of the item name'],
+  ['EVAL-010', 'text', 'pen - 100', JSON.stringify([{ item: 'Pen', amount: 100, shop: null }]), '', '', 'Dash is a separator, never part of the item. No shop is mentioned, so none should be invented'],
+  ['EVAL-011', 'text', 'chai 20 at tapri', JSON.stringify([{ item: 'Tea', amount: 20, shop: 'Tapri' }]), '', '', 'Single item with "at <place>" — previously saved as one item called "Tea Tapri"'],
+  ['EVAL-012', 'text', 'pen shop sharma 100', JSON.stringify([{ item: 'Pen', amount: 100, shop: 'Sharma' }]), '', '', 'Explicit word "shop" followed by the name'],
+  ['EVAL-013', 'text', 'bought tape from big bazaar shop 50', JSON.stringify([{ item: 'Tape', amount: 50, shop: 'Big Bazaar' }]), '', '', 'Multi-word shop name with the word "shop" at the end — item must stay just Tape'],
+  ['EVAL-014', 'text', 'sharma ji se doodh 60', JSON.stringify([{ item: 'Milk', amount: 60, shop: 'Sharma Ji' }]), '', '', 'Hinglish "X se" (from X) — tests translation and shop detection together'],
+  ['EVAL-015', 'text', 'pizza at office party 500', JSON.stringify([{ item: 'Pizza', amount: 500, shop: null }]), '', '', 'JUDGEMENT CASE: "office party" is an occasion, not a shop (confirmed by the product owner). Tests that Gemini does not turn every "at ..." into a shop; the prompt now defines what a shop is'],
+  ['EVAL-016', 'text', 'electricity bill for shop 2400', JSON.stringify([{ item: 'Electricity', amount: 2400, shop: null }]), '', '', 'JUDGEMENT CASE: the word "shop" here is the premises being billed, not a merchant. No shop should be recorded'],
+];
+
+// Safe, additive top-up: appends only the shop eval cases whose Case ID is not already in the Evals sheet.
+// Unlike seedEvalCases() it never clears anything, so your own cases and EVAL-008's Image File ID are untouched.
+// Run ONCE from the Apps Script editor; running it again does nothing.
+function addShopEvalCases() {
+  const sheet = getOrCreateEvalsSheet();
+  const lastRow = sheet.getLastRow();
+  const existingIds = lastRow >= 2
+    ? sheet.getRange(2, 1, lastRow - 1, 1).getValues().map(function(r) { return String(r[0]); })
+    : [];
+  let added = 0;
+  SHOP_EVAL_CASES.forEach(function(row) {
+    if (existingIds.indexOf(row[0]) === -1) { sheet.appendRow(row); added++; }
+  });
+  Logger.log('Added ' + added + ' shop eval case(s); ' + (SHOP_EVAL_CASES.length - added) + ' already present.');
+  return added;
 }
 
 // Run ONCE manually from the Apps Script editor to populate a starter set of eval
@@ -734,8 +809,8 @@ function seedEvalCases() {
     ]), 4193, 'PASTE_DRIVE_FILE_ID_HERE',
       'The Sandip Hardware bill that started the whole mismatch-detection feature. Ground truth here is "what a careful human would transcribe from the page" — all 9 legible line items as written, NOT the ₹2,354 actually paid, since the gap between those two numbers reflects an in-person adjustment the photo itself can\'t fully explain. This case tests transcription accuracy AND that the mismatch warning correctly fires (items sum ₹4,153 vs receipt total ₹4,193).'],
   ];
-  cases.forEach(function(row) { sheet.appendRow(row); });
-  Logger.log('Seeded ' + cases.length + ' eval cases. Remember to fill in the Image File ID for EVAL-008.');
+  cases.concat(SHOP_EVAL_CASES).forEach(function(row) { sheet.appendRow(row); });
+  Logger.log('Seeded ' + (cases.length + SHOP_EVAL_CASES.length) + ' eval cases. Remember to fill in the Image File ID for EVAL-008.');
 }
 
 function ok(data)  { return ContentService.createTextOutput(JSON.stringify({ success: true,  ...data })).setMimeType(ContentService.MimeType.JSON); }

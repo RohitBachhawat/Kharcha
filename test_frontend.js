@@ -1134,7 +1134,7 @@ section('6j. Fixes for the real mixed-error eval run (503/404/malformed-HTML)');
     const originalSetTimeout = sandbox.setTimeout;
     sandbox.setTimeout = (fn, ms) => { timeoutDelays.push(ms); return originalSetTimeout(fn, ms); };
     await sandbox.runEvals();
-    assert.ok(timeoutDelays.includes(1500), 'expected a 1500ms pacing delay between eval cases, got: ' + JSON.stringify(timeoutDelays));
+    assert.ok(timeoutDelays.includes(3000), 'expected a 3000ms pacing delay between eval cases, got: ' + JSON.stringify(timeoutDelays));
   });
 
   await test('REGRESSION: a transient Apps Script HTTP error (e.g. 404) now retries instead of failing on attempt 1 — this was the actual bug behind the real-world "Apps Script HTTP 404" failures, since the retry loop only ever retried Gemini\'s own 429/503, not Apps Script\'s own transient errors', async () => {
@@ -1446,13 +1446,180 @@ section('21. Local parser: dash separators; shop judgement is left to Gemini');
   });
   await test('The Gemini prompt tells the model to use judgement on shops, not follow a fixed rule', () => {
     const p = sandbox.buildExpensePrompt('bought pen from sharma 100');
-    assert.ok(p.includes('use your own judgement'));
+    assert.ok(p.includes('Use your own judgement'));
     assert.ok(p.includes('guidance, not rules'));
     assert.ok(p.includes('leave shop=null rather than guessing'));
     assert.ok(p.includes('"pen - 100"'));
-    assert.strictEqual(vm.runInContext('TEXT_EXPENSE_PROMPT_VERSION', sandbox), 'text-v3-shop-judgement');
+    // definition of what is and is not a shop (an occasion/event or the premises a bill is for is not a shop)
+    assert.ok(p.includes('a shop is a business or seller where the purchase was made'));
+    assert.ok(p.includes('These are NOT shops'));
+    assert.ok(p.includes('office party'));
+    assert.ok(p.includes('electricity bill for shop'));
+    assert.strictEqual(vm.runInContext('TEXT_EXPENSE_PROMPT_VERSION', sandbox), 'text-v4-shop-definition');
   });
 }
+
+// ══════════════════════════════════════════════════════════
+section('22. Payment mode defaults to Online');
+{
+  await test('A review chip opens with the Online pill active and Cash inactive, whatever the text says', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    for (const raw of ['chai 20', 'sabzi 120 cash', 'paid via upi 450']) {
+      const html = sandbox.buildChip({ date: '04 Sep 2026', item: 'Tea', amount: 20, category: 'Food', rawText: raw }, 0, 1, 'Regular');
+      assert.ok(/class="pay-pill active" data-pay="Online"/.test(html), raw);
+      assert.ok(!/class="pay-pill active" data-pay="Cash"/.test(html), raw);
+    }
+  });
+  await test('An explicit Cash choice on the chip is respected', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    const html = sandbox.buildChip({ date: '04 Sep 2026', item: 'Tea', amount: 20, category: 'Food', _payMode: 'Cash' }, 0, 1, 'Regular');
+    assert.ok(/class="pay-pill active" data-pay="Cash"/.test(html));
+  });
+  await test('Saving with an empty payment field falls back to Online, not Cash', async () => {
+    const elements = {};
+    setInput(elements, 'rv-date-0', '2026-09-04'); setInput(elements, 'rv-cat-0', 'Food'); setInput(elements, 'rv-tag-0', 'Regular');
+    setInput(elements, 'rv-item-0', 'Tea'); setInput(elements, 'rv-shop-0', ''); setInput(elements, 'rv-comment-0', '');
+    setInput(elements, 'rv-amount-0', '20'); setInput(elements, 'rv-pay-0', '');
+    const { sandbox, fetchCalls } = buildSandbox({ elements, fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }) });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', userName: 'RB' }));
+    sandbox.__setState({ parsedItems: ([{ date: '04 Sep 2026', item: 'Tea', amount: 20, category: 'Food' }]), multiMode: ('separate') });
+    await sandbox.confirmAndSave();
+    const rowCall = fetchCalls.find(c => c.body && c.body.item === 'Tea');
+    assert.ok(rowCall);
+    assert.strictEqual(rowCall.body.payMode, 'Online');
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('23. Eval tracking: per-case detail (what Gemini returned for shop, time, attempts), 404 backoff and call timeout');
+{
+  const cfgJson = JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' });
+  await test('scoreEvalCase records the shop Gemini actually returned, and whether it matched', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    const bad = sandbox.scoreEvalCase([{ item: 'Pizza', amount: 500, shop: 'Office Party' }], [{ item: 'Pizza', amount: 500, shop: null }]);
+    assert.strictEqual(bad.details[0].expectedShop, null);
+    assert.strictEqual(bad.details[0].matchedShop, 'Office Party');
+    assert.strictEqual(bad.details[0].shopMatch, false);
+    const good = sandbox.scoreEvalCase([{ item: 'Pen', amount: 100, shop: 'Sharma' }], [{ item: 'Pen', amount: 100, shop: 'Sharma Stationers' }]);
+    assert.strictEqual(good.details[0].shopMatch, true);
+    const none = sandbox.scoreEvalCase([{ item: 'Tea', amount: 20 }], [{ item: 'Tea', amount: 20 }]);
+    assert.ok(!('expectedShop' in none.details[0]), 'ungraded cases carry no shop fields');
+  });
+
+  await test('runEvals logs input, expected, actual (incl. the shop returned), scores, time and attempts per case', async () => {
+    const cases = [
+      { caseId: 'EVAL-015', type: 'text', input: 'pizza at office party 500', expectedItems: [{ item: 'Pizza', amount: 500, shop: null }], expectedTotal: null, imageFileId: '', notes: '' },
+      { caseId: 'EVAL-011', type: 'text', input: 'chai 20 at tapri', expectedItems: [{ item: 'Tea', amount: 20, shop: 'Tapri' }], expectedTotal: null, imageFileId: '', notes: '' },
+    ];
+    let proxyCalls = 0;
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements: {},
+      fetchImpl: async (url) => {
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { ok: true, json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
+        if (typeof url === 'string' && url.includes('action=geminiProxy')) {
+          proxyCalls++;
+          if (proxyCalls === 1) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Pizza","amount":500,"shop":"Office Party"}]' }) };
+          if (proxyCalls === 2) return { ok: false, status: 404, json: async () => ({}) };          // second case: one 404 ...
+          return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20,"shop":"Tapri"}]' }) }; // ... then success
+        }
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', cfgJson);
+    const out = await sandbox.runEvals();
+    const log = fetchCalls.find(c => c.body && c.body.action === 'logEvalRun');
+    assert.ok(log);
+    const detail = JSON.parse(log.body.perCaseDetail);
+    const d15 = detail.find(d => d.caseId === 'EVAL-015');
+    assert.strictEqual(d15.input, 'pizza at office party 500');
+    assert.strictEqual(d15.shopScore, 0);
+    assert.strictEqual(d15.actual[0].shop, 'Office Party');      // exactly what Gemini shared for shop
+    assert.strictEqual(d15.expected[0].shop, null);
+    assert.strictEqual(typeof d15.timeMs, 'number');
+    assert.strictEqual(d15.attempts, 1);
+    assert.strictEqual(d15.attemptErrors, null);
+    const d11 = detail.find(d => d.caseId === 'EVAL-011');
+    assert.strictEqual(d11.attempts, 2);
+    assert.deepStrictEqual(d11.attemptErrors, ['HTTP 404']);
+    assert.strictEqual(d11.shopScore, 100);
+    assert.strictEqual(typeof out.summary.totalTimeMs, 'number');
+    assert.strictEqual(out.summary.retriedCases, 1);
+    assert.ok(out.summary.slowestCase && out.summary.slowestCase.caseId);
+  });
+
+  await test('An errored case still records its timing, attempts and the reason for every failed attempt', async () => {
+    const cases = [{ caseId: 'EVAL-010', type: 'text', input: 'pen - 100', expectedItems: [{ item: 'Pen', amount: 100, shop: null }], expectedTotal: null, imageFileId: '', notes: '' }];
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements: {},
+      fetchImpl: async (url) => {
+        if (typeof url === 'string' && url.includes('action=getEvalCases')) return { ok: true, json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
+        if (typeof url === 'string' && url.includes('action=geminiProxy')) return { ok: false, status: 404, json: async () => ({}) };
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', cfgJson);
+    const out = await sandbox.runEvals();
+    assert.strictEqual(out.results[0].attempts, 3);
+    const d = JSON.parse(fetchCalls.find(c => c.body && c.body.action === 'logEvalRun').body.perCaseDetail)[0];
+    assert.ok(/404/.test(d.error));
+    assert.deepStrictEqual(d.attemptErrors, ['HTTP 404', 'HTTP 404', 'HTTP 404']);
+    assert.strictEqual(d.input, 'pen - 100');
+    assert.strictEqual(d.attempts, 3);
+  });
+
+  await test('The results screen shows expected vs returned shop (red on a mismatch) plus time and retries', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    const html = sandbox.renderEvalResultsHtml([{ caseId: 'EVAL-015', type: 'text', amountScore: 100, itemNameScore: 100, shopScore: 0, timeMs: 2300, attempts: 2, attemptErrors: ['HTTP 404'],
+      details: [{ expectedItem: 'Pizza', expectedShop: null, matchedShop: 'Office Party', shopMatch: false }] }]);
+    assert.ok(html.includes('expected none, Gemini returned'));
+    assert.ok(html.includes('Office Party'));
+    assert.ok(html.includes('#ff6b6b'));
+    assert.ok(html.includes('2.3s'));
+    assert.ok(html.includes('2 attempts (HTTP 404)'));
+    const errHtml = sandbox.renderEvalResultsHtml([{ caseId: 'EVAL-002', type: 'text', error: 'Apps Script HTTP 404 after 3 attempts', timeMs: 31000, attempts: 3, attemptErrors: ['HTTP 404', 'HTTP 404', 'HTTP 404'] }]);
+    assert.ok(errHtml.includes('3 attempts (HTTP 404, HTTP 404, HTTP 404)'));
+  });
+
+  await test('Apps Script 404s are retried with longer waits (5s then 15s), not the old 3s/6s', async () => {
+    let n = 0;
+    const { sandbox } = buildSandbox({
+      elements: {},
+      fetchImpl: async () => { n++; return n < 3 ? { ok: false, status: 404, json: async () => ({}) } : { ok: true, status: 200, json: async () => ({ success: true, result: '[]' }) }; },
+    });
+    sandbox.localStorage.setItem('kharcha_config', cfgJson);
+    const delays = []; const orig = sandbox.setTimeout;
+    sandbox.setTimeout = (fn, ms) => { delays.push(ms); return orig(fn, ms); };
+    const out = await sandbox.callGeminiProxy('p', null);
+    assert.strictEqual(out, '[]');
+    assert.strictEqual(n, 3);
+    const waits = [...new Set(delays.filter(d => d >= 1000))];
+    assert.deepStrictEqual(waits, [5000, 15000]); // (toast timers reuse the same values, so compare the distinct set)
+    assert.ok(!delays.includes(3000) && !delays.includes(6000), 'the old 3s/6s waits must be gone');
+  });
+
+  await test('A hung call is aborted after the timeout and retried instead of freezing', async () => {
+    sandboxTimerFns = [];
+    let n = 0;
+    const { sandbox } = buildSandbox({
+      elements: {},
+      fetchImpl: async (url, opts) => {
+        n++;
+        if (n === 1) return new Promise((_, reject) => { opts.signal.addEventListener('abort', () => reject(Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }))); }); // hangs until aborted
+        return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
+      },
+    });
+    sandbox.AbortController = AbortController;
+    sandbox.localStorage.setItem('kharcha_config', cfgJson);
+    sandbox.setTimeout = (fn, ms) => { if (ms === 60000) { sandboxTimerFns.push(fn); return 1; } fn(); return 0; };
+    const p = sandbox.callGeminiProxy('p', null);
+    assert.strictEqual(sandboxTimerFns.length, 1, 'a 60s timeout should be armed on the call');
+    sandboxTimerFns[0](); // simulate 60s passing
+    const out = await p;
+    assert.strictEqual(out, '[{"item":"Tea","amount":20}]');
+    assert.strictEqual(n, 2);
+  });
+}
+var sandboxTimerFns = [];
 
 })().then(() => {
 // ══════════════════════════════════════════════════════════

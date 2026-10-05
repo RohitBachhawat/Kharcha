@@ -433,7 +433,6 @@ const CAT_LEARN_KEY='kharcha_cat_learn';
 const HISTORY_CACHE_KEY='kharcha_history_cache';
 const CATS=['Food','Transport','Shopping','Utilities','Health','Entertainment','Other'];
 const PAY_MODES=['Cash','Online'];
-const ONLINE_KEYWORDS=/\b(upi|gpay|phonepe|paytm|card|debit|credit|online|neft|imps|rtgs|net.?banking|razorpay|amazon.?pay|bhim)\b/i;
 const IST_OFFSET=5.5*60*60*1000;
 const TODAY_STR=new Date(Date.now()+IST_OFFSET).toISOString().split('T')[0];
 // Model name used for every Gemini call — defined once so a future model swap is a
@@ -445,12 +444,30 @@ const GEMINI_MODEL='gemini-3.1-flash-lite-preview';
 // logic that was actually live when it was captured — without it, "why did this parse
 // badly three weeks ago" is unanswerable once the prompt has since been edited.
 const VISION_PROMPT_VERSION='vision-v2-receipttotal';
-const TEXT_EXPENSE_PROMPT_VERSION='text-v3-shop-judgement';
+const TEXT_EXPENSE_PROMPT_VERSION='text-v4-shop-definition';
 const TEXT_SMS_PROMPT_VERSION='sms-v1';
 const LOCAL_PARSER_VERSION='local-v1'; // bump when localParse()/guessCategory rules change, so local-parse quality is comparable across versions
 // Latency/token/model details of the most recent successful text/SMS Gemini call, stashed here by
 // callGeminiProxy() so its return type stays a plain string (four call sites and the eval suite rely on that).
 let lastGeminiMeta=null;
+
+// ── Call timeout, retry backoff and per-call stats ─────────────────────────────────────
+const CALL_TIMEOUT_MS=60000;  // a hung Apps Script/Gemini call fails after 60s and is retried, instead of freezing the app (or an eval run) indefinitely
+const EVAL_PACING_MS=3000;    // pause between eval cases
+// Transient Apps Script errors (sporadic 404s on a healthy deployment) were outlasting the old 3s/6s waits, so 3 quick retries all failed.
+function retryWaitMs(attempt){return attempt===1?5000:15000;}
+// Only abort when the runtime supports it (all browsers do); otherwise behaves exactly like fetch().
+function fetchWithTimeout(url,opts,ms){
+  if(typeof AbortController==='undefined')return fetch(url,opts);
+  const ctl=new AbortController();
+  const timer=setTimeout(function(){ctl.abort();},ms||CALL_TIMEOUT_MS);
+  return fetch(url,Object.assign({},opts||{},{signal:ctl.signal})).finally(function(){clearTimeout(timer);});
+}
+// Set by runEvals() for the duration of each eval case so we can report how many attempts it took and why attempts failed.
+let callStats=null;
+function statAttempt(){if(callStats)callStats.attempts++;}
+function statFail(label){if(callStats)callStats.errors.push(label);}
+function netErrLabel(e){return (e&&e.name==='AbortError')?'timeout':'network';}
 // Mirrors extractGeminiMeta() in backend.gs, for the photo path which calls Gemini directly from the browser.
 // Tolerant: missing fields come back null/'' so a response without metadata never breaks a parse.
 function extractGeminiMeta(data){
@@ -773,7 +790,7 @@ function buildSmsPrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateSt
 
 function autoSetUpiCategory(text){if(!isBankSms(text))return;document.querySelectorAll('.cat-picker').forEach(function(picker){var idx=picker.id.replace('catpicker-','');var hidden=document.getElementById('rv-cat-'+idx);if(!hidden||hidden.value)return;picker.querySelectorAll('.cat-pill').forEach(function(p){p.classList.remove('active');});var upiPill=picker.querySelector('[data-cat="UPI/Online"]');if(upiPill){upiPill.classList.add('active');hidden.value='UPI/Online';}});}
 
-function buildExpensePrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);const d2=new Date(now);d2.setDate(now.getDate()-2);const d3=new Date(now);d3.setDate(now.getDate()-3);const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];return 'You are a family expense parser for an Indian family. Return ONLY a valid JSON array, no markdown.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+', 2daysago='+fmt(d2)+', 3daysago='+fmt(d3)+', Day='+dn+'\n\nRules:\n1. Translate Hindi/Hinglish to English: chai=Tea, sabzi=Vegetables, doodh=Milk, dawai=Medicine, kapde=Clothes, bijli=Electricity, auto=Auto Rickshaw, kal=yesterday, aaj=today\n2. Detect multiple items if multiple expenses in text\n3. Resolve relative dates\n4. AMOUNT EXPRESSIONS: keep arithmetic as string: "clothes-2000-20" => amount="2000-20", "metro-50/2" => amount="50/2". Dashes between item and amount are separators not subtraction unless both sides are numbers, and the dash must never appear in the item name: "pen - 100" => item="Pen", amount=100.\n5. SHOP: use your own judgement. If the text names where something was bought or paid (for example "bought X from Y", "X at Y", "Y se X", or an explicit word like "shop"), and you think Y really is a shop, vendor or place, put Y in shop and keep it out of item. If you are not reasonably sure it is a shop (it could be part of the item or a comment), leave shop=null rather than guessing. These examples are guidance, not rules.\n6. Category: Food/Transport/Shopping/Utilities/Health/Entertainment/Other or null if unsure\n\nReturn: [{"date":"DD Mon YYYY","item":"English name","amount":"expr_or_number_or_null","shop":"name_or_null","comment":"extra_or_null","category":"cat_or_null"}]\n\nOnly JSON array.';}
+function buildExpensePrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);const d2=new Date(now);d2.setDate(now.getDate()-2);const d3=new Date(now);d3.setDate(now.getDate()-3);const dn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];return 'You are a family expense parser for an Indian family. Return ONLY a valid JSON array, no markdown.\n\nText: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+', 2daysago='+fmt(d2)+', 3daysago='+fmt(d3)+', Day='+dn+'\n\nRules:\n1. Translate Hindi/Hinglish to English: chai=Tea, sabzi=Vegetables, doodh=Milk, dawai=Medicine, kapde=Clothes, bijli=Electricity, auto=Auto Rickshaw, kal=yesterday, aaj=today\n2. Detect multiple items if multiple expenses in text\n3. Resolve relative dates\n4. AMOUNT EXPRESSIONS: keep arithmetic as string: "clothes-2000-20" => amount="2000-20", "metro-50/2" => amount="50/2". Dashes between item and amount are separators not subtraction unless both sides are numbers, and the dash must never appear in the item name: "pen - 100" => item="Pen", amount=100.\n5. SHOP: a shop is a business or seller where the purchase was made (a store, restaurant, stall, website, or a named person who sells). Use your own judgement. If the text names where something was bought or paid (for example "bought X from Y", "X at Y", "Y se X", or an explicit word like "shop"), and Y is a shop in that sense, put Y in shop and keep it out of item. These are NOT shops, so leave shop=null: an occasion or event (office party, birthday, wedding), a person or purpose you spent for, and the premises or property a bill is for ("electricity bill for shop", "office rent"). Example: "pizza at office party 500" => item="Pizza", shop=null, and the occasion can go in comment. If you are not reasonably sure it is a shop, leave shop=null rather than guessing. The examples are guidance, not rules.\n6. Category: Food/Transport/Shopping/Utilities/Health/Entertainment/Other or null if unsure\n\nReturn: [{"date":"DD Mon YYYY","item":"English name","amount":"expr_or_number_or_null","shop":"name_or_null","comment":"extra_or_null","category":"cat_or_null"}]\n\nOnly JSON array.';}
 
 async function callGeminiProxy(prompt,traceMeta){
   const cfg=loadConfig();
@@ -781,11 +798,13 @@ async function callGeminiProxy(prompt,traceMeta){
   const MAX_RETRIES=3;
   for(var attempt=1;attempt<=MAX_RETRIES;attempt++){
     const t0=Date.now();
+    statAttempt();
     let res;
-    try{const p=new URLSearchParams({action:'geminiProxy',apiKey:cfg.apiKey,prompt});res=await fetch(cfg.scriptUrl+'?'+p.toString());}
+    try{const p=new URLSearchParams({action:'geminiProxy',apiKey:cfg.apiKey,prompt});res=await fetchWithTimeout(cfg.scriptUrl+'?'+p.toString());}
     catch(e){
+      statFail(netErrLabel(e));
       if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,errorCategory:'network_error',errorMessage:e.message,latencyMs:Date.now()-t0}));
-      if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,retryWaitMs(attempt)));continue;}
       throw new KharchaError('Network Error','Could not reach Apps Script after '+MAX_RETRIES+' attempts: '+e.message,'Check internet and Script URL.');
     }
     // Apps Script's own infrastructure occasionally returns a transient non-200 status
@@ -795,14 +814,16 @@ async function callGeminiProxy(prompt,traceMeta){
     // the correct response, same as any other transient failure — previously this threw
     // immediately on attempt 1 despite being inside a MAX_RETRIES loop.
     if(!res.ok){
+      statFail('HTTP '+res.status);
       if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:res.status,errorCategory:'http_error',errorMessage:'Apps Script HTTP '+res.status,latencyMs:Date.now()-t0}));
-      if(attempt<MAX_RETRIES){showToast('Apps Script hiccup ('+res.status+') — retrying...',3000);await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      if(attempt<MAX_RETRIES){const w=retryWaitMs(attempt);showToast('Apps Script hiccup ('+res.status+') — retrying in '+(w/1000)+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}
       throw new KharchaError('Proxy Error','Apps Script HTTP '+res.status+' after '+MAX_RETRIES+' attempts','Redeploy as Web App, access=Anyone.');
     }
     let data;
     try{data=await res.json();}catch(e){
+      statFail('unreadable response');
       if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:res.status,errorCategory:'response_read_error',errorMessage:e.message,latencyMs:Date.now()-t0}));
-      if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,retryWaitMs(attempt)));continue;}
       throw new KharchaError('Response Error','Could not read response after '+MAX_RETRIES+' attempts.','Deploy latest Code.gs.');
     }
     if(!data.success){
@@ -810,6 +831,7 @@ async function callGeminiProxy(prompt,traceMeta){
       const isRetryable=m.includes('429')||m.includes('503')||m.toUpperCase().includes('UNAVAILABLE');
       if(isRetryable){
         const statusCode=m.includes('429')?429:503;
+        statFail(String(statusCode));
         if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:statusCode,errorCategory:statusCode===429?'rate_limit':'service_unavailable',errorMessage:m,latencyMs:Date.now()-t0}));
         if(attempt<MAX_RETRIES){const wait=attempt*10000;showToast((statusCode===429?'Rate limit':'Gemini busy')+' — retrying in '+attempt*10+'s ('+attempt+'/'+MAX_RETRIES+')...',wait);await new Promise(r=>setTimeout(r,wait));continue;}
         throw new KharchaError(statusCode===429?'Rate Limit':'Service Unavailable','All '+MAX_RETRIES+' retries failed: '+m,'Wait a minute and try again.');
@@ -916,20 +938,24 @@ async function runVisionParse(cfg,base64Data,fileName,traceId){
   const MAX_RETRIES=3;
   for(var attempt=1;attempt<=MAX_RETRIES;attempt++){
     const t0=Date.now();
+    statAttempt();
     let res;
-    try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent?key='+cfg.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:base64Data}}]}],generationConfig:{maxOutputTokens:1000}})});}
+    try{res=await fetchWithTimeout('https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent?key='+cfg.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:base64Data}}]}],generationConfig:{maxOutputTokens:1000}})});}
     catch(e){
       if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,errorCategory:'network_error',errorMessage:e.message,latencyMs:Date.now()-t0,fileName:fileName});
-      if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      statFail(netErrLabel(e));
+      if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,retryWaitMs(attempt)));continue;}
       throw new Error('Network error after '+MAX_RETRIES+' attempts: '+e.message);
     }
     if(res.status===429||res.status===503){
+      statFail(String(res.status));
       const cat=res.status===429?'rate_limit':'service_unavailable';
       if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:cat,errorMessage:res.status+' '+cat,latencyMs:Date.now()-t0,fileName:fileName});
       if(attempt<MAX_RETRIES){const w=attempt*10000;showToast((res.status===429?'Rate limit':'Gemini busy')+', retrying in '+attempt*10+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}
       throw new Error(res.status===429?'Rate limit. Wait a minute and try again.':'Gemini is busy. Wait a minute and try again.');
     }
     if(!res.ok){
+      statFail('HTTP '+res.status);
       const eb=await res.json().catch(()=>({}));
       const em=(eb&&eb.error?eb.error.message:'Unknown');
       if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:'http_error',errorMessage:em,latencyMs:Date.now()-t0,fileName:fileName});
@@ -1151,14 +1177,19 @@ function scoreEvalCase(actualItems,expectedItems){
     //   exp.shop = "Sharma"  -> Gemini should have named a shop that matches (either string may contain the other)
     //   exp.shop = null      -> Gemini should NOT have invented a shop (catches over-eager shop detection)
     //   no "shop" key        -> not graded
+    let shopHit=false;
     if(Object.prototype.hasOwnProperty.call(exp,'shop')){
       shopTotal++;
       const expShop=(exp.shop||'').toLowerCase().trim();
       const actShop=(act.shop||'').toLowerCase().trim();
-      if(!expShop){if(!actShop)shopHits++;}
-      else if(actShop&&(expShop.includes(actShop)||actShop.includes(expShop)))shopHits++;
+      if(!expShop){if(!actShop)shopHit=true;}
+      else if(actShop&&(expShop.includes(actShop)||actShop.includes(expShop)))shopHit=true;
+      if(shopHit)shopHits++;
     }
-    details.push({expectedItem:exp.item,expectedAmount:exp.amount,matchedItem:act.item,matchedAmount:act.amount,amountMatch:amountMatch,itemMatch:itemMatch});
+    const detail={expectedItem:exp.item,expectedAmount:exp.amount,matchedItem:act.item,matchedAmount:act.amount,amountMatch:amountMatch,itemMatch:itemMatch};
+    // Record exactly what Gemini returned for shop, so a 0% shop score can be diagnosed from the results alone
+    if(Object.prototype.hasOwnProperty.call(exp,'shop')){detail.expectedShop=exp.shop||null;detail.matchedShop=act.shop||null;detail.shopMatch=shopHit;}
+    details.push(detail);
     remaining.splice(bestIdx,1); // claim this actual item so it can't be double-matched
   });
   const n=(expectedItems||[]).length;
@@ -1188,12 +1219,12 @@ async function fetchWithRetry(url,context,maxRetries){
   maxRetries=maxRetries||3;
   for(var attempt=1;attempt<=maxRetries;attempt++){
     try{
-      const res=await fetch(url);
+      const res=await fetchWithTimeout(url,undefined,90000);
       if(res.ok)return res;
-      if(attempt<maxRetries){await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      if(attempt<maxRetries){await new Promise(r=>setTimeout(r,retryWaitMs(attempt)));continue;}
       throw new Error((context||'Request')+' failed with HTTP '+res.status+' after '+maxRetries+' attempts');
     }catch(e){
-      if(attempt<maxRetries){await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      if(attempt<maxRetries){await new Promise(r=>setTimeout(r,retryWaitMs(attempt)));continue;}
       throw e;
     }
   }
@@ -1202,6 +1233,26 @@ async function fetchWithRetry(url,context,maxRetries){
 // Runs every eval case through the EXACT production code paths (parseWithGemini for
 // text/sms, runVisionParse for photo) with tracing suppressed, scores each one, logs
 // the aggregate run, and returns everything for the UI to render.
+// Compact, self-contained per-case record for the Eval_Results sheet: what was asked, what we expected, what Gemini
+// actually returned (including the shop), the scores, and how long it took / how many attempts it needed.
+function compactEvalDetail(r){
+  const pickActual=function(it){return {item:it.item,amount:it.amount,shop:it.shop||null,category:it.category||null};};
+  const pickExpected=function(e){const o={item:e.item,amount:e.amount};if(Object.prototype.hasOwnProperty.call(e,'shop'))o.shop=e.shop;if(e.category)o.category=e.category;return o;};
+  return {
+    caseId:r.caseId,type:r.type||null,
+    input:r.input?String(r.input).slice(0,120):null,
+    error:r.error||null,
+    timeMs:r.timeMs!=null?r.timeMs:null,
+    attempts:r.attempts!=null?r.attempts:null,
+    attemptErrors:(r.attemptErrors&&r.attemptErrors.length)?r.attemptErrors:null,
+    amountScore:r.amountScore!=null?r.amountScore:null,
+    itemNameScore:r.itemNameScore!=null?r.itemNameScore:null,
+    categoryScore:r.categoryScore!=null?r.categoryScore:null,
+    shopScore:r.shopScore!=null?r.shopScore:null,
+    expected:(r.expectedItems||[]).slice(0,15).map(pickExpected),
+    actual:(r.actualItems||[]).slice(0,15).map(pickActual)
+  };
+}
 async function runEvals(onProgress){
   const cfg=loadConfig();
   if(!cfg.scriptUrl)throw new Error('Script URL not set — add it in Settings first.');
@@ -1219,11 +1270,13 @@ async function runEvals(onProgress){
     // real user's usage pattern ever does, and was producing a mix of transient
     // errors (Gemini 503s, Apps Script 404s, malformed responses) that a normal,
     // one-at-a-time submission never triggers.
-    if(i>0)await new Promise(function(r){setTimeout(r,1500);});
+    if(i>0)await new Promise(function(r){setTimeout(r,EVAL_PACING_MS);});
+    callStats={attempts:0,errors:[]};
+    const tCase=Date.now();
     try{
       let actualItems,receiptTotal=null;
       if(c.type==='photo'){
-        if(!c.imageFileId){results.push({caseId:c.caseId,type:c.type,error:'No Image File ID set for this case yet'});continue;}
+        if(!c.imageFileId){results.push({caseId:c.caseId,type:c.type,input:c.input||null,error:'No Image File ID set for this case yet',timeMs:0,attempts:0,attemptErrors:[]});continue;}
         const imgParams=new URLSearchParams({action:'getEvalImage',fileId:c.imageFileId});
         const imgRes=await fetchWithRetry(cfg.scriptUrl+'?'+imgParams.toString(),'getEvalImage');
         const imgData=await safeJson(imgRes,'getEvalImage');
@@ -1237,11 +1290,17 @@ async function runEvals(onProgress){
       const score=scoreEvalCase(actualItems,c.expectedItems);
       let totalMatch=null;
       if(c.expectedTotal!=null)totalMatch=receiptTotal!=null&&Math.abs(receiptTotal-c.expectedTotal)<=1;
-      results.push(Object.assign({caseId:c.caseId,type:c.type,notes:c.notes,receiptTotal:receiptTotal,expectedTotal:c.expectedTotal,totalMatch:totalMatch},score));
+      results.push(Object.assign({caseId:c.caseId,type:c.type,input:c.input||null,notes:c.notes,receiptTotal:receiptTotal,expectedTotal:c.expectedTotal,totalMatch:totalMatch,expectedItems:c.expectedItems,actualItems:actualItems},score));
     }catch(err){
-      results.push({caseId:c.caseId,type:c.type,error:err.message});
+      results.push({caseId:c.caseId,type:c.type,input:c.input||null,error:err.message,expectedItems:c.expectedItems});
     }
+    // How long this case took end to end (including any retries and waits) and what went wrong on each failed attempt
+    const last=results[results.length-1];
+    last.timeMs=Date.now()-tCase;
+    last.attempts=callStats.attempts;
+    last.attemptErrors=callStats.errors;
   }
+  callStats=null;
   const valid=results.filter(r=>!r.error);
   // Errored cases count as 0 toward amount/item scores — averaged across ALL cases run,
   // not just the ones that happened to succeed. A case that fails to execute entirely
@@ -1260,8 +1319,12 @@ async function runEvals(onProgress){
     shopScore:shopValid.length?Math.round((shopValid.reduce(function(s,r){return s+r.shopScore;},0)/shopValid.length)*10)/10:null,
   };
   summary.overallScore=Math.round(((summary.amountScore+summary.itemNameScore)/2)*10)/10;
+  summary.totalTimeMs=results.reduce(function(s,r){return s+(r.timeMs||0);},0);
+  const slowest=results.reduce(function(m,r){return (r.timeMs||0)>(m.timeMs||0)?r:m;},{});
+  summary.slowestCase=slowest.caseId?{caseId:slowest.caseId,timeMs:slowest.timeMs}:null;
+  summary.retriedCases=results.filter(function(r){return r.attempts>1;}).length;
   const runId='RUN-'+Date.now();
-  fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'logEvalRun',runId:runId,model:GEMINI_MODEL,visionPromptVersion:VISION_PROMPT_VERSION,textPromptVersion:TEXT_EXPENSE_PROMPT_VERSION,smsPromptVersion:TEXT_SMS_PROMPT_VERSION,casesRun:summary.casesRun,casesErrored:summary.casesErrored,amountScore:summary.amountScore,itemNameScore:summary.itemNameScore,categoryScore:summary.categoryScore,overallScore:summary.overallScore,perCaseDetail:JSON.stringify(results.map(function(r){return {caseId:r.caseId,error:r.error||null,amountScore:r.amountScore,itemNameScore:r.itemNameScore,shopScore:r.shopScore!=null?r.shopScore:null};}))})});
+  fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'logEvalRun',runId:runId,model:GEMINI_MODEL,visionPromptVersion:VISION_PROMPT_VERSION,textPromptVersion:TEXT_EXPENSE_PROMPT_VERSION,smsPromptVersion:TEXT_SMS_PROMPT_VERSION,casesRun:summary.casesRun,casesErrored:summary.casesErrored,amountScore:summary.amountScore,itemNameScore:summary.itemNameScore,categoryScore:summary.categoryScore,overallScore:summary.overallScore,perCaseDetail:JSON.stringify(results.map(compactEvalDetail))})});
   return {runId:runId,summary:summary,results:results};
 }
 function checkTotalMismatch(items){
@@ -1295,9 +1358,8 @@ function buildChip(item,idx,total,chipTag){
   var dateVal=toDateInput(item.date);
   var activeCat=item._localCat||item.category||'';
   var tag=chipTag||'Regular';
-  // Payment mode: detect from raw text or item category
-  var rawLower=(item.comment||'')+' '+(item.shop||'')+' '+(item.rawText||'');
-  var defaultPay=(ONLINE_KEYWORDS.test(rawLower)||activeCat==='UPI/Online')?'Online':'Cash';
+  // Payment mode defaults to Online (most family spending is UPI/card now); the Cash pill is one tap away
+  var defaultPay='Online';
   var activePay=item._payMode||defaultPay;
   var catPills=CATS.map(function(c){return '<button class="cat-pill'+(activeCat===c?' active':'')+'" data-cat="'+c+'" onclick="selectCat(this,'+idx+')" type="button">'+c+'</button>';}).join('');
   var payPills=PAY_MODES.map(function(p){return '<button class="pay-pill'+(activePay===p?' active':'')+'" data-pay="'+p+'" onclick="selectPay(this,'+idx+')" type="button">'+p+'</button>';}).join('');
@@ -1355,7 +1417,7 @@ async function confirmAndSave(){
       var shopVal=(getVal('rv-shop-'+i)||'').trim();
       var commentVal=(getVal('rv-comment-'+i)||'').trim();
       var amtRaw=getVal('rv-amount-'+i);
-      var payVal=getVal('rv-pay-'+i)||'Cash';
+      var payVal=getVal('rv-pay-'+i)||'Online';
       // Mandatory field validation
       if(!itemVal){showToast('❌ Item name is required for entry '+(count>1?i+1:''));btn.classList.remove('loading');btn.disabled=false;return;}
       var amtCalc=calcAmount(amtRaw);
@@ -1900,11 +1962,12 @@ function renderEvalSummaryHtml(s){
     +'<div style="font-size:28px;font-weight:700;">'+s.overallScore+'% overall</div>'
     +'<div style="margin-top:8px;color:#999;font-size:13px;">Amount: '+s.amountScore+'% · Item name: '+s.itemNameScore+'%'+(s.categoryScore!=null?' · Category: '+s.categoryScore+'%':' · Category: n/a')+(s.shopScore!=null?' · Shop: '+s.shopScore+'%':' · Shop: n/a')+'</div>'
     +'<div style="margin-top:4px;color:#999;font-size:13px;">'+s.casesRun+' case(s) run'+(s.casesErrored?', '+s.casesErrored+' errored':'')+'</div>'
+    +(s.totalTimeMs!=null?'<div style="margin-top:4px;color:#999;font-size:13px;">⏱ Total '+fmtDuration(s.totalTimeMs)+(s.slowestCase?' · slowest '+s.slowestCase.caseId+' ('+fmtDuration(s.slowestCase.timeMs)+')':'')+(s.retriedCases?' · '+s.retriedCases+' case(s) needed retries':'')+'</div>':'')
     +'</div>';
 }
 function renderEvalResultsHtml(results){
   return results.map(function(r){
-    if(r.error)return '<div style="padding:10px 0;border-bottom:1px solid #2a2a2a;"><b>'+r.caseId+'</b> <span style="color:#ff6b6b;">ERROR: '+r.error+'</span></div>';
+    if(r.error)return '<div style="padding:10px 0;border-bottom:1px solid #2a2a2a;"><b>'+r.caseId+'</b> <span style="color:#ff6b6b;">ERROR: '+r.error+'</span>'+evalTimingHtml(r)+'</div>';
     var color=r.amountScore>=90?'#4caf50':r.amountScore>=50?'#ff9800':'#ff5252';
     return '<div style="padding:10px 0;border-bottom:1px solid #2a2a2a;font-size:13px;">'
       +'<b>'+r.caseId+'</b> ('+r.type+') — <span style="color:'+color+';">amount '+r.amountScore+'%</span>, item name '+r.itemNameScore+'%'
@@ -1912,7 +1975,21 @@ function renderEvalResultsHtml(results){
       +(r.shopScore!=null?', shop '+r.shopScore+'%':'')
       +(r.totalMatch!=null?(', total match: '+(r.totalMatch?'✅':'❌')):'')
       +(r.extraActualItems?(' — ⚠️ '+r.extraActualItems+' extra unmatched item(s)'):'')
+      +evalTimingHtml(r)
+      +evalShopDetailHtml(r)
       +'</div>';
+  }).join('');
+}
+function fmtDuration(ms){if(ms==null)return '?';if(ms<1000)return ms+'ms';const sec=Math.round(ms/100)/10;if(sec<60)return sec+'s';return Math.floor(sec/60)+'m '+Math.round(sec%60)+'s';}
+function evalTimingHtml(r){
+  if(r.timeMs==null)return '';
+  return '<div style=\"color:#888;font-size:12px;margin-top:2px;\">⏱ '+fmtDuration(r.timeMs)+(r.attempts>1?' · '+r.attempts+' attempts'+((r.attemptErrors&&r.attemptErrors.length)?' ('+r.attemptErrors.join(', ')+')':''):'')+'</div>';
+}
+// For every graded shop expectation, show what was expected vs what Gemini actually returned (red when they disagree)
+function evalShopDetailHtml(r){
+  return (r.details||[]).filter(function(d){return Object.prototype.hasOwnProperty.call(d,'expectedShop');}).map(function(d){
+    const q=function(v){return v?'\"'+v+'\"':'none';};
+    return '<div style=\"font-size:12px;margin-top:2px;color:'+(d.shopMatch?'#4caf50':'#ff6b6b')+';\">'+(d.shopMatch?'✓':'✗')+' shop for '+d.expectedItem+': expected '+q(d.expectedShop)+', Gemini returned '+q(d.matchedShop)+'</div>';
   }).join('');
 }
 </script>

@@ -187,7 +187,7 @@ test('New row without additionalInfo writes empty string in col 13', () => {
   assert.strictEqual(res.success, true);
   const sheet = fakeSS.getSheetByName('Expenses');
   const row = sheet.rows[res.row - 1];
-  assert.strictEqual(row[11], 'Cash');   // Payment Mode defaults to Cash
+  assert.strictEqual(row[11], 'Online'); // Payment Mode defaults to Online
   assert.strictEqual(row[12], '');        // Additional Info blank
 });
 
@@ -781,6 +781,23 @@ test('Multiple runs accumulate as separate rows, giving a trend over time', () =
   post({ action: 'logEvalRun', runId: 'RUN-2', overallScore: 90.0, casesRun: 8 });
   const sheet = fakeSS.getSheetByName('Eval_Results');
   assert.strictEqual(sheet.rows.length, 3); // header + RUN-1 + RUN-2
+});
+
+test('logEvalRun keeps a rich per-case detail (well over the old 3000-character cut-off) intact and parseable', () => {
+  const big = JSON.stringify(Array.from({ length: 16 }, (_, i) => ({ caseId: 'EVAL-' + i, input: 'pizza at office party 500', actual: [{ item: 'Pizza', amount: 500, shop: 'Office Party', category: 'Food' }], expected: [{ item: 'Pizza', amount: 500, shop: null }], timeMs: 2300, attempts: 1 })));
+  assert.ok(big.length > 3000);
+  post({ action: 'logEvalRun', runId: 'RUN-BIG', model: 'm', casesRun: 16, casesErrored: 0, perCaseDetail: big });
+  const sheet = fakeSS.getSheetByName('Eval_Results');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.strictEqual(row[0], 'RUN-BIG');
+  assert.strictEqual(row[row.length - 1], big);
+  assert.strictEqual(JSON.parse(row[row.length - 1]).length, 16);
+});
+test('logEvalRun still caps an absurdly large per-case detail below the 50,000-character cell limit', () => {
+  post({ action: 'logEvalRun', runId: 'RUN-HUGE', model: 'm', casesRun: 1, perCaseDetail: 'x'.repeat(80000) });
+  const sheet = fakeSS.getSheetByName('Eval_Results');
+  const row = sheet.rows[sheet.rows.length - 1];
+  assert.ok(row[row.length - 1].length <= 45000);
 });
 test('logEvalRun never throws even with a malformed/missing payload', () => {
   const res = post({ action: 'logEvalRun' });
