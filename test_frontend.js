@@ -1621,6 +1621,107 @@ section('23. Eval tracking: per-case detail (what Gemini returned for shop, time
 }
 var sandboxTimerFns = [];
 
+// ══════════════════════════════════════════════════════════
+section('24. SMS prompt handles UPI-only payees; served model is recorded on every eval case');
+{
+  const cfgJson = JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' });
+  await test('The SMS prompt says a bare UPI ID is never the item: item "UPI Payment", shop = the UPI ID as written', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    const p = sandbox.buildSmsPrompt('Rs.500.00 debited from A/c XX1234 to VPA merchant@ybl UPI Ref No 123456789012');
+    assert.ok(p.includes('item="UPI Payment"'));
+    assert.ok(p.includes('shop to that UPI ID exactly as written'));
+    assert.ok(p.includes('Never use a UPI ID as the item'));
+    assert.ok(p.includes('use your judgement'), 'a business hidden in a UPI ID (swiggy@icici) is left to Gemini');
+    assert.ok(p.includes('name the same as the item') || p.includes('use the same name as the item'), 'a real merchant is still used as both shop and item');
+  });
+  await test('The SMS prompt no longer sends the payee UPI ID to the comment field', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    const p = sandbox.buildSmsPrompt('x');
+    assert.ok(!p.includes('Ref number, UPI ID, or transaction ID'), 'the old contradictory rule is gone');
+    assert.ok(p.includes('a UPI ID that is the payee goes in shop, not comment'));
+    assert.strictEqual(vm.runInContext('TEXT_SMS_PROMPT_VERSION', sandbox), 'sms-v2-upi');
+  });
+  await test('A named merchant SMS is unchanged in intent: the prompt still tells Gemini to use AMAZON as shop and item', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    const p = sandbox.buildSmsPrompt('INR 1,250.00 spent on your HDFC Bank Card XX5678 at AMAZON');
+    assert.ok(p.includes('for example AMAZON, Swiggy'));
+  });
+
+  await test('runVisionParse exposes the served model so a photo eval case can report it', async () => {
+    const { sandbox } = buildSandbox({
+      elements: {},
+      fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '{"items":[{"item":"Tea","amount":20}],"receiptTotal":20}' }] } }], modelVersion: 'gem-photo-v1', usageMetadata: { totalTokenCount: 900 } }) }),
+    });
+    await sandbox.runVisionParse({ scriptUrl: 'https://script.google.com/fake', apiKey: 'k', userName: 'RB' }, 'AAAA', 'bill.jpg', null);
+    const meta = vm.runInContext('lastGeminiMeta', sandbox);
+    assert.strictEqual(meta.servedModel, 'gem-photo-v1');
+  });
+
+  await test('runEvals records the served model on each case (text, SMS and photo) and in the run summary', async () => {
+    const cases = [
+      { caseId: 'EVAL-001', type: 'text', input: 'chai 20', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: null, imageFileId: '', notes: '' },
+      { caseId: 'EVAL-006', type: 'sms', input: 'Rs.500.00 debited from A/c XX1234 to VPA merchant@ybl UPI Ref No 1', expectedItems: [{ item: 'UPI Payment', amount: 500, shop: 'merchant@ybl' }], expectedTotal: null, imageFileId: '', notes: '' },
+      { caseId: 'EVAL-008', type: 'photo', input: '', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: 20, imageFileId: 'FILE1', notes: '' },
+    ];
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements: {},
+      fetchImpl: async (url) => {
+        const u = String(url);
+        if (u.includes('action=getEvalCases')) return { ok: true, json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
+        if (u.includes('action=getEvalImage')) return { ok: true, json: async () => ({ success: true, base64Data: 'AAAA' }), text: async () => JSON.stringify({ success: true, base64Data: 'AAAA' }) };
+        if (u.includes('action=geminiProxy')) {
+          const isSms = decodeURIComponent(u.replace(/\+/g, ' ')).includes('bank/UPI transaction SMS'); // URLSearchParams encodes spaces as +
+          return { ok: true, status: 200, json: async () => isSms
+            ? ({ success: true, result: '[{"item":"UPI Payment","amount":500,"shop":"merchant@ybl"}]', meta: { servedModel: 'gem-text-v2' } })
+            : ({ success: true, result: '[{"item":"Tea","amount":20}]', meta: { servedModel: 'gem-text-v1' } }) };
+        }
+        if (u.includes('generativelanguage.googleapis.com')) return { ok: true, status: 200, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '{"items":[{"item":"Tea","amount":20}],"receiptTotal":20}' }] } }], modelVersion: 'gem-photo-v1' }) };
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', cfgJson);
+    const out = await sandbox.runEvals();
+    const byId = id => out.results.find(r => r.caseId === id);
+    assert.strictEqual(byId('EVAL-001').servedModel, 'gem-text-v1');
+    assert.strictEqual(byId('EVAL-006').servedModel, 'gem-text-v2');
+    assert.strictEqual(byId('EVAL-008').servedModel, 'gem-photo-v1');
+    assert.strictEqual(byId('EVAL-006').shopScore, 100, 'the UPI-only SMS case is graded on shop too');
+    assert.deepStrictEqual([...out.summary.servedModels].sort(), ['gem-photo-v1', 'gem-text-v1', 'gem-text-v2']);
+    assert.strictEqual(out.summary.requestedModel, vm.runInContext('GEMINI_MODEL', sandbox));
+    const detail = JSON.parse(fetchCalls.find(c => c.body && c.body.action === 'logEvalRun').body.perCaseDetail);
+    assert.strictEqual(detail.find(d => d.caseId === 'EVAL-001').servedModel, 'gem-text-v1');
+    assert.strictEqual(detail.find(d => d.caseId === 'EVAL-008').servedModel, 'gem-photo-v1');
+  });
+  await test('A case whose call failed outright reports served model as null, not a stale value from the previous case', async () => {
+    const cases = [
+      { caseId: 'EVAL-001', type: 'text', input: 'chai 20', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: null, imageFileId: '', notes: '' },
+      { caseId: 'EVAL-002', type: 'text', input: 'sabzi 120 kal', expectedItems: [{ item: 'Vegetables', amount: 120 }], expectedTotal: null, imageFileId: '', notes: '' },
+    ];
+    let n = 0;
+    const { sandbox } = buildSandbox({
+      elements: {},
+      fetchImpl: async (url) => {
+        const u = String(url);
+        if (u.includes('action=getEvalCases')) return { ok: true, json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
+        if (u.includes('action=geminiProxy')) { n++; return n === 1 ? { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]', meta: { servedModel: 'gem-a' } }) } : { ok: false, status: 404, json: async () => ({}) }; }
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', cfgJson);
+    const out = await sandbox.runEvals();
+    assert.strictEqual(out.results[0].servedModel, 'gem-a');
+    assert.ok(out.results[1].error);
+    assert.strictEqual(out.results[1].servedModel, null);
+  });
+  await test('The results screen shows the model asked for, the model that answered, and the model on each case', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    const summary = { casesRun: 1, casesErrored: 0, amountScore: 100, itemNameScore: 100, categoryScore: null, shopScore: null, overallScore: 100, totalTimeMs: 1000, slowestCase: null, retriedCases: 0, requestedModel: 'gemini-3.1-flash-lite-preview', servedModels: ['gemini-3.1-flash-lite'] };
+    const results = [{ caseId: 'EVAL-001', type: 'text', amountScore: 100, itemNameScore: 100, timeMs: 1200, attempts: 1, servedModel: 'gemini-3.1-flash-lite', details: [] }];
+    const html = (sandbox.renderEvalSummaryHtml ? sandbox.renderEvalSummaryHtml(summary) : '') + sandbox.renderEvalResultsHtml(results);
+    assert.ok(html.includes('answered by gemini-3.1-flash-lite'));
+  });
+}
+
 })().then(() => {
 // ══════════════════════════════════════════════════════════
   console.log('\n' + '─'.repeat(50));

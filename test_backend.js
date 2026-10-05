@@ -728,6 +728,13 @@ test('addShopEvalCases is idempotent: a second run adds nothing', () => {
   sandbox.seedEvalCases(); // restore the full starter set for later tests
 });
 
+test('The seeded UPI-only SMS case (EVAL-006) expects item "UPI Payment" and the UPI ID as the shop', () => {
+  sandbox.seedEvalCases();
+  const c = get({ action: 'getEvalCases' }).cases.find(x => x.caseId === 'EVAL-006');
+  assert.strictEqual(c.expectedItems[0].item, 'UPI Payment');
+  assert.strictEqual(c.expectedItems[0].shop, 'merchant@ybl');
+});
+
 section('16. getEvalImage — serving a fixture photo for photo eval cases');
 test('getEvalImage returns base64 + mimeType for a real Drive file', () => {
   const folder = sandbox.DriveApp.createFolder('Eval Fixtures Test');

@@ -445,7 +445,7 @@ const GEMINI_MODEL='gemini-3.1-flash-lite-preview';
 // badly three weeks ago" is unanswerable once the prompt has since been edited.
 const VISION_PROMPT_VERSION='vision-v2-receipttotal';
 const TEXT_EXPENSE_PROMPT_VERSION='text-v4-shop-definition';
-const TEXT_SMS_PROMPT_VERSION='sms-v1';
+const TEXT_SMS_PROMPT_VERSION='sms-v2-upi';
 const LOCAL_PARSER_VERSION='local-v1'; // bump when localParse()/guessCategory rules change, so local-parse quality is comparable across versions
 // Latency/token/model details of the most recent successful text/SMS Gemini call, stashed here by
 // callGeminiProxy() so its return type stays a plain string (four call sites and the eval suite rely on that).
@@ -786,7 +786,7 @@ function isBankSms(text){
   return hasMoney&&(hasVerb||hasRef);
 }
 
-function buildSmsPrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);return 'You are parsing a bank/UPI transaction SMS for an Indian family expense tracker. Return ONLY a valid JSON array, no markdown.\n\nSMS: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+'\n\nRules:\n1. Extract the debit/payment amount only (ignore credited amounts — those are money received, not expenses)\n2. merchant/UPI handle = shop field\n3. If SMS says "debited" or "spent" it is an expense; if only "credited" skip or return empty array []\n4. Ref number, UPI ID, or transaction ID → put in comment field\n5. Date: use date in SMS if present, else today\n6. Category: UPI/Online for UPI transactions, otherwise guess from merchant name\n7. item: short description like "UPI Payment" or merchant name\n\nReturn: [{"date":"DD Mon YYYY","item":"description","amount":number,"shop":"merchant_or_null","comment":"ref_or_null","category":"UPI/Online"}]\n\nOnly JSON array.';}
+function buildSmsPrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);return 'You are parsing a bank/UPI transaction SMS for an Indian family expense tracker. Return ONLY a valid JSON array, no markdown.\n\nSMS: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+'\n\nRules:\n1. Extract the debit/payment amount only (ignore credited amounts — those are money received, not expenses)\n2. PAYEE: if the SMS names a real merchant or business (for example AMAZON, Swiggy), put it in shop and use the same name as the item. If the only payee given is a UPI ID or handle (for example name@ybl or 9876543210@paytm) with no business name, set item="UPI Payment" and set shop to that UPI ID exactly as written. Never use a UPI ID as the item. If a UPI ID clearly contains a business name (for example swiggy@icici), use your judgement and treat it as that business.\n3. If SMS says "debited" or "spent" it is an expense; if only "credited" skip or return empty array []\n4. Ref number or transaction ID → put in comment field (a UPI ID that is the payee goes in shop, not comment)\n5. Date: use date in SMS if present, else today\n6. Category: UPI/Online for UPI transactions, otherwise guess from merchant name\n7. item: the merchant name when there is one, otherwise "UPI Payment"\n\nReturn: [{"date":"DD Mon YYYY","item":"description","amount":number,"shop":"merchant_or_null","comment":"ref_or_null","category":"UPI/Online"}]\n\nOnly JSON array.';}
 
 function autoSetUpiCategory(text){if(!isBankSms(text))return;document.querySelectorAll('.cat-picker').forEach(function(picker){var idx=picker.id.replace('catpicker-','');var hidden=document.getElementById('rv-cat-'+idx);if(!hidden||hidden.value)return;picker.querySelectorAll('.cat-pill').forEach(function(p){p.classList.remove('active');});var upiPill=picker.querySelector('[data-cat="UPI/Online"]');if(upiPill){upiPill.classList.add('active');hidden.value='UPI/Online';}});}
 
@@ -964,6 +964,7 @@ async function runVisionParse(cfg,base64Data,fileName,traceId){
     }
     const data=await res.json();
     const meta=extractGeminiMeta(data);
+    lastGeminiMeta=Object.assign({attempt:attempt,latencyMs:Date.now()-t0},meta); // so the eval runner can report which model answered a photo case
     const raw=(data.candidates[0].content.parts[0].text||'').replace(/```json|```/g,'').trim();
     let parsed;
     try{parsed=JSON.parse(raw);}
@@ -1243,6 +1244,7 @@ function compactEvalDetail(r){
     input:r.input?String(r.input).slice(0,120):null,
     error:r.error||null,
     timeMs:r.timeMs!=null?r.timeMs:null,
+    servedModel:r.servedModel||null,
     attempts:r.attempts!=null?r.attempts:null,
     attemptErrors:(r.attemptErrors&&r.attemptErrors.length)?r.attemptErrors:null,
     amountScore:r.amountScore!=null?r.amountScore:null,
@@ -1272,6 +1274,7 @@ async function runEvals(onProgress){
     // one-at-a-time submission never triggers.
     if(i>0)await new Promise(function(r){setTimeout(r,EVAL_PACING_MS);});
     callStats={attempts:0,errors:[]};
+    lastGeminiMeta=null;
     const tCase=Date.now();
     try{
       let actualItems,receiptTotal=null;
@@ -1294,6 +1297,8 @@ async function runEvals(onProgress){
     }catch(err){
       results.push({caseId:c.caseId,type:c.type,input:c.input||null,error:err.message,expectedItems:c.expectedItems});
     }
+    // The model version Gemini says actually answered (not just the one we asked for), when a response came back
+    results[results.length-1].servedModel=(lastGeminiMeta&&lastGeminiMeta.servedModel)||null;
     // How long this case took end to end (including any retries and waits) and what went wrong on each failed attempt
     const last=results[results.length-1];
     last.timeMs=Date.now()-tCase;
@@ -1323,6 +1328,8 @@ async function runEvals(onProgress){
   const slowest=results.reduce(function(m,r){return (r.timeMs||0)>(m.timeMs||0)?r:m;},{});
   summary.slowestCase=slowest.caseId?{caseId:slowest.caseId,timeMs:slowest.timeMs}:null;
   summary.retriedCases=results.filter(function(r){return r.attempts>1;}).length;
+  summary.requestedModel=GEMINI_MODEL;
+  summary.servedModels=Array.from(new Set(results.map(function(r){return r.servedModel;}).filter(Boolean)));
   const runId='RUN-'+Date.now();
   fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'logEvalRun',runId:runId,model:GEMINI_MODEL,visionPromptVersion:VISION_PROMPT_VERSION,textPromptVersion:TEXT_EXPENSE_PROMPT_VERSION,smsPromptVersion:TEXT_SMS_PROMPT_VERSION,casesRun:summary.casesRun,casesErrored:summary.casesErrored,amountScore:summary.amountScore,itemNameScore:summary.itemNameScore,categoryScore:summary.categoryScore,overallScore:summary.overallScore,perCaseDetail:JSON.stringify(results.map(compactEvalDetail))})});
   return {runId:runId,summary:summary,results:results};
@@ -1963,6 +1970,7 @@ function renderEvalSummaryHtml(s){
     +'<div style="margin-top:8px;color:#999;font-size:13px;">Amount: '+s.amountScore+'% · Item name: '+s.itemNameScore+'%'+(s.categoryScore!=null?' · Category: '+s.categoryScore+'%':' · Category: n/a')+(s.shopScore!=null?' · Shop: '+s.shopScore+'%':' · Shop: n/a')+'</div>'
     +'<div style="margin-top:4px;color:#999;font-size:13px;">'+s.casesRun+' case(s) run'+(s.casesErrored?', '+s.casesErrored+' errored':'')+'</div>'
     +(s.totalTimeMs!=null?'<div style="margin-top:4px;color:#999;font-size:13px;">⏱ Total '+fmtDuration(s.totalTimeMs)+(s.slowestCase?' · slowest '+s.slowestCase.caseId+' ('+fmtDuration(s.slowestCase.timeMs)+')':'')+(s.retriedCases?' · '+s.retriedCases+' case(s) needed retries':'')+'</div>':'')
+    +(s.requestedModel?'<div style=\"margin-top:4px;color:#999;font-size:13px;\">Model asked for: '+s.requestedModel+' · answered by: '+((s.servedModels&&s.servedModels.length)?s.servedModels.join(', '):'unknown')+'</div>':'')
     +'</div>';
 }
 function renderEvalResultsHtml(results){
@@ -1983,7 +1991,7 @@ function renderEvalResultsHtml(results){
 function fmtDuration(ms){if(ms==null)return '?';if(ms<1000)return ms+'ms';const sec=Math.round(ms/100)/10;if(sec<60)return sec+'s';return Math.floor(sec/60)+'m '+Math.round(sec%60)+'s';}
 function evalTimingHtml(r){
   if(r.timeMs==null)return '';
-  return '<div style=\"color:#888;font-size:12px;margin-top:2px;\">⏱ '+fmtDuration(r.timeMs)+(r.attempts>1?' · '+r.attempts+' attempts'+((r.attemptErrors&&r.attemptErrors.length)?' ('+r.attemptErrors.join(', ')+')':''):'')+'</div>';
+  return '<div style=\"color:#888;font-size:12px;margin-top:2px;\">⏱ '+fmtDuration(r.timeMs)+(r.servedModel?' · answered by '+r.servedModel:'')+(r.attempts>1?' · '+r.attempts+' attempts'+((r.attemptErrors&&r.attemptErrors.length)?' ('+r.attemptErrors.join(', ')+')':''):'')+'</div>';
 }
 // For every graded shop expectation, show what was expected vs what Gemini actually returned (red when they disagree)
 function evalShopDetailHtml(r){
