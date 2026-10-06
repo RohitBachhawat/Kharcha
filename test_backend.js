@@ -728,11 +728,12 @@ test('addShopEvalCases is idempotent: a second run adds nothing', () => {
   sandbox.seedEvalCases(); // restore the full starter set for later tests
 });
 
-test('The seeded UPI-only SMS case (EVAL-006) expects item "UPI Payment" and the UPI ID as the shop', () => {
+test('The seeded UPI-only SMS case (EVAL-006) expects item "UPI Payment" and no shop (a UPI ID is not a shop)', () => {
   sandbox.seedEvalCases();
   const c = get({ action: 'getEvalCases' }).cases.find(x => x.caseId === 'EVAL-006');
   assert.strictEqual(c.expectedItems[0].item, 'UPI Payment');
-  assert.strictEqual(c.expectedItems[0].shop, 'merchant@ybl');
+  assert.ok('shop' in c.expectedItems[0], 'the shop expectation must be present so it is graded');
+  assert.strictEqual(c.expectedItems[0].shop, null);
 });
 
 section('16. getEvalImage — serving a fixture photo for photo eval cases');

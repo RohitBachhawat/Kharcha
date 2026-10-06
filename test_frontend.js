@@ -1625,21 +1625,22 @@ var sandboxTimerFns = [];
 section('24. SMS prompt handles UPI-only payees; served model is recorded on every eval case');
 {
   const cfgJson = JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' });
-  await test('The SMS prompt says a bare UPI ID is never the item: item "UPI Payment", shop = the UPI ID as written', () => {
+  await test('The SMS prompt says a bare UPI ID is never the item or the shop: item "UPI Payment", shop null, UPI ID in comment', () => {
     const { sandbox } = buildSandbox({ elements: {} });
     const p = sandbox.buildSmsPrompt('Rs.500.00 debited from A/c XX1234 to VPA merchant@ybl UPI Ref No 123456789012');
     assert.ok(p.includes('item="UPI Payment"'));
-    assert.ok(p.includes('shop to that UPI ID exactly as written'));
-    assert.ok(p.includes('Never use a UPI ID as the item'));
+    assert.ok(p.includes('is NOT a shop'));
+    assert.ok(p.includes('set shop=null, and put the UPI ID in comment'));
+    assert.ok(p.includes('Never use a UPI ID as the item or the shop'));
     assert.ok(p.includes('use your judgement'), 'a business hidden in a UPI ID (swiggy@icici) is left to Gemini');
     assert.ok(p.includes('name the same as the item') || p.includes('use the same name as the item'), 'a real merchant is still used as both shop and item');
   });
-  await test('The SMS prompt no longer sends the payee UPI ID to the comment field', () => {
+  await test('The SMS prompt sends a non-business payee UPI ID to the comment field, along with the ref number', () => {
     const { sandbox } = buildSandbox({ elements: {} });
     const p = sandbox.buildSmsPrompt('x');
-    assert.ok(!p.includes('Ref number, UPI ID, or transaction ID'), 'the old contradictory rule is gone');
-    assert.ok(p.includes('a UPI ID that is the payee goes in shop, not comment'));
-    assert.strictEqual(vm.runInContext('TEXT_SMS_PROMPT_VERSION', sandbox), 'sms-v2-upi');
+    assert.ok(!p.includes('goes in shop, not comment'), 'the previous rule (UPI ID as shop) is gone');
+    assert.ok(p.includes('a payee UPI ID that is not a business'));
+    assert.strictEqual(vm.runInContext('TEXT_SMS_PROMPT_VERSION', sandbox), 'sms-v3-upi-comment');
   });
   await test('A named merchant SMS is unchanged in intent: the prompt still tells Gemini to use AMAZON as shop and item', () => {
     const { sandbox } = buildSandbox({ elements: {} });
@@ -1660,7 +1661,7 @@ section('24. SMS prompt handles UPI-only payees; served model is recorded on eve
   await test('runEvals records the served model on each case (text, SMS and photo) and in the run summary', async () => {
     const cases = [
       { caseId: 'EVAL-001', type: 'text', input: 'chai 20', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: null, imageFileId: '', notes: '' },
-      { caseId: 'EVAL-006', type: 'sms', input: 'Rs.500.00 debited from A/c XX1234 to VPA merchant@ybl UPI Ref No 1', expectedItems: [{ item: 'UPI Payment', amount: 500, shop: 'merchant@ybl' }], expectedTotal: null, imageFileId: '', notes: '' },
+      { caseId: 'EVAL-006', type: 'sms', input: 'Rs.500.00 debited from A/c XX1234 to VPA merchant@ybl UPI Ref No 1', expectedItems: [{ item: 'UPI Payment', amount: 500, shop: null }], expectedTotal: null, imageFileId: '', notes: '' },
       { caseId: 'EVAL-008', type: 'photo', input: '', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: 20, imageFileId: 'FILE1', notes: '' },
     ];
     const { sandbox, fetchCalls } = buildSandbox({
@@ -1672,7 +1673,7 @@ section('24. SMS prompt handles UPI-only payees; served model is recorded on eve
         if (u.includes('action=geminiProxy')) {
           const isSms = decodeURIComponent(u.replace(/\+/g, ' ')).includes('bank/UPI transaction SMS'); // URLSearchParams encodes spaces as +
           return { ok: true, status: 200, json: async () => isSms
-            ? ({ success: true, result: '[{"item":"UPI Payment","amount":500,"shop":"merchant@ybl"}]', meta: { servedModel: 'gem-text-v2' } })
+            ? ({ success: true, result: '[{"item":"UPI Payment","amount":500,"shop":null,"comment":"merchant@ybl, Ref 1"}]', meta: { servedModel: 'gem-text-v2' } })
             : ({ success: true, result: '[{"item":"Tea","amount":20}]', meta: { servedModel: 'gem-text-v1' } }) };
         }
         if (u.includes('generativelanguage.googleapis.com')) return { ok: true, status: 200, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '{"items":[{"item":"Tea","amount":20}],"receiptTotal":20}' }] } }], modelVersion: 'gem-photo-v1' }) };
@@ -1719,6 +1720,167 @@ section('24. SMS prompt handles UPI-only payees; served model is recorded on eve
     const results = [{ caseId: 'EVAL-001', type: 'text', amountScore: 100, itemNameScore: 100, timeMs: 1200, attempts: 1, servedModel: 'gemini-3.1-flash-lite', details: [] }];
     const html = (sandbox.renderEvalSummaryHtml ? sandbox.renderEvalSummaryHtml(summary) : '') + sandbox.renderEvalResultsHtml(results);
     assert.ok(html.includes('answered by gemini-3.1-flash-lite'));
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+section('25. Shop names are capitalised; failed attempts are logged with timing, host and response text');
+{
+  const cfgJson = JSON.stringify({ scriptUrl: 'https://script.google.com/fake', apiKey: 'fake-key', userName: 'RB' });
+  await test('titleCaseShop capitalises the first letter of each word and leaves the rest as typed', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    assert.strictEqual(sandbox.titleCaseShop('tapri'), 'Tapri');
+    assert.strictEqual(sandbox.titleCaseShop('sharma ji'), 'Sharma Ji');
+    assert.strictEqual(sandbox.titleCaseShop('  big   bazaar '), 'Big   Bazaar');
+    assert.strictEqual(sandbox.titleCaseShop('AMAZON'), 'AMAZON');
+    assert.strictEqual(sandbox.titleCaseShop("mcDonald's"), "McDonald's");
+    assert.strictEqual(sandbox.titleCaseShop(''), '');
+    assert.strictEqual(sandbox.titleCaseShop(null), '');
+  });
+  await test('The review screen shows the shop already capitalised', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    const html = sandbox.buildChip({ date: '04 Sep 2026', item: 'Tea', amount: 20, shop: 'tapri', category: 'Food' }, 0, 1, 'Regular');
+    assert.ok(html.includes('value="Tapri"'));
+  });
+  await test('Saving sends the capitalised shop, even if the field was typed in lowercase', async () => {
+    const elements = {};
+    setInput(elements, 'rv-date-0', '2026-09-04'); setInput(elements, 'rv-cat-0', 'Food'); setInput(elements, 'rv-tag-0', 'Regular');
+    setInput(elements, 'rv-item-0', 'Tea'); setInput(elements, 'rv-shop-0', 'sharma ji'); setInput(elements, 'rv-comment-0', '');
+    setInput(elements, 'rv-amount-0', '20'); setInput(elements, 'rv-pay-0', 'Online');
+    const { sandbox, fetchCalls } = buildSandbox({ elements, fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ success: true }) }) });
+    sandbox.localStorage.setItem('kharcha_config', JSON.stringify({ scriptUrl: 'https://script.google.com/fake', userName: 'RB' }));
+    sandbox.__setState({ parsedItems: ([{ date: '04 Sep 2026', item: 'Tea', amount: 20, shop: 'sharma ji', category: 'Food' }]), multiMode: ('separate') });
+    await sandbox.confirmAndSave();
+    const rowCall = fetchCalls.find(c => c.body && c.body.item === 'Tea');
+    assert.strictEqual(rowCall.body.shop, 'Sharma Ji');
+  });
+  await test('Capitalisation alone is not counted as a user edit of the shop', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    const fields = sandbox.computeEditedFields({ item: 'Tea', amount: 20, shop: 'tapri' }, { item: 'Tea', amount: 20, shop: 'Tapri' });
+    assert.ok(!fields.includes('shop'));
+    const real = sandbox.computeEditedFields({ item: 'Tea', amount: 20, shop: 'tapri' }, { item: 'Tea', amount: 20, shop: 'Cafe' });
+    assert.ok(real.includes('shop'));
+  });
+  await test('Editing an old entry capitalises a shop only if the user changed it', () => {
+    const elements = {};
+    setInput(elements, 'editShop', 'tapri');
+    const { sandbox } = buildSandbox({ elements });
+    sandbox.__setState({ editingRow: ({ shop: 'tapri' }) });
+    assert.strictEqual(sandbox.editShopValue(), 'tapri', 'untouched old value is left alone');
+    setInput(elements, 'editShop', 'new shop');
+    assert.strictEqual(sandbox.editShopValue(), 'New Shop');
+  });
+
+  await test('responseSnippet turns an HTML error page into its title plus readable text, capped at 150 characters', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    const html = '<html><head><title>Error</title><style>body{color:red}</style></head><body><script>var x=1;</script><div>Sorry, unable to open the file at present.</div></body></html>';
+    const out = sandbox.responseSnippet(html);
+    assert.ok(out.startsWith('Error '), 'the page title leads the snippet');
+    assert.ok(out.includes('Sorry, unable to open the file at present.'));
+    assert.ok(!out.includes('color:red') && !out.includes('var x'));
+    assert.ok(sandbox.responseSnippet('x'.repeat(500)).length <= 150);
+    assert.strictEqual(sandbox.responseSnippet('{}'), '');
+  });
+
+  await test('A failed real-use attempt logs the host that answered and what the response said, in the existing error message', async () => {
+    let n = 0;
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements: {},
+      fetchImpl: async (url) => {
+        if (String(url).includes('action=geminiProxy')) {
+          n++;
+          if (n === 1) return { ok: false, status: 404, url: 'https://script.googleusercontent.com/macros/echo?x=1', text: async () => '<html><head><title>Page Not Found</title></head><body>Sorry, unable to open the file at present.</body></html>' };
+          return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
+        }
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', cfgJson);
+    await sandbox.callGeminiProxy('p', { traceId: 'T-fail1', type: 'text', model: 'm', promptVersion: 'v' });
+    const t = fetchCalls.find(c => c.body && c.body.action === 'logAITrace' && c.body.httpStatus === 404);
+    assert.ok(t);
+    assert.ok(t.body.errorMessage.startsWith('Apps Script HTTP 404 via script.googleusercontent.com: '));
+    assert.ok(t.body.errorMessage.includes('Sorry, unable to open the file at present.'));
+  });
+  await test('A failed real-use attempt without a readable body still logs the plain status message', async () => {
+    let n = 0;
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements: {},
+      fetchImpl: async (url) => {
+        if (String(url).includes('action=geminiProxy')) { n++; return n === 1 ? { ok: false, status: 404, json: async () => ({}) } : { ok: true, status: 200, json: async () => ({ success: true, result: '[]' }) }; }
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', cfgJson);
+    await sandbox.callGeminiProxy('p', { traceId: 'T-fail2', type: 'text', model: 'm', promptVersion: 'v' });
+    const t = fetchCalls.find(c => c.body && c.body.action === 'logAITrace' && c.body.httpStatus === 404);
+    assert.strictEqual(t.body.errorMessage, 'Apps Script HTTP 404');
+  });
+
+  await test('Eval cases record every attempt: clock time, duration, outcome, host and response text, plus the case start time', async () => {
+    const cases = [{ caseId: 'EVAL-013', type: 'text', input: 'bought tape from big bazaar shop 50', expectedItems: [{ item: 'Tape', amount: 50, shop: 'Big Bazaar' }], expectedTotal: null, imageFileId: '', notes: '' }];
+    let n = 0;
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements: {},
+      fetchImpl: async (url) => {
+        const u = String(url);
+        if (u.includes('action=getEvalCases')) return { ok: true, json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
+        if (u.includes('action=geminiProxy')) {
+          n++;
+          if (n === 1) return { ok: false, status: 404, url: 'https://script.google.com/macros/s/abc/exec', text: async () => '<title>Not Found</title><p>Sorry, unable to open the file at present.</p>' };
+          if (n === 2) return { ok: true, status: 200, json: async () => ({ success: true, error: 'x', result: '' }) , _skip: true };
+          return { ok: true, status: 200, url: 'https://script.googleusercontent.com/echo', json: async () => ({ success: true, result: '[{"item":"Tape","amount":50,"shop":"Big Bazaar"}]', meta: { servedModel: 'gem-x' } }) };
+        }
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', cfgJson);
+    // second attempt: Gemini busy (503 surfaced through the proxy as success:false)
+    const origFetch = sandbox.fetch;
+    sandbox.fetch = async (url, opts) => { const r = await origFetch(url, opts); if (r._skip) return { ok: true, status: 200, json: async () => ({ success: false, error: 'Gemini API error 503: {"error":{"message":"This model is currently experiencing high demand.","status":"UNAVAILABLE"}}' }) }; return r; };
+    const out = await sandbox.runEvals();
+    const r = out.results[0];
+    assert.strictEqual(r.attempts, 3);
+    assert.ok(/^\d\d:\d\d:\d\d$/.test(r.startedAt), 'case start time looks like HH:MM:SS');
+    assert.strictEqual(r.attemptLog.length, 3);
+    assert.deepStrictEqual(Array.from(r.attemptLog.map(a => a.outcome)), ['HTTP 404', '503', 'ok']);
+    assert.deepStrictEqual(Array.from(r.attemptLog.map(a => a.attempt)), [1, 2, 3]);
+    assert.ok(r.attemptLog.every(a => /^\d\d:\d\d:\d\d$/.test(a.startedAt) && typeof a.ms === 'number'));
+    assert.strictEqual(r.attemptLog[0].via, 'script.google.com');
+    assert.ok(r.attemptLog[0].detail.includes('Sorry, unable to open the file at present.'));
+    assert.ok(r.attemptLog[1].detail.includes('experiencing high demand'));
+    const d = JSON.parse(fetchCalls.find(c => c.body && c.body.action === 'logEvalRun').body.perCaseDetail)[0];
+    assert.strictEqual(d.attemptLog.length, 3);
+    assert.strictEqual(d.startedAt, r.startedAt);
+  });
+  await test('A clean case stores no attempt log (keeps the sheet cell small); timing is still there', async () => {
+    const cases = [{ caseId: 'EVAL-001', type: 'text', input: 'chai 20', expectedItems: [{ item: 'Tea', amount: 20 }], expectedTotal: null, imageFileId: '', notes: '' }];
+    const { sandbox, fetchCalls } = buildSandbox({
+      elements: {},
+      fetchImpl: async (url) => {
+        const u = String(url);
+        if (u.includes('action=getEvalCases')) return { ok: true, json: async () => ({ success: true, cases }), text: async () => JSON.stringify({ success: true, cases }) };
+        if (u.includes('action=geminiProxy')) return { ok: true, status: 200, json: async () => ({ success: true, result: '[{"item":"Tea","amount":20}]' }) };
+        return { json: async () => ({ success: true }) };
+      },
+    });
+    sandbox.localStorage.setItem('kharcha_config', cfgJson);
+    await sandbox.runEvals();
+    const d = JSON.parse(fetchCalls.find(c => c.body && c.body.action === 'logEvalRun').body.perCaseDetail)[0];
+    assert.strictEqual(d.attemptLog, null);
+    assert.strictEqual(typeof d.timeMs, 'number');
+    assert.ok(d.startedAt);
+  });
+  await test('The results screen lists each failed attempt with time, duration, outcome, host and response text', () => {
+    const { sandbox } = buildSandbox({ elements: {} });
+    const html = sandbox.renderEvalResultsHtml([{ caseId: 'EVAL-014', type: 'text', error: 'Apps Script HTTP 404 after 3 attempts', timeMs: 227050, startedAt: '12:01:05', attempts: 3, attemptErrors: ['timeout', 'HTTP 404'],
+      attemptLog: [{ attempt: 1, startedAt: '12:01:05', ms: 60012, outcome: 'timeout', detail: 'AbortError: aborted' }, { attempt: 2, startedAt: '12:02:20', ms: 3100, outcome: 'HTTP 404', via: 'script.google.com', detail: '[Not Found] Sorry, unable to open the file' }] }]);
+    assert.ok(html.includes('started 12:01:05'));
+    assert.ok(html.includes('#1 12:01:05'));
+    assert.ok(html.includes('timeout'));
+    assert.ok(html.includes('#2 12:02:20'));
+    assert.ok(html.includes('via script.google.com'));
+    assert.ok(html.includes('Sorry, unable to open the file'));
   });
 }
 

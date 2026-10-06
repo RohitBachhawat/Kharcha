@@ -445,7 +445,7 @@ const GEMINI_MODEL='gemini-3.1-flash-lite-preview';
 // badly three weeks ago" is unanswerable once the prompt has since been edited.
 const VISION_PROMPT_VERSION='vision-v2-receipttotal';
 const TEXT_EXPENSE_PROMPT_VERSION='text-v4-shop-definition';
-const TEXT_SMS_PROMPT_VERSION='sms-v2-upi';
+const TEXT_SMS_PROMPT_VERSION='sms-v3-upi-comment';
 const LOCAL_PARSER_VERSION='local-v1'; // bump when localParse()/guessCategory rules change, so local-parse quality is comparable across versions
 // Latency/token/model details of the most recent successful text/SMS Gemini call, stashed here by
 // callGeminiProxy() so its return type stays a plain string (four call sites and the eval suite rely on that).
@@ -466,8 +466,31 @@ function fetchWithTimeout(url,opts,ms){
 // Set by runEvals() for the duration of each eval case so we can report how many attempts it took and why attempts failed.
 let callStats=null;
 function statAttempt(){if(callStats)callStats.attempts++;}
-function statFail(label){if(callStats)callStats.errors.push(label);}
+// info = {attempt, startedAt, ms, via, detail}: per-attempt timing plus what the failing response actually said
+function statFail(label,info){if(callStats){callStats.errors.push(label);if(info)callStats.log.push(Object.assign({outcome:label},info));}}
+function statOk(info){if(callStats&&info)callStats.log.push(Object.assign({outcome:'ok'},info));}
 function netErrLabel(e){return (e&&e.name==='AbortError')?'timeout':'network';}
+function clockNow(){return new Date().toLocaleTimeString('en-GB',{hour12:false});} // HH:MM:SS local time, matches the Apps Script execution log
+function responseHost(res){const m=res&&res.url?String(res.url).match(/^https?:\/\/([^\/?#]+)/i):null;return m?m[1]:'';} // which host actually answered after redirects
+function squash(t,n){return String(t||'').replace(/\s+/g,' ').trim().slice(0,n||150);}
+// First ~150 readable characters of a failed response. For an HTML error page (Apps Script 404s) this is the page title + visible text.
+function responseSnippet(text){
+  let t=String(text||'');
+  const title=((t.match(/<title[^>]*>([^<]*)<\/title>/i)||[])[1]||'').trim();
+  t=t.replace(/<(style|script)[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+  const out=(title&&!t.includes(title)?'['+title+'] ':'')+t;
+  return out==='{}'?'':out.slice(0,150);
+}
+async function readBodySnippet(res){
+  try{
+    if(typeof res.text==='function')return responseSnippet(await res.text());
+    if(typeof res.json==='function'){const j=await res.json();return responseSnippet(j&&j.error&&j.error.message?j.error.message:JSON.stringify(j));}
+  }catch(e){}
+  return '';
+}
+// Shop names are saved with the first letter of each word capitalised ("tapri" -> "Tapri", "sharma ji" -> "Sharma Ji");
+// the rest of each word is left exactly as typed so "AMAZON" and "McDonald's" survive.
+function titleCaseShop(s){return String(s||'').trim().replace(/(^|\s)(\S)/g,function(m,sp,ch){return sp+ch.toUpperCase();});}
 // Mirrors extractGeminiMeta() in backend.gs, for the photo path which calls Gemini directly from the browser.
 // Tolerant: missing fields come back null/'' so a response without metadata never breaks a parse.
 function extractGeminiMeta(data){
@@ -786,7 +809,7 @@ function isBankSms(text){
   return hasMoney&&(hasVerb||hasRef);
 }
 
-function buildSmsPrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);return 'You are parsing a bank/UPI transaction SMS for an Indian family expense tracker. Return ONLY a valid JSON array, no markdown.\n\nSMS: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+'\n\nRules:\n1. Extract the debit/payment amount only (ignore credited amounts — those are money received, not expenses)\n2. PAYEE: if the SMS names a real merchant or business (for example AMAZON, Swiggy), put it in shop and use the same name as the item. If the only payee given is a UPI ID or handle (for example name@ybl or 9876543210@paytm) with no business name, set item="UPI Payment" and set shop to that UPI ID exactly as written. Never use a UPI ID as the item. If a UPI ID clearly contains a business name (for example swiggy@icici), use your judgement and treat it as that business.\n3. If SMS says "debited" or "spent" it is an expense; if only "credited" skip or return empty array []\n4. Ref number or transaction ID → put in comment field (a UPI ID that is the payee goes in shop, not comment)\n5. Date: use date in SMS if present, else today\n6. Category: UPI/Online for UPI transactions, otherwise guess from merchant name\n7. item: the merchant name when there is one, otherwise "UPI Payment"\n\nReturn: [{"date":"DD Mon YYYY","item":"description","amount":number,"shop":"merchant_or_null","comment":"ref_or_null","category":"UPI/Online"}]\n\nOnly JSON array.';}
+function buildSmsPrompt(text){const now=new Date();const fmt=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});const y=new Date(now);y.setDate(now.getDate()-1);return 'You are parsing a bank/UPI transaction SMS for an Indian family expense tracker. Return ONLY a valid JSON array, no markdown.\n\nSMS: "'+text.replace(/"/g,'\\"')+'"\n\nDates: Today='+fmt(now)+', Yesterday='+fmt(y)+'\n\nRules:\n1. Extract the debit/payment amount only (ignore credited amounts — those are money received, not expenses)\n2. PAYEE: if the SMS names a real merchant or business (for example AMAZON, Swiggy), put it in shop and use the same name as the item. A UPI ID or handle (for example name@ybl or 9876543210@paytm) is NOT a shop. If the only payee given is a UPI ID with no business name, set item="UPI Payment", set shop=null, and put the UPI ID in comment. Never use a UPI ID as the item or the shop. If a UPI ID clearly contains a business name (for example swiggy@icici), use your judgement and treat it as that business.\n3. If SMS says "debited" or "spent" it is an expense; if only "credited" skip or return empty array []\n4. Ref number, transaction ID, and a payee UPI ID that is not a business → put in comment field\n5. Date: use date in SMS if present, else today\n6. Category: UPI/Online for UPI transactions, otherwise guess from merchant name\n7. item: the merchant name when there is one, otherwise "UPI Payment"\n\nReturn: [{"date":"DD Mon YYYY","item":"description","amount":number,"shop":"merchant_or_null","comment":"ref_or_null","category":"UPI/Online"}]\n\nOnly JSON array.';}
 
 function autoSetUpiCategory(text){if(!isBankSms(text))return;document.querySelectorAll('.cat-picker').forEach(function(picker){var idx=picker.id.replace('catpicker-','');var hidden=document.getElementById('rv-cat-'+idx);if(!hidden||hidden.value)return;picker.querySelectorAll('.cat-pill').forEach(function(p){p.classList.remove('active');});var upiPill=picker.querySelector('[data-cat="UPI/Online"]');if(upiPill){upiPill.classList.add('active');hidden.value='UPI/Online';}});}
 
@@ -798,11 +821,12 @@ async function callGeminiProxy(prompt,traceMeta){
   const MAX_RETRIES=3;
   for(var attempt=1;attempt<=MAX_RETRIES;attempt++){
     const t0=Date.now();
+    const startedAt=clockNow();
     statAttempt();
     let res;
     try{const p=new URLSearchParams({action:'geminiProxy',apiKey:cfg.apiKey,prompt});res=await fetchWithTimeout(cfg.scriptUrl+'?'+p.toString());}
     catch(e){
-      statFail(netErrLabel(e));
+      statFail(netErrLabel(e),{attempt:attempt,startedAt:startedAt,ms:Date.now()-t0,detail:squash((e&&e.name?e.name+': ':'')+e.message)});
       if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,errorCategory:'network_error',errorMessage:e.message,latencyMs:Date.now()-t0}));
       if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,retryWaitMs(attempt)));continue;}
       throw new KharchaError('Network Error','Could not reach Apps Script after '+MAX_RETRIES+' attempts: '+e.message,'Check internet and Script URL.');
@@ -814,14 +838,16 @@ async function callGeminiProxy(prompt,traceMeta){
     // the correct response, same as any other transient failure — previously this threw
     // immediately on attempt 1 despite being inside a MAX_RETRIES loop.
     if(!res.ok){
-      statFail('HTTP '+res.status);
-      if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:res.status,errorCategory:'http_error',errorMessage:'Apps Script HTTP '+res.status,latencyMs:Date.now()-t0}));
+      // Capture what the failing response actually said and which host answered (a 404 page's title/text tells us who rejected it)
+      const snip=await readBodySnippet(res);const via=responseHost(res);
+      statFail('HTTP '+res.status,{attempt:attempt,startedAt:startedAt,ms:Date.now()-t0,via:via,detail:snip});
+      if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:res.status,errorCategory:'http_error',errorMessage:'Apps Script HTTP '+res.status+(via?' via '+via:'')+(snip?': '+snip:''),latencyMs:Date.now()-t0}));
       if(attempt<MAX_RETRIES){const w=retryWaitMs(attempt);showToast('Apps Script hiccup ('+res.status+') — retrying in '+(w/1000)+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}
       throw new KharchaError('Proxy Error','Apps Script HTTP '+res.status+' after '+MAX_RETRIES+' attempts','Redeploy as Web App, access=Anyone.');
     }
     let data;
     try{data=await res.json();}catch(e){
-      statFail('unreadable response');
+      statFail('unreadable response',{attempt:attempt,startedAt:startedAt,ms:Date.now()-t0,detail:squash(e.message)});
       if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:res.status,errorCategory:'response_read_error',errorMessage:e.message,latencyMs:Date.now()-t0}));
       if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,retryWaitMs(attempt)));continue;}
       throw new KharchaError('Response Error','Could not read response after '+MAX_RETRIES+' attempts.','Deploy latest Code.gs.');
@@ -831,7 +857,7 @@ async function callGeminiProxy(prompt,traceMeta){
       const isRetryable=m.includes('429')||m.includes('503')||m.toUpperCase().includes('UNAVAILABLE');
       if(isRetryable){
         const statusCode=m.includes('429')?429:503;
-        statFail(String(statusCode));
+        statFail(String(statusCode),{attempt:attempt,startedAt:startedAt,ms:Date.now()-t0,detail:squash(m)});
         if(traceMeta)logAITrace(cfg,Object.assign({},traceMeta,{attempt:attempt,httpStatus:statusCode,errorCategory:statusCode===429?'rate_limit':'service_unavailable',errorMessage:m,latencyMs:Date.now()-t0}));
         if(attempt<MAX_RETRIES){const wait=attempt*10000;showToast((statusCode===429?'Rate limit':'Gemini busy')+' — retrying in '+attempt*10+'s ('+attempt+'/'+MAX_RETRIES+')...',wait);await new Promise(r=>setTimeout(r,wait));continue;}
         throw new KharchaError(statusCode===429?'Rate Limit':'Service Unavailable','All '+MAX_RETRIES+' retries failed: '+m,'Wait a minute and try again.');
@@ -842,6 +868,7 @@ async function callGeminiProxy(prompt,traceMeta){
       throw new KharchaError('Gemini Error',m,'Check API key in settings.');
     }
     lastGeminiMeta=Object.assign({attempt:attempt,latencyMs:Date.now()-t0},data.meta||{});
+    statOk({attempt:attempt,startedAt:startedAt,ms:Date.now()-t0,via:responseHost(res)});
     return data.result||'';
   }
 }
@@ -938,33 +965,36 @@ async function runVisionParse(cfg,base64Data,fileName,traceId){
   const MAX_RETRIES=3;
   for(var attempt=1;attempt<=MAX_RETRIES;attempt++){
     const t0=Date.now();
+    const startedAt=clockNow();
     statAttempt();
     let res;
     try{res=await fetchWithTimeout('https://generativelanguage.googleapis.com/v1beta/models/'+GEMINI_MODEL+':generateContent?key='+cfg.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt},{inline_data:{mime_type:'image/jpeg',data:base64Data}}]}],generationConfig:{maxOutputTokens:1000}})});}
     catch(e){
       if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,errorCategory:'network_error',errorMessage:e.message,latencyMs:Date.now()-t0,fileName:fileName});
-      statFail(netErrLabel(e));
+      statFail(netErrLabel(e),{attempt:attempt,startedAt:startedAt,ms:Date.now()-t0,detail:squash((e&&e.name?e.name+': ':'')+e.message)});
       if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,retryWaitMs(attempt)));continue;}
       throw new Error('Network error after '+MAX_RETRIES+' attempts: '+e.message);
     }
     if(res.status===429||res.status===503){
-      statFail(String(res.status));
+      const sn=await readBodySnippet(res);
+      statFail(String(res.status),{attempt:attempt,startedAt:startedAt,ms:Date.now()-t0,detail:sn});
       const cat=res.status===429?'rate_limit':'service_unavailable';
-      if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:cat,errorMessage:res.status+' '+cat,latencyMs:Date.now()-t0,fileName:fileName});
+      if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:cat,errorMessage:res.status+' '+cat+(sn?': '+sn:''),latencyMs:Date.now()-t0,fileName:fileName});
       if(attempt<MAX_RETRIES){const w=attempt*10000;showToast((res.status===429?'Rate limit':'Gemini busy')+', retrying in '+attempt*10+'s...',w);await new Promise(r=>setTimeout(r,w));continue;}
       throw new Error(res.status===429?'Rate limit. Wait a minute and try again.':'Gemini is busy. Wait a minute and try again.');
     }
     if(!res.ok){
-      statFail('HTTP '+res.status);
       const eb=await res.json().catch(()=>({}));
       const em=(eb&&eb.error?eb.error.message:'Unknown');
+      statFail('HTTP '+res.status,{attempt:attempt,startedAt:startedAt,ms:Date.now()-t0,detail:squash(em)});
       if(traceId)logAITrace(cfg,{traceId:traceId,type:'photo',attempt:attempt,model:GEMINI_MODEL,promptVersion:VISION_PROMPT_VERSION,httpStatus:res.status,errorCategory:'http_error',errorMessage:em,latencyMs:Date.now()-t0,fileName:fileName});
-      if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,attempt*3000));continue;}
+      if(attempt<MAX_RETRIES){await new Promise(r=>setTimeout(r,retryWaitMs(attempt)));continue;}
       throw new Error('Vision error '+res.status+' after '+MAX_RETRIES+' attempts: '+em);
     }
     const data=await res.json();
     const meta=extractGeminiMeta(data);
     lastGeminiMeta=Object.assign({attempt:attempt,latencyMs:Date.now()-t0},meta); // so the eval runner can report which model answered a photo case
+    statOk({attempt:attempt,startedAt:startedAt,ms:Date.now()-t0});
     const raw=(data.candidates[0].content.parts[0].text||'').replace(/```json|```/g,'').trim();
     let parsed;
     try{parsed=JSON.parse(raw);}
@@ -1120,7 +1150,8 @@ function computeEditedFields(original,final){
   const origAmt=parseFloat(calcAmount(String(original.amount||'')))||0;
   const finalAmt=parseFloat(final.amount)||0;
   if(Math.abs(origAmt-finalAmt)>0.01)fields.push('amount');
-  if((original.shop||'').trim()!==(final.shop||'').trim())fields.push('shop');
+  // Compare after the same capitalisation we apply on save, so Gemini's "tapri" vs the saved "Tapri" is not counted as a user edit
+  if(titleCaseShop(original.shop)!==titleCaseShop(final.shop))fields.push('shop');
   if((original.comment||'').trim()!==(final.comment||'').trim())fields.push('comment');
   const origCat=(original._localCat||original.category||'').trim();
   const finalCat=(final.category||'').trim();
@@ -1219,12 +1250,16 @@ async function safeJson(res,context){
 async function fetchWithRetry(url,context,maxRetries){
   maxRetries=maxRetries||3;
   for(var attempt=1;attempt<=maxRetries;attempt++){
+    const t0=Date.now();const startedAt=clockNow();
     try{
       const res=await fetchWithTimeout(url,undefined,90000);
       if(res.ok)return res;
+      const sn=await readBodySnippet(res);
+      statFail((context||'request')+' HTTP '+res.status,{attempt:attempt,startedAt:startedAt,ms:Date.now()-t0,via:responseHost(res),detail:sn});
       if(attempt<maxRetries){await new Promise(r=>setTimeout(r,retryWaitMs(attempt)));continue;}
-      throw new Error((context||'Request')+' failed with HTTP '+res.status+' after '+maxRetries+' attempts');
+      const finalErr=new Error((context||'Request')+' failed with HTTP '+res.status+' after '+maxRetries+' attempts');finalErr.logged=true;throw finalErr;
     }catch(e){
+      if(!e.logged)statFail((context||'request')+' '+netErrLabel(e),{attempt:attempt,startedAt:startedAt,ms:Date.now()-t0,detail:squash((e&&e.name?e.name+': ':'')+e.message)});
       if(attempt<maxRetries){await new Promise(r=>setTimeout(r,retryWaitMs(attempt)));continue;}
       throw e;
     }
@@ -1243,10 +1278,13 @@ function compactEvalDetail(r){
     caseId:r.caseId,type:r.type||null,
     input:r.input?String(r.input).slice(0,120):null,
     error:r.error||null,
+    startedAt:r.startedAt||null,
     timeMs:r.timeMs!=null?r.timeMs:null,
     servedModel:r.servedModel||null,
     attempts:r.attempts!=null?r.attempts:null,
     attemptErrors:(r.attemptErrors&&r.attemptErrors.length)?r.attemptErrors:null,
+    // Full per-attempt log (clock time, duration, outcome, host, response snippet), kept only when something failed
+    attemptLog:(r.attemptLog&&r.attemptLog.some(function(a){return a.outcome!=='ok';}))?r.attemptLog.slice(0,6):null,
     amountScore:r.amountScore!=null?r.amountScore:null,
     itemNameScore:r.itemNameScore!=null?r.itemNameScore:null,
     categoryScore:r.categoryScore!=null?r.categoryScore:null,
@@ -1273,9 +1311,10 @@ async function runEvals(onProgress){
     // errors (Gemini 503s, Apps Script 404s, malformed responses) that a normal,
     // one-at-a-time submission never triggers.
     if(i>0)await new Promise(function(r){setTimeout(r,EVAL_PACING_MS);});
-    callStats={attempts:0,errors:[]};
+    callStats={attempts:0,errors:[],log:[]};
     lastGeminiMeta=null;
     const tCase=Date.now();
+    const caseStartedAt=clockNow();
     try{
       let actualItems,receiptTotal=null;
       if(c.type==='photo'){
@@ -1304,6 +1343,8 @@ async function runEvals(onProgress){
     last.timeMs=Date.now()-tCase;
     last.attempts=callStats.attempts;
     last.attemptErrors=callStats.errors;
+    last.startedAt=caseStartedAt;
+    last.attemptLog=callStats.log;
   }
   callStats=null;
   const valid=results.filter(r=>!r.error);
@@ -1384,7 +1425,7 @@ function buildChip(item,idx,total,chipTag){
     +'<div class="review-field" style="flex:2;min-width:180px;"><label>Item</label><input class="review-input" id="rv-item-'+idx+'" value="'+esc(item.item||'')+'" placeholder="Item"/></div>'
     +'<div class="review-field" style="min-width:90px;"><label>Amount ₹</label><input class="review-input amount-input" id="rv-amount-'+idx+'" type="text" inputmode="decimal" value="'+(item.amount||'')+'" placeholder="0" onblur="evalAmountField(this)" oninput="this.style.color=\'\'"/></div>'
     +'<div class="review-field"><label>Date</label><input class="review-input" id="rv-date-'+idx+'" type="date" value="'+dateVal+'" max="'+TODAY_STR+'"/></div>'
-    +'<div class="review-field"><label>Shop</label><input class="review-input" id="rv-shop-'+idx+'" value="'+esc(item.shop||'')+'" placeholder="optional"/></div>'
+    +'<div class="review-field"><label>Shop</label><input class="review-input" id="rv-shop-'+idx+'" value="'+esc(titleCaseShop(item.shop||''))+'" placeholder="optional"/></div>'
     +'<div class="review-field" style="flex:2;min-width:180px;"><label>Comment</label><input class="review-input" id="rv-comment-'+idx+'" value="'+esc(item.comment||'')+'" placeholder="optional"/></div>'
     +'</div>'
     +'<div style="margin-top:8px;"><div style="font-size:9px;font-family:\'JetBrains Mono\',monospace;color:var(--muted2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;">Type</div>'
@@ -1421,7 +1462,7 @@ async function confirmAndSave(){
       var catVal=getVal('rv-cat-'+i);
       var tagVal=getVal('rv-tag-'+i)||'Regular';
       var itemVal=(getVal('rv-item-'+i)||'').trim();
-      var shopVal=(getVal('rv-shop-'+i)||'').trim();
+      var shopVal=titleCaseShop((getVal('rv-shop-'+i)||'').trim());
       var commentVal=(getVal('rv-comment-'+i)||'').trim();
       var amtRaw=getVal('rv-amount-'+i);
       var payVal=getVal('rv-pay-'+i)||'Online';
@@ -1816,6 +1857,8 @@ function openEdit(index){
 }
 function closeEdit(){document.getElementById('editOverlay').classList.remove('show');editingRow=null;editOriginalTag=null;}
 function maybeCloseEdit(e){if(e.target===document.getElementById('editOverlay'))closeEdit();}
+// Only capitalise a shop the user actually changed in the edit form; an untouched old entry keeps its stored value
+function editShopValue(){const v=document.getElementById('editShop').value.trim();return v===((editingRow&&editingRow.shop)||'').trim()?v:titleCaseShop(v);}
 async function saveEdit(){const cfg=loadConfig();if(!cfg.scriptUrl){showToast('Script URL not set');return;}if(!editingRow)return;const dateVal=document.getElementById('editDate').value;const dateErr=validateDate(dateVal);if(dateErr){showToast('❌ '+dateErr);return;}const newTag=getEditTag();const tagChanged=newTag!==(editOriginalTag||'Regular');const btn=document.getElementById('saveEditBtn');btn.classList.add('loading');btn.disabled=true;try{const sheetName=editingRow.sheetName||editingRow._sheet||'Expenses';if(tagChanged){const mp={action:'moveRow',rowNum:editingRow.rowNum,fromSheet:sheetName,toSheet:newTag==='Shaadi'?'Shaadi':'Expenses',date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||'',payMode:editingRow.payMode||'Cash',additionalInfo:editingRow.additionalInfo||'',traceId:editingRow.traceId||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(mp)});allRows.splice(allRows.indexOf(editingRow),1);renderFilteredHistory();closeEdit();showToast('Moved to '+(newTag==='Shaadi'?'Shaadi':'Expenses')+' sheet ✓');}else{const upd={action:'updateRow',rowNum:editingRow.rowNum,sheetName:sheetName,date:fromDateInput(dateVal),item:document.getElementById('editItem').value.trim(),amount:calcAmount(document.getElementById('editAmount').value),shop:document.getElementById('editShop').value.trim(),comment:document.getElementById('editComment').value.trim(),tag:newTag,category:document.getElementById('editCategory').value.trim(),loggedBy:editingRow.loggedBy||cfg.userName||'',rawText:editingRow.rawText||'',payMode:editingRow.payMode||'Cash',additionalInfo:editingRow.additionalInfo||'',traceId:editingRow.traceId||''};fetch(cfg.scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(upd)});Object.assign(editingRow,upd);renderFilteredHistory();closeEdit();showToast('Entry updated ✓');}}catch(err){showToast('Failed — try again');}finally{btn.classList.remove('loading');btn.disabled=false;}}
 
 // Silent background refresh — merges both sheets into allRows
@@ -1991,7 +2034,12 @@ function renderEvalResultsHtml(results){
 function fmtDuration(ms){if(ms==null)return '?';if(ms<1000)return ms+'ms';const sec=Math.round(ms/100)/10;if(sec<60)return sec+'s';return Math.floor(sec/60)+'m '+Math.round(sec%60)+'s';}
 function evalTimingHtml(r){
   if(r.timeMs==null)return '';
-  return '<div style=\"color:#888;font-size:12px;margin-top:2px;\">⏱ '+fmtDuration(r.timeMs)+(r.servedModel?' · answered by '+r.servedModel:'')+(r.attempts>1?' · '+r.attempts+' attempts'+((r.attemptErrors&&r.attemptErrors.length)?' ('+r.attemptErrors.join(', ')+')':''):'')+'</div>';
+  let h='<div style="color:#888;font-size:12px;margin-top:2px;">⏱ '+fmtDuration(r.timeMs)+(r.startedAt?' · started '+r.startedAt:'')+(r.servedModel?' · answered by '+r.servedModel:'')+(r.attempts>1?' · '+r.attempts+' attempts'+((r.attemptErrors&&r.attemptErrors.length)?' ('+r.attemptErrors.join(', ')+')':''):'')+'</div>';
+  // When any attempt failed, show every attempt: clock time, duration, outcome, which host answered, and what the response said
+  if((r.attemptLog||[]).some(function(a){return a.outcome!=='ok';})){
+    h+=r.attemptLog.map(function(a){return '<div style="color:#777;font-size:11px;margin-top:1px;">&nbsp;&nbsp;#'+a.attempt+' '+esc(a.startedAt||'')+' · '+fmtDuration(a.ms)+' · '+esc(a.outcome)+(a.via?' · via '+esc(a.via):'')+(a.detail?' · '+esc(a.detail):'')+'</div>';}).join('');
+  }
+  return h;
 }
 // For every graded shop expectation, show what was expected vs what Gemini actually returned (red when they disagree)
 function evalShopDetailHtml(r){

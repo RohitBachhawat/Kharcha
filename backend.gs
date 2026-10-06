@@ -794,7 +794,7 @@ function seedEvalCases() {
     ['EVAL-003', 'text', 'chai 20 samosa 15 at tapri', JSON.stringify([{ item: 'Tea', amount: 20, shop: 'Tapri' }, { item: 'Samosa', amount: 15, shop: 'Tapri' }]), '', '', 'Multi-item single-line text — tests item-splitting, not just single-item extraction'],
     ['EVAL-004', 'text', 'bought groceries for 450 rupees at more supermarket', JSON.stringify([{ item: 'Groceries', amount: 450, shop: 'More', category: 'Food' }]), '', '', 'Full sentence rather than shorthand — tests natural language robustness'],
     ['EVAL-005', 'text', 'doodh 60 rupaye', JSON.stringify([{ item: 'Milk', amount: 60 }]), '', '', 'Hinglish vocabulary — tests translation, not just parsing'],
-    ['EVAL-006', 'sms', 'Rs.500.00 debited from A/c XX1234 on 05-09-26 to VPA merchant@ybl UPI Ref No 123456789012', JSON.stringify([{ item: 'UPI Payment', amount: 500, shop: 'merchant@ybl' }]), '', '', 'Standard UPI debit SMS format — tests isBankSms() routing + amount extraction from bank-speak'],
+    ['EVAL-006', 'sms', 'Rs.500.00 debited from A/c XX1234 on 05-09-26 to VPA merchant@ybl UPI Ref No 123456789012', JSON.stringify([{ item: 'UPI Payment', amount: 500, shop: null }]), '', '', 'Standard UPI debit SMS format — tests isBankSms() routing + amount extraction from bank-speak'],
     ['EVAL-007', 'sms', 'INR 1,250.00 spent on your HDFC Bank Card XX5678 at AMAZON on 04-Sep-26', JSON.stringify([{ item: 'Amazon', amount: 1250, shop: 'Amazon' }]), '', '', 'Card-transaction SMS with comma-formatted amount — tests numeric parsing robustness'],
     ['EVAL-008', 'photo', '', JSON.stringify([
       { item: '4 inch R/A Handle', amount: 840 },
